@@ -4,6 +4,26 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const MedsReminderApp());
 
+class PatientProfileItem {
+  final String code;
+  final String name;
+  final int age;
+  final String relation;
+  final String condition;
+  final Color avatarBg;
+  final IconData avatarIcon;
+
+  const PatientProfileItem({
+    required this.code,
+    required this.name,
+    required this.age,
+    required this.relation,
+    required this.condition,
+    this.avatarBg = const Color(0xFFFFD9C6),
+    this.avatarIcon = Icons.face_3_rounded,
+  });
+}
+
 class MedsReminderApp extends StatefulWidget {
   const MedsReminderApp({super.key});
 
@@ -19,6 +39,28 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   bool prescriptionAdded = false;
   OrderStage orderStage = OrderStage.review;
 
+  List<PatientProfileItem> linkedPatients = [
+    const PatientProfileItem(
+      code: 'PA-8899',
+      name: 'Nguyễn Thị Lan',
+      age: 72,
+      relation: 'Mẹ ruột',
+      condition: 'Huyết áp & Tiểu đường',
+      avatarBg: Color(0xFFFFD9C6),
+      avatarIcon: Icons.face_3_rounded,
+    ),
+    const PatientProfileItem(
+      code: 'PA-5521',
+      name: 'Trần Văn Nam',
+      age: 76,
+      relation: 'Bố ruột',
+      condition: 'Tim mạch',
+      avatarBg: Color(0xFFD6E4FF),
+      avatarIcon: Icons.face_rounded,
+    ),
+  ];
+  int activePatientIndex = 0;
+
   void markTaken() => setState(() {
     doseTaken = true;
     doseMissed = false;
@@ -26,6 +68,35 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   void markMissed() => setState(() {
     doseTaken = false;
     doseMissed = true;
+  });
+  void addPatient(String code, {String? name, String? relation}) => setState(() {
+    linkedPatients.add(
+      PatientProfileItem(
+        code: code,
+        name: (name != null && name.trim().isNotEmpty)
+            ? name.trim()
+            : 'Bệnh nhân $code',
+        age: 70,
+        relation: (relation != null && relation.trim().isNotEmpty)
+            ? relation.trim()
+            : 'Người thân',
+        condition: 'Đang theo dõi',
+        avatarBg: const Color(0xFFFFE5D0),
+        avatarIcon: Icons.person_rounded,
+      ),
+    );
+    activePatientIndex = linkedPatients.length - 1;
+  });
+  void removePatient(int index) => setState(() {
+    if (linkedPatients.length > 1) {
+      linkedPatients.removeAt(index);
+      if (activePatientIndex >= linkedPatients.length) {
+        activePatientIndex = linkedPatients.length - 1;
+      }
+    }
+  });
+  void selectPatient(int index) => setState(() {
+    activePatientIndex = index;
   });
 
   @override
@@ -71,6 +142,8 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
               doseMissed: doseMissed,
               prescriptionAdded: prescriptionAdded,
               orderStage: orderStage,
+              linkedPatients: linkedPatients,
+              activePatientIndex: activePatientIndex,
               onRoleChanged: (value) => setState(() => role = value),
               onTaken: markTaken,
               onMissed: markMissed,
@@ -78,6 +151,9 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
                   setState(() => prescriptionAdded = true),
               onOrderStageChanged: (value) =>
                   setState(() => orderStage = value),
+              onAddPatient: addPatient,
+              onRemovePatient: removePatient,
+              onSelectPatient: selectPatient,
             ),
     ),
   );
@@ -646,18 +722,28 @@ class AppShell extends StatefulWidget {
     required this.doseMissed,
     required this.prescriptionAdded,
     required this.orderStage,
+    required this.linkedPatients,
+    required this.activePatientIndex,
     required this.onRoleChanged,
     required this.onTaken,
     required this.onMissed,
     required this.onPrescriptionAdded,
     required this.onOrderStageChanged,
+    required this.onAddPatient,
+    required this.onRemovePatient,
+    required this.onSelectPatient,
   });
   final AppRole role;
   final bool doseTaken, doseMissed, prescriptionAdded;
+  final List<PatientProfileItem> linkedPatients;
+  final int activePatientIndex;
   final OrderStage orderStage;
   final ValueChanged<AppRole> onRoleChanged;
   final VoidCallback onTaken, onMissed, onPrescriptionAdded;
   final ValueChanged<OrderStage> onOrderStageChanged;
+  final void Function(String code, {String? name, String? relation}) onAddPatient;
+  final ValueChanged<int> onRemovePatient;
+  final ValueChanged<int> onSelectPatient;
   @override
   State<AppShell> createState() => _AppShellState();
 }
@@ -685,6 +771,7 @@ class _AppShellState extends State<AppShell>
   List<_NavItem> get nav => switch (widget.role) {
     AppRole.patient => const [
       _NavItem(Icons.home_rounded, 'Hôm nay'),
+      _NavItem(Icons.medication_rounded, 'Uống thuốc'),
       _NavItem(Icons.calendar_month_rounded, 'Lịch uống'),
       _NavItem(Icons.person_rounded, 'Hồ sơ'),
     ],
@@ -692,6 +779,7 @@ class _AppShellState extends State<AppShell>
       _NavItem(Icons.grid_view_rounded, 'Tổng quan'),
       _NavItem(Icons.receipt_long_rounded, 'Đơn thuốc'),
       _NavItem(Icons.storefront_rounded, 'Nhà thuốc'),
+      _NavItem(Icons.person_rounded, 'Hồ sơ'),
     ],
     AppRole.pharmacist => const [
       _NavItem(Icons.dashboard_rounded, 'Xử lý đơn'),
@@ -754,16 +842,27 @@ class _AppShellState extends State<AppShell>
       tab: tab,
       doseTaken: widget.doseTaken,
       doseMissed: widget.doseMissed,
+      prescriptionAdded: widget.prescriptionAdded,
+      onPrescriptionAdded: widget.onPrescriptionAdded,
+      isLinked: widget.linkedPatients.isNotEmpty,
+      linkedPatientCode: widget.linkedPatients.isNotEmpty
+          ? widget.linkedPatients[widget.activePatientIndex].code
+          : 'PA-8899',
       onTaken: widget.onTaken,
     ),
     AppRole.caregiver => CaregiverHome(
-      key: ValueKey('${widget.role}$tab'),
+      key: ValueKey('${widget.role}$tab${widget.activePatientIndex}'),
       tab: tab,
       doseTaken: widget.doseTaken,
       doseMissed: widget.doseMissed,
       prescriptionAdded: widget.prescriptionAdded,
+      linkedPatients: widget.linkedPatients,
+      activePatientIndex: widget.activePatientIndex,
       onMissed: widget.onMissed,
       onPrescriptionAdded: widget.onPrescriptionAdded,
+      onAddPatient: widget.onAddPatient,
+      onRemovePatient: widget.onRemovePatient,
+      onSelectPatient: widget.onSelectPatient,
     ),
     AppRole.pharmacist => PharmacistHome(
       key: ValueKey('${widget.role}$tab'),
@@ -887,13 +986,126 @@ class PatientHome extends StatelessWidget {
     required this.doseTaken,
     required this.doseMissed,
     required this.onTaken,
+    this.prescriptionAdded = false,
+    this.onPrescriptionAdded,
+    this.isLinked = true,
+    this.linkedPatientCode = 'PA-8899',
   });
   final int tab;
-  final bool doseTaken, doseMissed;
+  final bool doseTaken, doseMissed, prescriptionAdded, isLinked;
+  final String linkedPatientCode;
   final VoidCallback onTaken;
+  final VoidCallback? onPrescriptionAdded;
   @override
   Widget build(BuildContext context) {
     if (tab == 1) {
+      return _Scroll(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const PageIntro(
+              'Uống thuốc theo đơn',
+              'Chi tiết đơn thuốc và cữ uống của cô Lan',
+            ),
+            Glass(
+              padding: const EdgeInsets.all(16),
+              child: const Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Color(0xFFE7E9FF),
+                    child: Icon(
+                      Icons.volunteer_activism_rounded,
+                      color: Color(0xFF5267F4),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Người chăm sóc: Trần Minh Anh (Con gái)',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          'Đã liên kết · Đang đồng bộ đơn thuốc',
+                          style: TextStyle(
+                            color: Color(0xFF249D76),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF249D76)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Cữ thuốc cần uống',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            _DoseCard(taken: doseTaken, missed: doseMissed, onTaken: onTaken),
+            const SizedBox(height: 18),
+            const Text(
+              'Toa thuốc đang điều trị',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            const _PrescriptionCard(
+              'Liệu trình huyết áp & tiểu đường',
+              '16/09 - 16/10/2026',
+              '3 thuốc · 3 khung giờ (Sáng, Trưa, Tối)',
+            ),
+            if (prescriptionAdded) ...[
+              const SizedBox(height: 10),
+              const _PrescriptionCard(
+                'Vitamin tổng hợp',
+                '16/09 - 16/11/2026',
+                '1 thuốc · 08:00 sáng',
+              ),
+            ],
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => _showAddMedicineModal(
+                context,
+                onAdded: () => onPrescriptionAdded?.call(),
+                isPatient: true,
+              ),
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              label: const Text('Thêm thuốc mới / thuốc ngoài đơn'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Glass(
+              padding: const EdgeInsets.all(14),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: Color(0xFF5267F4),
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Lưu ý: Uống thuốc đúng giờ sau bữa ăn. Bấm "Tôi đã uống đủ thuốc" để tự động thông báo đến người chăm sóc.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (tab == 2) {
       return _Scroll(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,15 +1138,82 @@ class PatientHome extends StatelessWidget {
         ),
       );
     }
-    if (tab == 2) {
+    if (tab == 3) {
       return _Scroll(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const PageIntro(
               'Hồ sơ sức khoẻ',
-              'Thông tin của cô Nguyễn Thị Lan',
+              'Thông tin cá nhân & mã liên kết',
             ),
+            Glass(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.qr_code_2_rounded,
+                            color: Color(0xFF5267F4),
+                            size: 28,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Mã liên kết của bạn',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      _StatusChip(
+                        isLinked ? 'Đã liên kết' : 'Chưa liên kết',
+                        isLinked
+                            ? const Color(0xFF249D76)
+                            : const Color(0xFFF09B3C),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDEFFC),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        linkedPatientCode,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF5065F2),
+                          letterSpacing: 3,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isLinked
+                        ? 'Đã kết nối với người chăm sóc: Trần Minh Anh (Con gái).'
+                        : 'Đưa mã này cho người chăm sóc để liên kết tài khoản và nhận lịch nhắc thuốc.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6E7590),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             Glass(
               padding: const EdgeInsets.all(18),
               child: Row(
@@ -986,6 +1265,35 @@ class PatientHome extends StatelessWidget {
                       color: Color(0xFF5065F2),
                     ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Glass(
+              padding: const EdgeInsets.all(16),
+              child: const Row(
+                children: [
+                  Icon(Icons.volume_up_rounded, color: Color(0xFF5065F2)),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Âm lượng chuông nhắc',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          'Đang đặt mức tối đa cho người lớn tuổi',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF717993),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _StatusChip('Tối đa', Color(0xFF249D76)),
                 ],
               ),
             ),
@@ -1114,12 +1422,23 @@ class CaregiverHome extends StatelessWidget {
     required this.doseTaken,
     required this.doseMissed,
     required this.prescriptionAdded,
+    required this.linkedPatients,
+    required this.activePatientIndex,
     required this.onMissed,
     required this.onPrescriptionAdded,
+    required this.onAddPatient,
+    required this.onRemovePatient,
+    required this.onSelectPatient,
   });
   final int tab;
   final bool doseTaken, doseMissed, prescriptionAdded;
+  final List<PatientProfileItem> linkedPatients;
+  final int activePatientIndex;
   final VoidCallback onMissed, onPrescriptionAdded;
+  final void Function(String code, {String? name, String? relation}) onAddPatient;
+  final ValueChanged<int> onRemovePatient;
+  final ValueChanged<int> onSelectPatient;
+
   @override
   Widget build(BuildContext context) {
     if (tab == 1) {
@@ -1129,45 +1448,172 @@ class CaregiverHome extends StatelessWidget {
       );
     }
     if (tab == 2) return _PharmacyPage();
+    if (tab == 3) {
+      return _CaregiverProfilePage(
+        linkedPatients: linkedPatients,
+        activePatientIndex: activePatientIndex,
+        onAddPatient: onAddPatient,
+        onRemovePatient: onRemovePatient,
+        onSelectPatient: onSelectPatient,
+      );
+    }
+    final hasPatients = linkedPatients.isNotEmpty;
+    final currentPatient =
+        hasPatients ? linkedPatients[activePatientIndex] : null;
+
     return _Scroll(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PageIntro('Chào Anh!', 'Theo dõi sức khoẻ người thân'),
           if (doseMissed) _AlertCard(),
-          Glass(
-            padding: const EdgeInsets.all(17),
-            child: Row(
-              children: [
-                const CircleAvatar(
-                  radius: 26,
-                  backgroundColor: Color(0xFFFFD9C6),
-                  child: Icon(
-                    Icons.face_3_rounded,
-                    color: Color(0xFFAD6047),
-                    size: 34,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Nguyễn Thị Lan',
+          if (!hasPatients)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Glass(
+                padding: const EdgeInsets.all(14),
+                child: const Row(
+                  children: [
+                    Icon(Icons.link_off_rounded, color: Color(0xFFE2794D)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Chưa liên kết bệnh nhân nào. Hãy chuyển sang tab "Hồ sơ" để nhập mã kết nối.',
                         style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF8B4513),
                         ),
                       ),
-                      Text('72 tuổi · Đã liên kết từ 02/09/2026'),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const Icon(Icons.chevron_right_rounded),
-              ],
+              ),
             ),
-          ),
+          if (linkedPatients.length > 1) ...[
+            SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: linkedPatients.length,
+                separatorBuilder: (_, index) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  final p = linkedPatients[idx];
+                  final isSelected = idx == activePatientIndex;
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(19),
+                    onTap: () => onSelectPatient(idx),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF5065F2)
+                            : Colors.white.withValues(alpha: .7),
+                        borderRadius: BorderRadius.circular(19),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF5065F2)
+                              : const Color(0xFFD6DBF5),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            p.avatarIcon,
+                            size: 16,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF5065F2),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${p.name} (${p.relation})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF2C3E6E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (currentPatient != null)
+            Glass(
+              padding: const EdgeInsets.all(17),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: currentPatient.avatarBg,
+                    child: Icon(
+                      currentPatient.avatarIcon,
+                      color: const Color(0xFFAD6047),
+                      size: 34,
+                    ),
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              currentPatient.name,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE9EDFF),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                currentPatient.relation,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF485EE8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${currentPatient.age} tuổi · Mã: ${currentPatient.code} · ${currentPatient.condition}',
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF249D76),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 18),
           const Text(
             'Liệu trình hôm nay',
@@ -1267,6 +1713,447 @@ class CaregiverHome extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CaregiverProfilePage extends StatefulWidget {
+  const _CaregiverProfilePage({
+    required this.linkedPatients,
+    required this.activePatientIndex,
+    required this.onAddPatient,
+    required this.onRemovePatient,
+    required this.onSelectPatient,
+  });
+  final List<PatientProfileItem> linkedPatients;
+  final int activePatientIndex;
+  final void Function(String code, {String? name, String? relation}) onAddPatient;
+  final ValueChanged<int> onRemovePatient;
+  final ValueChanged<int> onSelectPatient;
+
+  @override
+  State<_CaregiverProfilePage> createState() => _CaregiverProfilePageState();
+}
+
+class _CaregiverProfilePageState extends State<_CaregiverProfilePage> {
+  late final TextEditingController _codeController;
+  late final TextEditingController _nameController;
+  late final TextEditingController _relationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController = TextEditingController();
+    _nameController = TextEditingController();
+    _relationController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _nameController.dispose();
+    _relationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _Scroll(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const PageIntro(
+          'Hồ sơ người chăm sóc',
+          'Quản lý thông tin & liên kết bệnh nhân',
+        ),
+        Glass(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 30,
+                backgroundColor: Color(0xFFDCE2FE),
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 36,
+                  color: Color(0xFF5066F3),
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Trần Minh Anh',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Người chăm sóc chính (Con gái)',
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '090 123 4567 · minhanh@gmail.com',
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              _StatusChip('Hoạt động', const Color(0xFF249D76)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Liên kết thêm bệnh nhân mới',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 10),
+        Glass(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.person_add_alt_1_rounded,
+                    color: Color(0xFF5267F4),
+                    size: 24,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Nhập mã liên kết người thân',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Nhập mã trên màn hình của bệnh nhân (VD: PA-8899, PA-5521...) để liên kết nhiều người thân vào tài khoản chăm sóc.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEDEFFC),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: TextField(
+                  controller: _codeController,
+                  decoration: const InputDecoration(
+                    hintText: 'Mã bệnh nhân (VD: PA-7788)',
+                    prefixIcon: Icon(
+                      Icons.qr_code_rounded,
+                      color: Color(0xFF5065F2),
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDEFFC),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: TextField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          hintText: 'Họ tên (VD: Bà ngoại Mai)',
+                          prefixIcon: Icon(
+                            Icons.badge_outlined,
+                            color: Color(0xFF5065F2),
+                            size: 20,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDEFFC),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: TextField(
+                        controller: _relationController,
+                        decoration: const InputDecoration(
+                          hintText: 'Mối quan hệ (VD: Bà ngoại)',
+                          prefixIcon: Icon(
+                            Icons.family_restroom_rounded,
+                            color: Color(0xFF5065F2),
+                            size: 20,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: () {
+                  final code = _codeController.text.trim();
+                  if (code.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vui lòng nhập mã bệnh nhân!'),
+                      ),
+                    );
+                    return;
+                  }
+                  final exists = widget.linkedPatients.any(
+                    (p) => p.code.toUpperCase() == code.toUpperCase(),
+                  );
+                  if (exists) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Bệnh nhân có mã $code đã có trong danh sách!',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  final name = _nameController.text.trim();
+                  final rel = _relationController.text.trim();
+                  widget.onAddPatient(
+                    code,
+                    name: name.isNotEmpty ? name : null,
+                    relation: rel.isNotEmpty ? rel : null,
+                  );
+                  _codeController.clear();
+                  _nameController.clear();
+                  _relationController.clear();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Đã liên kết thêm bệnh nhân mới: ${name.isNotEmpty ? name : code}!',
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('Liên kết thêm bệnh nhân'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Danh sách bệnh nhân (${widget.linkedPatients.length})',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              'Đang theo dõi: ${widget.linkedPatients.isNotEmpty ? widget.linkedPatients[widget.activePatientIndex].name : "Không"}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF5065F2),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...List.generate(widget.linkedPatients.length, (idx) {
+          final patient = widget.linkedPatients[idx];
+          final isActive = idx == widget.activePatientIndex;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Glass(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: patient.avatarBg,
+                        child: Icon(
+                          patient.avatarIcon,
+                          size: 32,
+                          color: const Color(0xFFAD6047),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  patient.name,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE9EDFF),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    patient.relation,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF485EE8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${patient.age} tuổi · Mã: ${patient.code}',
+                              style: const TextStyle(
+                                color: Color(0xFF5267F4),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              'Tình trạng: ${patient.condition}',
+                              style: const TextStyle(
+                                color: Color(0xFF6B7280),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isActive)
+                        _StatusChip('Đang theo dõi', const Color(0xFF249D76))
+                      else
+                        OutlinedButton(
+                          onPressed: () => widget.onSelectPatient(idx),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Theo dõi',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (widget.linkedPatients.length > 1) ...[
+                    const Divider(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () {
+                            final pName = patient.name;
+                            widget.onRemovePatient(idx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Đã hủy liên kết với $pName.'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.link_off_rounded,
+                            size: 16,
+                            color: Color(0xFFD65E4A),
+                          ),
+                          label: const Text(
+                            'Hủy liên kết',
+                            style: TextStyle(
+                              color: Color(0xFFD65E4A),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 18),
+        const Text(
+          'Cài đặt nhắc nhở & cảnh báo',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 10),
+        Glass(
+          padding: const EdgeInsets.all(16),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.notification_important_rounded,
+                color: Color(0xFFD65E4A),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Cảnh báo khẩn cấp (Unhappy case)',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Báo động đỏ khi bệnh nhân chưa uống thuốc sau 15 phút',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                    ),
+                  ],
+                ),
+              ),
+              _StatusChip('15 phút', Color(0xFFD65E4A)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class PharmacistHome extends StatelessWidget {
@@ -1630,7 +2517,11 @@ class _PrescriptionPage extends StatelessWidget {
           ),
         const SizedBox(height: 18),
         OutlinedButton.icon(
-          onPressed: () => _addSheet(context),
+          onPressed: () => _showAddMedicineModal(
+            context,
+            onAdded: onAdded,
+            isPatient: false,
+          ),
           icon: const Icon(Icons.add_circle_outline_rounded),
           label: const Text('Thêm đơn thuốc & giờ nhắc'),
           style: OutlinedButton.styleFrom(
@@ -1640,50 +2531,568 @@ class _PrescriptionPage extends StatelessWidget {
       ],
     ),
   );
-  void _addSheet(BuildContext context) => showModalBottomSheet(
+}
+
+void _showAddMedicineModal(
+  BuildContext context, {
+  required VoidCallback onAdded,
+  bool isPatient = false,
+}) {
+  showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => Container(
-      padding: const EdgeInsets.all(22),
+    builder: (ctx) => Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580),
+        child: _AddMedicineSheet(
+          onAdded: onAdded,
+          isPatient: isPatient,
+        ),
+      ),
+    ),
+  );
+}
+
+class _MedicineFormItem {
+  const _MedicineFormItem({
+    required this.name,
+    required this.icon,
+    required this.defaultDose,
+    required this.dosageHints,
+    required this.suggestedNote,
+  });
+  final String name;
+  final IconData icon;
+  final String defaultDose;
+  final List<String> dosageHints;
+  final String suggestedNote;
+}
+
+const List<_MedicineFormItem> _medicineForms = [
+  _MedicineFormItem(
+    name: 'Viên nang',
+    icon: Icons.medication_liquid_rounded,
+    defaultDose: '1 viên / lần',
+    dosageHints: ['1 viên', '2 viên', '1/2 viên'],
+    suggestedNote: 'Uống nguyên viên cùng nước lọc',
+  ),
+  _MedicineFormItem(
+    name: 'Viên nén',
+    icon: Icons.circle_rounded,
+    defaultDose: '1 viên / lần',
+    dosageHints: ['1 viên', '2 viên', '1/2 viên'],
+    suggestedNote: 'Uống sau bữa ăn no',
+  ),
+  _MedicineFormItem(
+    name: 'Dạng nước / siro',
+    icon: Icons.water_drop_rounded,
+    defaultDose: '10 ml / lần',
+    dosageHints: ['5 ml', '10 ml', '15 ml', '1 nắp'],
+    suggestedNote: 'Lắc đều trước khi uống, dùng cốc đong',
+  ),
+  _MedicineFormItem(
+    name: 'Dạng bột / gói',
+    icon: Icons.all_inbox_rounded,
+    defaultDose: '1 gói / lần',
+    dosageHints: ['1 gói', '2 gói', '1/2 gói'],
+    suggestedNote: 'Pha tan với 100ml nước ấm',
+  ),
+  _MedicineFormItem(
+    name: 'Dạng xịt / hít',
+    icon: Icons.air_rounded,
+    defaultDose: '2 nhát xịt / lần',
+    dosageHints: ['1 nhát', '2 nhát', '3 nhát'],
+    suggestedNote: 'Xịt thẳng vào vòm họng / khoang mũi',
+  ),
+  _MedicineFormItem(
+    name: 'Dạng bôi ngoài da',
+    icon: Icons.healing_rounded,
+    defaultDose: 'Thoa 1 lớp mỏng',
+    dosageHints: ['1 lớp mỏng', '2 lần / ngày'],
+    suggestedNote: 'Vệ sinh sạch da trước khi thoa thuốc',
+  ),
+];
+
+class _AddMedicineSheet extends StatefulWidget {
+  const _AddMedicineSheet({
+    required this.onAdded,
+    this.isPatient = false,
+  });
+  final VoidCallback onAdded;
+  final bool isPatient;
+
+  @override
+  State<_AddMedicineSheet> createState() => _AddMedicineSheetState();
+}
+
+class _AddMedicineSheetState extends State<_AddMedicineSheet> {
+  late TextEditingController _nameController;
+  late TextEditingController _doseController;
+  late TextEditingController _timeController;
+  late TextEditingController _noteController;
+  int _selectedFormIndex = 0;
+  String _selectedMealTiming = 'Sau bữa ăn';
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(
+      text: widget.isPatient ? 'Vitamin C 500mg' : 'Vitamin tổng hợp Centrum',
+    );
+    _doseController = TextEditingController(
+      text: _medicineForms[0].defaultDose,
+    );
+    _timeController = TextEditingController(text: '08:00 sáng');
+    _noteController = TextEditingController(
+      text: 'Uống Sau bữa ăn, ${_medicineForms[0].suggestedNote}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _doseController.dispose();
+    _timeController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _selectForm(int index) {
+    setState(() {
+      _selectedFormIndex = index;
+      _doseController.text = _medicineForms[index].defaultDose;
+      _noteController.text = 'Uống $_selectedMealTiming, ${_medicineForms[index].suggestedNote}';
+    });
+  }
+
+  Widget _mealTimingBox(String title, IconData icon) {
+    final isSelected = _selectedMealTiming == title;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedMealTiming = title;
+            _noteController.text = 'Uống $title, ${_medicineForms[_selectedFormIndex].suggestedNote}';
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF5168F4) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF5168F4) : const Color(0xFFDEE2F5),
+              width: isSelected ? 1.8 : 1.0,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF5168F4).withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? Colors.white : const Color(0xFF5168F4),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF2D3748),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final currentForm = _medicineForms[_selectedFormIndex];
+
+    return Container(
+      margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.08),
+      padding: EdgeInsets.fromLTRB(22, 14, 22, 22 + bottomInset),
       decoration: const BoxDecoration(
         color: Color(0xFFF8F9FF),
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Thêm đơn thuốc',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 16),
-          const _InputPreview('Tên thuốc', 'Vitamin tổng hợp Centrum'),
-          const SizedBox(height: 10),
-          const _InputPreview('Liều dùng', '1 viên / ngày'),
-          const SizedBox(height: 10),
-          const _InputPreview('Khung giờ nhắc', '08:00 sáng'),
-          const SizedBox(height: 18),
-          FilledButton(
-            onPressed: () {
-              onAdded();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã lưu đơn và lên lịch nhắc thuốc.'),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4D8EF),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              );
-            },
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
+              ),
             ),
-            child: const Text('Lưu đơn thuốc'),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFF5168F4),
+                  child: Icon(
+                    Icons.medication_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.isPatient ? 'Thêm thuốc mới (Bệnh nhân)' : 'Thêm đơn thuốc & Giờ nhắc',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        widget.isPatient
+                            ? 'Tự thêm thuốc bổ/ngoài đơn và báo cho người chăm sóc'
+                            : 'Thiết lập liều dùng và giờ nhắc cho người bệnh',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Tên thuốc',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                hintText: 'Nhập tên thuốc hoặc thực phẩm bổ sung...',
+                prefixIcon: const Icon(Icons.medical_services_outlined, size: 20),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text(
+                  'Dạng thuốc',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8EBFC),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'viên nang, viên nén, dạng nước...',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4353C4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: List.generate(_medicineForms.length, (index) {
+                final form = _medicineForms[index];
+                final isSelected = index == _selectedFormIndex;
+                return InkWell(
+                  onTap: () => _selectForm(index),
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF5168F4) : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF5168F4) : const Color(0xFFDEE2F5),
+                        width: isSelected ? 1.8 : 1.0,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF5168F4).withValues(alpha: 0.28),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          form.icon,
+                          size: 17,
+                          color: isSelected ? Colors.white : const Color(0xFF5168F4),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          form.name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected ? Colors.white : const Color(0xFF2D3748),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Liều dùng',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _doseController,
+              decoration: InputDecoration(
+                hintText: 'Ví dụ: 1 viên / lần, 10 ml / lần...',
+                prefixIcon: const Icon(Icons.pin_outlined, size: 20),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              children: currentForm.dosageHints.map((hint) {
+                return ActionChip(
+                  label: Text(hint, style: const TextStyle(fontSize: 11)),
+                  backgroundColor: const Color(0xFFEDEFFC),
+                  side: BorderSide.none,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  onPressed: () {
+                    setState(() {
+                      _doseController.text = '$hint / lần';
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Khung giờ nhắc uống',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _timeController,
+              decoration: InputDecoration(
+                hintText: 'Chọn giờ nhắc...',
+                prefixIcon: const Icon(Icons.alarm_rounded, size: 20),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              children: [
+                '08:00 sáng',
+                '12:30 trưa',
+                '20:00 tối',
+                '08:00 & 20:00',
+              ].map((time) {
+                return ActionChip(
+                  label: Text(time, style: const TextStyle(fontSize: 11)),
+                  backgroundColor: const Color(0xFFEDEFFC),
+                  side: BorderSide.none,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  onPressed: () {
+                    setState(() {
+                      _timeController.text = time;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            // Dòng "Lưu ý khi uống" gồm 3 ô để chọn: "Trước bữa ăn, Sau bữa ăn, Trong khi ăn"
+            Row(
+              children: [
+                const Text(
+                  'Lưu ý khi uống',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8EBFC),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Đang chọn: $_selectedMealTiming',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4353C4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _mealTimingBox('Trước bữa ăn', Icons.timer_outlined),
+                const SizedBox(width: 8),
+                _mealTimingBox('Sau bữa ăn', Icons.restaurant_rounded),
+                const SizedBox(width: 8),
+                _mealTimingBox('Trong khi ăn', Icons.flatware_rounded),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Ghi chú hướng dẫn thêm',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _noteController,
+              decoration: InputDecoration(
+                hintText: 'Ví dụ: Uống sau bữa ăn no, uống nhiều nước...',
+                prefixIcon: const Icon(Icons.note_alt_outlined, size: 20),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () {
+                final medName = _nameController.text.trim().isEmpty
+                    ? 'Thuốc mới'
+                    : _nameController.text.trim();
+                widget.onAdded();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF249D76),
+                    content: Text(
+                      'Đã lưu "$medName" (Dạng ${currentForm.name} · $_selectedMealTiming) vào lịch nhắc thành công!',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.check_circle_outline_rounded),
+              label: Text(
+                widget.isPatient
+                    ? 'Lưu thuốc & Báo người chăm sóc'
+                    : 'Lưu đơn thuốc & Đặt lịch nhắc',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF5168F4),
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _PharmacyPage extends StatelessWidget {
@@ -2208,7 +3617,10 @@ class _GlassBottomNav extends StatelessWidget {
             onTap: () => onTap(i),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: EdgeInsets.symmetric(
+                horizontal: items.length > 3 ? 9 : 14,
+                vertical: 6,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 gradient: active
@@ -2677,28 +4089,6 @@ class _PrescriptionCard extends StatelessWidget {
         const Icon(Icons.chevron_right_rounded),
       ],
     ),
-  );
-}
-
-class _InputPreview extends StatelessWidget {
-  const _InputPreview(this.label, this.value);
-  final String label, value;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 6),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEDEFFC),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(value),
-      ),
-    ],
   );
 }
 
