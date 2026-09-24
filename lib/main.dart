@@ -1,8 +1,24 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-void main() => runApp(const MedsReminderApp());
+// --- IMPORT CÁC MÀN HÌNH TỪ GOOGLE AI STUDIO (STITCH) ---
+import 'screens/caregiver_pharmacy_screen.dart';
+import 'screens/pharmacist_verification_screen.dart';
+import 'screens/shipper_task_screen.dart';
+import 'screens/caregiver_tracking_screen.dart';
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Đặt thanh trạng thái iOS / Android trong suốt như yêu cầu
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+  runApp(const MedsReminderApp());
+}
 
 class PatientProfileItem {
   final String code;
@@ -117,7 +133,7 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
           foregroundColor: Colors.white,
           backgroundColor: const Color(0xFF5B5AF7),
           elevation: 8,
-          shadowColor: const Color(0xFF665EF7).withValues(alpha: .36),
+          shadowColor: const Color(0xFF665EF7).withOpacity(.36),
           shape: const StadiumBorder(),
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
@@ -132,29 +148,29 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
           FadeTransition(opacity: animation, child: child),
       child: showWelcome
           ? WelcomeScreen(
-              key: const ValueKey('welcome'),
-              onFinished: () => setState(() => showWelcome = false),
-            )
+        key: const ValueKey('welcome'),
+        onFinished: () => setState(() => showWelcome = false),
+      )
           : AppShell(
-              key: const ValueKey('app-shell'),
-              role: role,
-              doseTaken: doseTaken,
-              doseMissed: doseMissed,
-              prescriptionAdded: prescriptionAdded,
-              orderStage: orderStage,
-              linkedPatients: linkedPatients,
-              activePatientIndex: activePatientIndex,
-              onRoleChanged: (value) => setState(() => role = value),
-              onTaken: markTaken,
-              onMissed: markMissed,
-              onPrescriptionAdded: () =>
-                  setState(() => prescriptionAdded = true),
-              onOrderStageChanged: (value) =>
-                  setState(() => orderStage = value),
-              onAddPatient: addPatient,
-              onRemovePatient: removePatient,
-              onSelectPatient: selectPatient,
-            ),
+        key: const ValueKey('app-shell'),
+        role: role,
+        doseTaken: doseTaken,
+        doseMissed: doseMissed,
+        prescriptionAdded: prescriptionAdded,
+        orderStage: orderStage,
+        linkedPatients: linkedPatients,
+        activePatientIndex: activePatientIndex,
+        onRoleChanged: (value) => setState(() => role = value),
+        onTaken: markTaken,
+        onMissed: markMissed,
+        onPrescriptionAdded: () =>
+            setState(() => prescriptionAdded = true),
+        onOrderStageChanged: (value) =>
+            setState(() => orderStage = value),
+        onAddPatient: addPatient,
+        onRemovePatient: removePatient,
+        onSelectPatient: selectPatient,
+      ),
     ),
   );
 }
@@ -203,122 +219,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   Widget build(BuildContext context) =>
       _ReferenceLanding(entrance: _entrance, wave: _wave, onStart: _finish);
-
-  /*
-  Widget buildLegacy(BuildContext context) => Scaffold(
-    body: DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFF0F5FF), Color(0xFFEAFBF7), Color(0xFFF7F3FF)],
-        ),
-      ),
-      child: SafeArea(
-        child: Stack(
-          children: [
-            const Positioned(
-              top: 72,
-              right: -46,
-              child: _WelcomeOrb(color: Color(0x335A57F7), size: 160),
-            ),
-            const Positioned(
-              bottom: 150,
-              left: -35,
-              child: _WelcomeOrb(color: Color(0x3324CFA6), size: 125),
-            ),
-            Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(28, 20, 28, 96),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entrance,
-                        curve: const Interval(0, .55, curve: Curves.easeOut),
-                      ),
-                      child: const _WelcomeBrand(),
-                    ),
-                    const SizedBox(height: 18),
-                    SlideTransition(
-                      position:
-                          Tween<Offset>(
-                            begin: const Offset(0, .12),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: _entrance,
-                              curve: Curves.easeOutBack,
-                            ),
-                          ),
-                      child: RotationTransition(
-                        turns: Tween<double>(begin: -.014, end: .014).animate(
-                          CurvedAnimation(
-                            parent: _wave,
-                            curve: Curves.easeInOut,
-                          ),
-                        ),
-                        child: Image.asset(
-                          'assets/images/welcome_doctor_3d.png',
-                          height: 205,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entrance,
-                        curve: const Interval(.35, 1, curve: Curves.easeOut),
-                      ),
-                      child: const Text(
-                        'MedsReminder chăm sóc bạn\ntừ những điều nhỏ nhất',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Color(0xFF25305F),
-                          fontSize: 25,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entrance,
-                        curve: const Interval(.55, 1, curve: Curves.easeOut),
-                      ),
-                      child: const _LandingProjectCard(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: 20,
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: _entrance,
-                  curve: const Interval(.55, 1, curve: Curves.easeOut),
-                ),
-                child: FilledButton(
-                  onPressed: _finish,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(54),
-                  ),
-                  child: const Text('Bắt đầu'),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  */
 }
 
 class _ReferenceLanding extends StatelessWidget {
@@ -513,12 +413,12 @@ class _LandingHero extends StatelessWidget {
           right: 0,
           child: SlideTransition(
             position:
-                Tween<Offset>(
-                  begin: const Offset(.08, .1),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(parent: entrance, curve: Curves.easeOutBack),
-                ),
+            Tween<Offset>(
+              begin: const Offset(.08, .1),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: entrance, curve: Curves.easeOutBack),
+            ),
             child: RotationTransition(
               turns: Tween<double>(
                 begin: -.012,
@@ -541,11 +441,11 @@ class _LandingHero extends StatelessWidget {
             width: 120,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .78),
+              color: Colors.white.withOpacity(.78),
               borderRadius: BorderRadius.circular(17),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF163F7D).withValues(alpha: .16),
+                  color: const Color(0xFF163F7D).withOpacity(.16),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
@@ -610,9 +510,9 @@ class _LandingHighlights extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .68),
+      color: Colors.white.withOpacity(.68),
       borderRadius: BorderRadius.circular(22),
-      border: Border.all(color: Colors.white.withValues(alpha: .54)),
+      border: Border.all(color: Colors.white.withOpacity(.54)),
     ),
     child: const Row(
       children: [
@@ -670,7 +570,7 @@ class _HighlightDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Container(width: 1, height: 38, color: Color(0x3355739F));
+       Container(width: 1, height: 38, color: Color(0x3355739F));
 }
 
 class _WelcomeOrb extends StatelessWidget {
@@ -687,7 +587,6 @@ class _WelcomeOrb extends StatelessWidget {
 }
 
 enum AppRole { patient, caregiver, pharmacist, shipper, admin }
-
 enum OrderStage { review, verified, pickedUp, delivering, delivered }
 
 extension RoleData on AppRole {
@@ -768,6 +667,7 @@ class _AppShellState extends State<AppShell>
     super.dispose();
   }
 
+  // --- CẬP NHẬT NAV ĐỂ THÊM TAB THEO DÕI CHO CAREGIVER ---
   List<_NavItem> get nav => switch (widget.role) {
     AppRole.patient => const [
       _NavItem(Icons.home_rounded, 'Hôm nay'),
@@ -779,6 +679,7 @@ class _AppShellState extends State<AppShell>
       _NavItem(Icons.grid_view_rounded, 'Tổng quan'),
       _NavItem(Icons.receipt_long_rounded, 'Đơn thuốc'),
       _NavItem(Icons.storefront_rounded, 'Nhà thuốc'),
+      _NavItem(Icons.near_me_rounded, 'Theo dõi'),
       _NavItem(Icons.person_rounded, 'Hồ sơ'),
     ],
     AppRole.pharmacist => const [
@@ -797,6 +698,7 @@ class _AppShellState extends State<AppShell>
       _NavItem(Icons.security_rounded, 'Cảnh báo'),
     ],
   };
+
   @override
   void didUpdateWidget(covariant AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -836,6 +738,8 @@ class _AppShellState extends State<AppShell>
       ),
     ),
   );
+
+  // --- TÍCH HỢP CÁC FILE .DART TỪ AI STUDIO ---
   Widget _content() => switch (widget.role) {
     AppRole.patient => PatientHome(
       key: ValueKey('${widget.role}$tab'),
@@ -850,7 +754,19 @@ class _AppShellState extends State<AppShell>
           : 'PA-8899',
       onTaken: widget.onTaken,
     ),
-    AppRole.caregiver => CaregiverHome(
+
+  // --- CAREGIVER: CHÈN NHÀ THUỐC VÀ TRACKING VÀO ĐÂY ---
+    AppRole.caregiver => tab == 2
+        ? CaregiverPharmacyScreen(
+      key: ValueKey('${widget.role}$tab'),
+      onSendRefill: () => widget.onRoleChanged(AppRole.pharmacist),
+    )
+        : tab == 3
+        ? CaregiverTrackingScreen(
+      key: ValueKey('${widget.role}$tab'),
+      onReceiptConfirmed: () => setState(() => tab = 0),
+    )
+        : CaregiverHome(
       key: ValueKey('${widget.role}$tab${widget.activePatientIndex}'),
       tab: tab,
       doseTaken: widget.doseTaken,
@@ -864,18 +780,39 @@ class _AppShellState extends State<AppShell>
       onRemovePatient: widget.onRemovePatient,
       onSelectPatient: widget.onSelectPatient,
     ),
-    AppRole.pharmacist => PharmacistHome(
+
+  // --- PHARMACIST: CHÈN XÁC NHẬN ĐƠN VÀO ĐÂY ---
+    AppRole.pharmacist => tab == 0
+        ? PharmacistVerificationScreen(
+      key: ValueKey('${widget.role}$tab'),
+      onApproveAndDispatch: () => widget.onRoleChanged(AppRole.shipper),
+    )
+        : PharmacistHome(
       key: ValueKey('${widget.role}$tab'),
       tab: tab,
       orderStage: widget.orderStage,
       onOrderStageChanged: widget.onOrderStageChanged,
     ),
-    AppRole.shipper => ShipperHome(
+
+  // --- SHIPPER: CHÈN TÀI XẾ NHẬN CHUYẾN VÀO ĐÂY ---
+    AppRole.shipper => tab == 0
+        ? ShipperTaskScreen(
+      key: ValueKey('${widget.role}$tab'),
+      onConfirmPickup: () {
+        // Khi tài xế xác nhận, tự nhảy về Caregiver và mở tab Bản Đồ (3)
+        widget.onRoleChanged(AppRole.caregiver);
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (mounted) setState(() => tab = 3);
+        });
+      },
+    )
+        : ShipperHome(
       key: ValueKey('${widget.role}$tab'),
       tab: tab,
       orderStage: widget.orderStage,
       onOrderStageChanged: widget.onOrderStageChanged,
     ),
+
     AppRole.admin => AdminHome(
       key: ValueKey('${widget.role}$tab'),
       doseMissed: widget.doseMissed,
@@ -920,6 +857,7 @@ class _TopBar extends StatelessWidget {
       ],
     ),
   );
+
   void _showRoles(BuildContext context) => showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
@@ -947,7 +885,7 @@ class _TopBar extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ...AppRole.values.map(
-            (item) => ListTile(
+                (item) => ListTile(
               leading: CircleAvatar(
                 backgroundColor: item == role
                     ? const Color(0xFF5268F5)
@@ -963,9 +901,9 @@ class _TopBar extends StatelessWidget {
               ),
               trailing: item == role
                   ? const Icon(
-                      Icons.check_circle_rounded,
-                      color: Color(0xFF5268F5),
-                    )
+                Icons.check_circle_rounded,
+                color: Color(0xFF5268F5),
+              )
                   : null,
               onTap: () {
                 Navigator.pop(context);
@@ -996,6 +934,7 @@ class PatientHome extends StatelessWidget {
   final String linkedPatientCode;
   final VoidCallback onTaken;
   final VoidCallback? onPrescriptionAdded;
+
   @override
   Widget build(BuildContext context) {
     if (tab == 1) {
@@ -1447,8 +1386,8 @@ class CaregiverHome extends StatelessWidget {
         onAdded: onPrescriptionAdded,
       );
     }
-    if (tab == 2) return _PharmacyPage();
-    if (tab == 3) {
+    // LƯU Ý: tab == 2 (Nhà thuốc) và tab == 3 (Theo dõi) đã được xử lý ở _content() phía trên
+    if (tab == 4) {
       return _CaregiverProfilePage(
         linkedPatients: linkedPatients,
         activePatientIndex: activePatientIndex,
@@ -1459,7 +1398,7 @@ class CaregiverHome extends StatelessWidget {
     }
     final hasPatients = linkedPatients.isNotEmpty;
     final currentPatient =
-        hasPatients ? linkedPatients[activePatientIndex] : null;
+    hasPatients ? linkedPatients[activePatientIndex] : null;
 
     return _Scroll(
       child: Column(
@@ -1510,7 +1449,7 @@ class CaregiverHome extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? const Color(0xFF5065F2)
-                            : Colors.white.withValues(alpha: .7),
+                            : Colors.white.withOpacity(.7),
                         borderRadius: BorderRadius.circular(19),
                         border: Border.all(
                           color: isSelected
@@ -1928,7 +1867,7 @@ class _CaregiverProfilePageState extends State<_CaregiverProfilePage> {
                     return;
                   }
                   final exists = widget.linkedPatients.any(
-                    (p) => p.code.toUpperCase() == code.toUpperCase(),
+                        (p) => p.code.toUpperCase() == code.toUpperCase(),
                   );
                   if (exists) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -2534,10 +2473,10 @@ class _PrescriptionPage extends StatelessWidget {
 }
 
 void _showAddMedicineModal(
-  BuildContext context, {
-  required VoidCallback onAdded,
-  bool isPatient = false,
-}) {
+    BuildContext context, {
+      required VoidCallback onAdded,
+      bool isPatient = false,
+    }) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -2689,12 +2628,12 @@ class _AddMedicineSheetState extends State<_AddMedicineSheet> {
             ),
             boxShadow: isSelected
                 ? [
-                    BoxShadow(
-                      color: const Color(0xFF5168F4).withValues(alpha: 0.25),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
+              BoxShadow(
+                color: const Color(0xFF5168F4).withOpacity(0.25),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ]
                 : null,
           ),
           child: Column(
@@ -2866,12 +2805,12 @@ class _AddMedicineSheetState extends State<_AddMedicineSheet> {
                       ),
                       boxShadow: isSelected
                           ? [
-                              BoxShadow(
-                                color: const Color(0xFF5168F4).withValues(alpha: 0.28),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              )
-                            ]
+                        BoxShadow(
+                          color: const Color(0xFF5168F4).withOpacity(0.28),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        )
+                      ]
                           : null,
                     ),
                     child: Row(
@@ -3095,62 +3034,6 @@ class _AddMedicineSheetState extends State<_AddMedicineSheet> {
   }
 }
 
-class _PharmacyPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => _Scroll(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const PageIntro('Digital Pharmacy', 'Đặt lại thuốc cho cô Lan'),
-        Glass(
-          padding: const EdgeInsets.all(17),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF5148BD), Color(0xFF7B75DD)],
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Metformin sắp hết',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              SizedBox(height: 5),
-              Text(
-                'Còn 4 ngày sử dụng · Hãy đặt thêm để không gián đoạn liệu trình',
-                style: TextStyle(color: Colors.white70),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 17),
-        const Text(
-          'Đơn gợi ý',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        const _PrescriptionCard(
-          'Tái cấp thuốc tháng 10',
-          'Theo đơn đang dùng',
-          'Metformin · Vitamin D3 · Amlodipine',
-        ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Yêu cầu đã gửi đến Dược sĩ An Tâm.')),
-          ),
-          icon: const Icon(Icons.send_rounded),
-          label: const Text('Gửi đơn đến nhà thuốc'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-        ),
-      ],
-    ),
-  );
-}
-
 class _WarehousePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Scroll(
@@ -3236,17 +3119,17 @@ class AnimatedAuroraBackground extends StatelessWidget {
             _AuroraOrb(
               alignment: Alignment(-1.12 + drift * .22, -.92 + drift * .12),
               size: 250,
-              color: const Color(0xFF88A0FF).withValues(alpha: .34),
+              color: const Color(0xFF88A0FF).withOpacity(.34),
             ),
             _AuroraOrb(
               alignment: Alignment(.98 - drift * .18, -.36 + drift * .22),
               size: 205,
-              color: const Color(0xFFD19EFF).withValues(alpha: .28),
+              color: const Color(0xFFD19EFF).withOpacity(.28),
             ),
             _AuroraOrb(
               alignment: Alignment(.52 + drift * .20, 1.08 - drift * .10),
               size: 270,
-              color: const Color(0xFF6EE5C7).withValues(alpha: .25),
+              color: const Color(0xFF6EE5C7).withOpacity(.25),
             ),
             _FloatingPill(
               alignment: Alignment(-.92 + drift * .13, .20),
@@ -3333,12 +3216,12 @@ class _FloatingPill extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Colors.white.withValues(alpha: .92), color],
+              colors: [Colors.white.withOpacity(.92), color],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: .78)),
+            border: Border.all(color: Colors.white.withOpacity(.78)),
             boxShadow: [
               BoxShadow(
-                color: color.withValues(alpha: .48),
+                color: color.withOpacity(.48),
                 blurRadius: 16,
                 offset: const Offset(0, 7),
               ),
@@ -3395,13 +3278,13 @@ class Glass extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF33477F).withValues(alpha: .14),
+            color: const Color(0xFF33477F).withOpacity(.14),
             blurRadius: 28,
             spreadRadius: -6,
             offset: const Offset(0, 15),
           ),
           BoxShadow(
-            color: Colors.white.withValues(alpha: .75),
+            color: Colors.white.withOpacity(.75),
             blurRadius: 10,
             offset: const Offset(-5, -5),
           ),
@@ -3415,17 +3298,17 @@ class Glass extends StatelessWidget {
             padding: padding,
             decoration: BoxDecoration(
               gradient:
-                  gradient ??
+              gradient ??
                   LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Colors.white.withValues(alpha: .76),
-                      Colors.white.withValues(alpha: .42),
+                      Colors.white.withOpacity(.76),
+                      Colors.white.withOpacity(.42),
                     ],
                   ),
               borderRadius: BorderRadius.circular(radius),
-              border: Border.all(color: Colors.white.withValues(alpha: .88)),
+              border: Border.all(color: Colors.white.withOpacity(.88)),
             ),
             child: Stack(
               children: [
@@ -3436,7 +3319,7 @@ class Glass extends StatelessWidget {
                   height: 1.5,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .82),
+                      color: Colors.white.withOpacity(.82),
                     ),
                   ),
                 ),
@@ -3451,8 +3334,8 @@ class Glass extends StatelessWidget {
                         borderRadius: BorderRadius.circular(80),
                         gradient: RadialGradient(
                           colors: [
-                            Colors.white.withValues(alpha: .30),
-                            Colors.white.withValues(alpha: 0),
+                            Colors.white.withOpacity(.30),
+                            Colors.white.withOpacity(0),
                           ],
                         ),
                       ),
@@ -3510,13 +3393,13 @@ class _BrandMark extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFC99433).withValues(alpha: .32),
+              color: const Color(0xFFC99433).withOpacity(.32),
               blurRadius: 14,
               offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: Image.asset('assets/images/medsreminder_logo.png'),
+        child: Image.asset('assets/images/medsreminder_logo.png'), // Bạn nhớ thêm ảnh vào tài nguyên nhé!
       ),
       const SizedBox(width: 7),
       const Column(
@@ -3625,17 +3508,17 @@ class _GlassBottomNav extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 gradient: active
                     ? const LinearGradient(
-                        colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
-                      )
+                  colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
+                )
                     : null,
                 boxShadow: active
                     ? [
-                        BoxShadow(
-                          color: const Color(0xFF586FF3).withValues(alpha: .22),
-                          blurRadius: 12,
-                          offset: const Offset(0, 5),
-                        ),
-                      ]
+                  BoxShadow(
+                    color: const Color(0xFF586FF3).withOpacity(.22),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
                     : null,
               ),
               child: Column(
@@ -3676,7 +3559,7 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: .13),
+      color: color.withOpacity(.13),
       borderRadius: BorderRadius.circular(20),
     ),
     child: Text(
@@ -3759,8 +3642,8 @@ class _DoseCard extends StatelessWidget {
                     : const Color(0xFF299B73),
                 elevation: 9,
                 shadowColor:
-                    (missed ? const Color(0xFFD65E4A) : const Color(0xFF299B73))
-                        .withValues(alpha: .42),
+                (missed ? const Color(0xFFD65E4A) : const Color(0xFF299B73))
+                    .withOpacity(.42),
                 shape: const StadiumBorder(),
               ),
             ),
@@ -3875,23 +3758,23 @@ class _DayStrip extends StatelessWidget {
           .entries
           .map(
             (e) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: e.key == 0
-                    ? const Color(0xFF5368F4)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                e.value,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: e.key == 0 ? Colors.white : const Color(0xFF566080),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: e.key == 0
+                ? const Color(0xFF5368F4)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            e.value,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: e.key == 0 ? Colors.white : const Color(0xFF566080),
+              fontWeight: FontWeight.w700,
             ),
-          )
+          ),
+        ),
+      )
           .toList(),
     ),
   );
@@ -3899,12 +3782,12 @@ class _DayStrip extends StatelessWidget {
 
 class _TimelineItem extends StatelessWidget {
   const _TimelineItem(
-    this.time,
-    this.title,
-    this.detail,
-    this.status,
-    this.color,
-  );
+      this.time,
+      this.title,
+      this.detail,
+      this.status,
+      this.color,
+      );
   final String time, title, detail, status;
   final Color color;
   @override
@@ -4030,7 +3913,7 @@ class _Activity extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: color.withValues(alpha: .12),
+          backgroundColor: color.withOpacity(.12),
           child: Icon(icon, color: color, size: 17),
         ),
         const SizedBox(width: 10),
@@ -4141,6 +4024,7 @@ String _stageText(OrderStage stage) => switch (stage) {
   OrderStage.delivering => 'Đang giao',
   OrderStage.delivered => 'Đã giao',
 };
+
 Color _stageColor(OrderStage stage) => switch (stage) {
   OrderStage.review => const Color(0xFFF0A042),
   OrderStage.verified => const Color(0xFF586CF4),
