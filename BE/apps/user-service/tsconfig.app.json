@@ -4,7 +4,7 @@
     "composite": true,
     "declaration": true,
     "rootDir": "../../",
-    "outDir": "../../dist/apps/api-gateway"
+    "outDir": "../../dist/apps/user-service"
   },
   "include": [
     "src/**/*",
