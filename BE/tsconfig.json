@@ -2,6 +2,13 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    "baseUrl": ".",
+    "paths": {
+      "@lib/error-handling": [
+        "libs/error-handling/src/index.ts"
+      ]
+    },
+    "ignoreDeprecations": "6.0",
     "resolvePackageJsonExports": true,
     "esModuleInterop": true,
     "isolatedModules": true,
@@ -26,6 +33,9 @@
   "references": [
     {
       "path": "./apps/api-gateway/tsconfig.app.json"
+    },
+    {
+      "path": "./apps/user-service/tsconfig.app.json"
     }
   ]
 }
