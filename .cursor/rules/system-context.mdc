@@ -1,0 +1,35 @@
+---
+description: MedReminder mục tiêu, tác nhân, client và ranh giới hệ thống
+alwaysApply: true
+---
+
+# MedReminder
+
+Nền tảng nhắc tuân thủ thuốc cho người cao tuổi và chuỗi bổ sung thuốc. Giám sát hai chiều bệnh nhân và người chăm sóc. Ngữ cảnh này là chuẩn đã chốt; bám theo khi thiết kế hoặc sinh code.
+
+## Tác nhân
+
+- **PA (PATIENT):** app Flutter, thao tác tối giản (đã uống, hoãn, bỏ qua).
+- **CG (CAREGIVER):** app Flutter. Ghép cặp, nhập đơn và lịch, theo dõi tuân thủ, đặt thuốc khi sắp hết.
+- **P (PHARMACIST):** portal Next.js. Duyệt đơn, kiểm kho, đóng gói, dán QR kiện.
+- **DS (SHIPPER):** app mobile. Nhận cuốc, quét QR, giao, OTP hoặc ảnh bàn giao.
+- **ADMIN:** tài khoản, danh mục thuốc, vận hành.
+
+## Client
+
+- `FE/`: Flutter, một app theo role. Nhắc đúng giờ khi mất mạng là việc của máy PA (SQLite hoặc Isar + exact alarm / full-screen intent), không phải microservice.
+- Portal Next.js của dược sĩ chưa có trong repo.
+
+## Backend đã chốt: 4 process, không tách thêm
+
+- `api-gateway`: một cổng HTTP cho Flutter và portal.
+- `user-service`: tài khoản và ghép cặp.
+- `prescription-reminder-service`: đơn, lịch, log uống, leo thang, thông báo tuân thủ.
+- `pharmacy-delivery-service`: nhà thuốc, kho, đơn hàng, giao hàng, thanh toán.
+
+Không tạo service riêng cho notification, escalation, inventory hay shipper. Các việc đó nằm trong hai service miền ở trên.
+
+## Stack hiện tại
+
+- `BE/`: NestJS 12 monorepo (`nest-cli.json`), TCP giữa gateway và service, Vitest, oxlint, rspack.
+- Code đang dùng Mongoose. Schema chuẩn bên dưới là mô hình quan hệ (UUID, timestamptz). Khi làm persistence, chuyển theo schema đó, không thêm collection Mongo mới cho domain đã có bảng.

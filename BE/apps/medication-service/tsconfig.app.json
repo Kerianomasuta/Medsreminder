@@ -3,13 +3,9 @@
   "compilerOptions": {
     "composite": true,
     "declaration": true,
-    "rootDir": "../../",
-    "outDir": "../../dist/apps/user-service"
+    "rootDir": "./src",
+    "outDir": "../../dist/apps/medication-service"
   },
-  "include": [
-    "src/**/*",
-    "utils/**/*.ts",
-    "../../libs/**/*.ts"
-  ],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }

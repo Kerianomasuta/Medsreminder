@@ -1,0 +1,27 @@
+---
+description: Những gì đã làm trên repo và việc chưa làm
+alwaysApply: true
+---
+
+# Trạng thái repo (2026-09-29)
+
+Chỉ mới có khung backend và UI Flutter. Chưa có pairing, đơn thuốc, log, đơn hàng, Docker hay CI.
+
+## Đã có
+
+- `BE/apps/api-gateway`: HTTP, cookie-parser, ValidationPipe. `AuthModule` (TCP client tới user-service, `POST /api/v1/auth/login`) đã viết nhưng chưa import trong `ApiGatewayModule`.
+- `BE/apps/user-service`: TCP microservice. Schema user Mongo chỉ có email, password, role. `findByEmail` và login so khớp bcrypt. `AuthModule` chưa import trong `UserServiceModule`. Chưa `MongooseModule.forRoot`.
+- `BE/libs/error-handling`: helper lỗi dùng trong login.
+- `FE/`: Flutter, `lib/main.dart` là prototype giao diện theo role. `flutter pub get` đã chạy, analyzer sạch.
+- Đã `npm install` trong `BE`. Đã gỡ package sai `class-transform`, cài `class-transformer` (peer của ValidationPipe).
+
+## Chưa làm
+
+- Chưa có app `prescription-reminder-service` và `pharmacy-delivery-service`.
+- Chưa có portal Next.js.
+- Chưa có Dockerfile, docker-compose, `.github/workflows`.
+- Script `BE/package.json` chưa khớp monorepo: `start:prod` trỏ `dist/apps/meds-backend/main`, `lint` quét `src/` và `test/` không tồn tại, `test:e2e` là lệnh hỏng. E2e gateway còn kỳ vọng `GET /` trả `Hello World!`.
+
+## Hướng triển khai đã chốt
+
+Làm Docker (một Dockerfile nhận tên app, compose cho mongo hoặc Postgres, user-service, gateway) trước, rồi CI (lint, test, build, `flutter analyze`), rồi CD (push image, VPS `compose pull`). Không commit `.env`. Biến gateway và user-service đang dùng: `GATEWAY_PORT`, `USER_SERVICE_HOST`, `USER_SERVICE_PORT`, `UPSTASH_REDIS_URL`, `ACCESS_JWT_SECRET`, `REFRESH_JWT_SECRET`.
