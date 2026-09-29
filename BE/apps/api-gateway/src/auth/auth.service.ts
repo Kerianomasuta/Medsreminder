@@ -12,6 +12,6 @@ export class AuthService {
     login(
         loginDto: LoginDto
     ) {
-        return this.userClient.send({ cmd: 'handle_user_login '}, loginDto)
+        return this.userClient.send({ cmd: 'handle_user_login' }, loginDto)
     }
 }

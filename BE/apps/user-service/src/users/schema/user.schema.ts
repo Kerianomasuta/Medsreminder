@@ -13,6 +13,15 @@ export class User {
 
     @Prop({ required: true, enum: ["PATIENT", "CARE_GIVER", "PHARMACIST", "DRUGSHIPPER", "ADMIN"] })
     role: string;
+
+    @Prop({ required: true })
+    fullName: string;
+
+    @Prop({ required: true })
+    phone: string
+
+    @Prop({})
+    avatar_url: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User)
