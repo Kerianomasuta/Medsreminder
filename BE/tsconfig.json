@@ -2,7 +2,6 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "baseUrl": ".",
     "paths": {
       "@lib/error-handling": [
         "libs/error-handling/src/index.ts"
@@ -36,6 +35,12 @@
     },
     {
       "path": "./apps/user-service/tsconfig.app.json"
+    },
+    {
+      "path": "./apps/meds-backend/tsconfig.app.json"
+    },
+    {
+      "path": "./apps/medication-service/tsconfig.app.json"
     }
   ]
 }

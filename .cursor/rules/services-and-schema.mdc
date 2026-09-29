@@ -1,0 +1,35 @@
+---
+description: Bảng dữ liệu, enum và service sở hữu từng bảng
+alwaysApply: true
+---
+
+# Schema chuẩn
+
+Role DB: `PATIENT`, `CAREGIVER`, `PHARMACIST`, `SHIPPER`, `ADMIN`. Code cũ trong `user.schema.ts` đang dùng `CARE_GIVER` và `DRUGSHIPPER`; khi sửa user thì đổi về tên DB.
+
+## user-service
+
+- `users`: id uuid, email unique, phone unique, password_hash, full_name, role, fcm_token, avatar_url, timezone mặc định `Asia/Ho_Chi_Minh`, is_active, created_at, updated_at.
+- `caregiver_patient_relations`: caregiver_id, patient_id unique cùng nhau, status `PENDING | ACCEPTED | REJECTED` (mặc định `ACCEPTED`), emergency_contact_phone. Xóa user thì xóa quan hệ.
+- `pairing_codes`: patient_id, code 6 ký tự, expires_at, is_used. Hạn dùng thực tế 10–15 phút.
+
+## prescription-reminder-service
+
+- `medicines`: name, generic_name, unit (viên/gói/chai), instruction_note, image_url. Danh mục dùng chung; kho nhà thuốc tham chiếu `medicine_id`, không copy tên thuốc.
+- `prescriptions`: patient_id, created_by_cg_id, title, doctor_name, prescription_code, image_prescription_url, start_date, end_date, is_active.
+- `prescription_items`: prescription_id, medicine_id, dosage_per_time, current_stock (tồn cá nhân của PA), reorder_threshold mặc định 6, instructions.
+- `schedule_rules`: prescription_item_id, patient_id, reminder_time, days_of_week mặc định `[1,2,3,4,5,6,7]`, is_active.
+- `medication_logs`: schedule_rule_id, patient_id, scheduled_at, actual_taken_at, status, snooze_until, escalation_level mặc định 0.
+- Index log: `(status, scheduled_at, escalation_level)`, `(patient_id, scheduled_at)`.
+- `dose_status`: `SCHEDULED | TAKEN | SNOOZED | MISSED | SKIPPED`.
+
+## pharmacy-delivery-service
+
+- `pharmacies`: pharmacist_id, name, phone, address_text, latitude, longitude, is_active.
+- `pharmacy_inventory`: pharmacy_id + medicine_id unique, stock_quantity, price_per_unit.
+- `orders`: order_code unique, patient_id, caregiver_id, pharmacy_id, shipper_id, prescription_id, status, total_amount, delivery_address, delivery_lat/lng, recipient_phone, otp_code 4 số, pod_image_url, rejection_reason.
+- Index đơn: `(pharmacy_id, status)`, `(shipper_id, status)`.
+- `order_items`: order_id, medicine_id, quantity, unit_price.
+- `order_status`: `PENDING_REVIEW | PREPARING | READY_FOR_PICKUP | ASSIGNED | IN_TRANSIT | DELIVERED | CANCELLED`.
+
+Khi `DELIVERED`, service giao hàng báo service nhắc thuốc cộng `current_stock` và gia hạn lịch. Không nhân bản tồn cá nhân sang bảng orders.
