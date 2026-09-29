@@ -2,10 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { ErrorHandling } from "libs/error-handling/src/error-handling.js";
 import { UserService } from "../users/user.service.js";
 import * as bcrypt from 'bcrypt'
+import { TokenService } from "../token/token.service.js";
 @Injectable()
 export class AuthService {
     constructor(
         private readonly userService: UserService,
+        private readonly tokenService: TokenService,
     ) {}
 
     async handleUserLogin(loginData: any) {
@@ -27,6 +29,27 @@ export class AuthService {
 
         if (!isMatchedPassword) {
             throw ErrorHandling.BadRequest(`Wrong password!`)
+        }
+
+        const { accessToken, refreshToken, deviceId } = await this.tokenService.generateToken({
+            fullName: existingUser.fullName,
+            deviceId: '',
+            role: existingUser.role,
+            userId: existingUser?._id.toString(),
+        })
+
+        await this.tokenService.saveRefreshToken({
+            refreshToken: refreshToken,
+            deviceId: deviceId,
+            userId: existingUser?._id.toString()
+        });
+
+        return {
+            status: 200,
+            data: {
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+            }
         }
     }
 }
