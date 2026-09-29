@@ -19,6 +19,15 @@
         "tsConfigPath": "apps/api-gateway/tsconfig.app.json"
       }
     },
+    "medication-service": {
+      "type": "application",
+      "root": "apps/medication-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/medication-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/medication-service/tsconfig.app.json"
+      }
+    },
     "user-service": {
       "type": "application",
       "root": "apps/user-service",

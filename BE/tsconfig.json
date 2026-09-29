@@ -5,7 +5,7 @@
     "baseUrl": ".",
     "paths": {
       "@lib/error-handling": [
-        "libs/error-handling/src/index.ts"
+        "./libs/error-handling/src/error-handling.ts"
       ]
     },
     "ignoreDeprecations": "6.0",
@@ -36,6 +36,9 @@
     },
     {
       "path": "./apps/user-service/tsconfig.app.json"
+    },
+    {
+      "path": "./apps/medication-service/tsconfig.app.json"
     }
   ]
 }

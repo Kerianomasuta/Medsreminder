@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { ErrorHandling } from "libs/error-handling/src/error-handling.js";
+import { ErrorHandling } from "@lib/error-handling";
 import { UserService } from "../users/user.service.js";
 import * as bcrypt from 'bcrypt'
 import { TokenService } from "../token/token.service.js";
