@@ -1,0 +1,70 @@
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        APP_NAME: api-gateway
+    container_name: meds-api-gateway
+    command: ["npm", "run", "start:dev", "--", "api-gateway"]
+    ports:
+      - "3000:3000"
+    environment: 
+      NODE_ENV: development
+      GATEWAY_PORT: 3000
+      USER_SERVICE_HOST: user-service
+      USER_SERVICE_PORT: 3529
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - user-service
+    networks:
+      - meds-network
+  
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        APP_NAME: user-service
+    container_name: meds-user-service
+    command: ["npm", "run", "start:dev", "--", "user-service"]
+    env_file:
+      - ./apps/user-service/.env
+    environment:
+      NODE_ENV: development
+      USER_SERVICE_HOST: 0.0.0.0
+      USER_SERVICE_PORT: 3529
+    expose:
+      - "3529"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - meds-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: meds-mongodb
+    ports:
+      - "27017:27017"
+    networks:
+      - meds-network
+
+  redis:
+    image: redis:alpine
+    container_name: meds-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - meds-network
+
+networks:
+  meds-network:
+    driver: bridge
