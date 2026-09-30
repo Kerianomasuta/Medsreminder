@@ -14,4 +14,17 @@ export class AuthService {
     ) {
         return this.userClient.send({ cmd: 'handle_user_login' }, loginDto)
     }
+
+    logout(input: {
+        userId: string,
+        deviceId: string,
+    }) {
+        return this.userClient.send({ cmd: 'handle_user_logout' }, input);
+    }
+
+    refreshToken(input: {
+        oldRefreshToken: string
+    }) {
+        return this.userClient.send({ cmd: `handle_user_refresh_token` }, input)
+    }
 }
