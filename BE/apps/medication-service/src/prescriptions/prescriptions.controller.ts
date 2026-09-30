@@ -22,7 +22,6 @@ type CreatePrescriptionMessage = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
-  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   items?: ItemMessage[];
@@ -33,7 +32,6 @@ type UpdatePrescriptionMessage = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
-  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   isActive?: boolean;
@@ -82,18 +80,5 @@ export class PrescriptionsController {
   ) {
     const { id, ...changes } = payload;
     return this.prescriptionsService.updateItem(id, changes);
-  }
-
-  @MessagePattern({ cmd: 'update_schedule_rule' })
-  updateSchedule(
-    @Payload() payload: {
-      id: string;
-      reminderTime?: string;
-      daysOfWeek?: number[];
-      isActive?: boolean;
-    },
-  ) {
-    const { id, ...changes } = payload;
-    return this.prescriptionsService.updateSchedule(id, changes);
   }
 }

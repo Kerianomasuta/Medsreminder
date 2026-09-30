@@ -3,9 +3,13 @@ import { AuthController } from "./auth.controller.js";
 import { AuthService } from "./auth.service.js";
 import { ClientsModule, Transport } from "@nestjs/microservices"
 import { ConfigService } from "@nestjs/config";
+import { JwtModule } from '@nestjs/jwt'
+import { JwtAuthGuard } from "./guards/jwt-auth.guards.js";
 
 @Module({
     imports: [
+        JwtModule.register({}),
+
         ClientsModule.registerAsync([
             {
                 name: 'USER_SERVICE',
@@ -21,6 +25,10 @@ import { ConfigService } from "@nestjs/config";
         ])
     ],
     controllers: [AuthController],
-    providers: [AuthService]
+    providers: [
+        AuthService,
+        JwtAuthGuard,
+    ],
+    exports: [JwtAuthGuard]
 })
 export class AuthModule {}

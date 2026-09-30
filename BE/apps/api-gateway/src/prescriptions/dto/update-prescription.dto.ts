@@ -20,12 +20,6 @@ export class UpdatePrescriptionDto {
   @MaxLength(100)
   prescriptionCode?: string | null;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  imagePrescriptionUrl?: string | null;
-
   @ApiPropertyOptional({ example: '2026-10-01' })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
