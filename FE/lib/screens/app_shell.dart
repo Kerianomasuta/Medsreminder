@@ -4,12 +4,12 @@ import '../widgets/widgets.dart';
 
 import 'patient/patient_home.dart';
 import 'caregiver/caregiver_home.dart';
-import 'caregiver_pharmacy_screen.dart';
-import 'caregiver_tracking_screen.dart';
+import 'caregiver/caregiver_pharmacy_screen.dart';
+import 'caregiver/caregiver_tracking_screen.dart';
 import 'pharmacist/pharmacist_home.dart';
-import 'pharmacist_verification_screen.dart';
+import 'pharmacist/pharmacist_verification_screen.dart';
 import 'shipper/shipper_home.dart';
-import 'shipper_task_screen.dart';
+import 'shipper/shipper_task_screen.dart';
 import 'admin/admin_home.dart';
 
 class AppShell extends StatefulWidget {
