@@ -4,7 +4,6 @@ import { CreatePrescriptionItemDto, CreatePrescriptionDto } from './dto/create-p
 import { ListPrescriptionsQueryDto } from './dto/list-prescriptions.query.js';
 import { UpdatePrescriptionItemDto } from './dto/update-prescription-item.dto.js';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto.js';
-import { UpdateScheduleRuleDto } from './dto/update-schedule-rule.dto.js';
 import { PrescriptionsService } from './prescriptions.service.js';
 
 @Controller('api/v1')
@@ -46,11 +45,5 @@ export class PrescriptionsController {
   @ApiOperation({ summary: 'Update dose, stock, or instructions of one medicine line' })
   updateItem(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePrescriptionItemDto) {
     return this.prescriptionsService.updateItem(id, dto);
-  }
-
-  @Patch('schedule-rules/:id')
-  @ApiOperation({ summary: 'Update one dose time' })
-  updateSchedule(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateScheduleRuleDto) {
-    return this.prescriptionsService.updateSchedule(id, dto);
   }
 }
