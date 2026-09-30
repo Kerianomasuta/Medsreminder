@@ -13,6 +13,7 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
+    transform: true,
   }))
 
   const swaggerConfig = new DocumentBuilder()
@@ -20,6 +21,7 @@ async function bootstrap() {
     .setDescription('API documentation for the Meds Reminder gateway')
     .setVersion('1.0')
     .addCookieAuth('accessToken')
+    .addCookieAuth('refreshToken')
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);

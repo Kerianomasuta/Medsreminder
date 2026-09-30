@@ -12,4 +12,14 @@ export class AuthController {
     async handleUserLogin(@Payload() data: any) {
         return this.authService.handleUserLogin(data)
     }
+
+    @MessagePattern({ cmd: 'handle_user_logout' })
+    async handleUserLogout(@Payload() data: any) {
+        return this.authService.handleUserLogout(data)
+    }
+
+    @MessagePattern({ cmd: 'handle_user_refresh_token' })
+    async handleUserRefreshToken(@Payload() data: any) {
+        return this.authService.handleUserRefreshToken(data)
+    }
 } 
