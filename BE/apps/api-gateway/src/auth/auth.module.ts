@@ -5,6 +5,7 @@ import { ClientsModule, Transport } from "@nestjs/microservices"
 import { ConfigService } from "@nestjs/config";
 import { JwtModule } from '@nestjs/jwt'
 import { JwtAuthGuard } from "./guards/jwt-auth.guards.js";
+import { RolesGuard } from "./guards/authorizedByRoles/roles.guard.js";
 
 @Module({
     imports: [
@@ -28,7 +29,11 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guards.js";
     providers: [
         AuthService,
         JwtAuthGuard,
+        RolesGuard,
     ],
-    exports: [JwtAuthGuard]
+    exports: [
+        JwtAuthGuard,
+        RolesGuard,
+    ]
 })
 export class AuthModule {}
