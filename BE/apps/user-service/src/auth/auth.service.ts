@@ -52,4 +52,60 @@ export class AuthService {
             }
         }
     }
+
+    async handleUserLogout(logoutData: any) {
+        const { userId, deviceId } = logoutData
+
+        const existingUser = await this.userService.findById(userId);
+        if (!existingUser) {
+            throw ErrorHandling.Unauthorized(`[Fake token detected!] This user is not exist in the system!`)
+        }
+
+        await this.tokenService.removeRefreshToken({
+            userId: userId,
+            deviceId: deviceId
+        });
+
+        return {
+            status: 200,
+            message: 'Refresh token has been removed!'
+        }
+    }
+
+    async handleUserRefreshToken(refreshTokenData: any) {
+        const { oldRefreshToken } = refreshTokenData
+
+        const { userId, deviceId } = await this.tokenService.verifyRefreshToken({ refreshToken: oldRefreshToken })
+
+        await this.tokenService.removeRefreshToken({
+            userId: userId,
+            deviceId: deviceId,
+        })
+
+        const existingUser = await this.userService.findById(userId)
+        if (!existingUser) {
+            throw ErrorHandling.Unauthorized(`This user from refresh token is not exist in the system!`)
+        }
+
+        const { accessToken, refreshToken } = await this.tokenService.generateToken({
+            deviceId: deviceId,
+            userId: userId,
+            role: existingUser?.role.toString(),
+            fullName: existingUser?.fullName.toString(),
+        })
+
+        await this.tokenService.saveRefreshToken({
+            refreshToken: refreshToken,
+            deviceId: deviceId,
+            userId: userId,
+        })
+
+        return {
+            status: 200,
+            data: {
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+            }
+        }
+    }
 }

@@ -47,6 +47,17 @@ describe('MedicinesService', () => {
     expect(created.unit).toBe(MedicineUnit.VIEN);
   });
 
+  it('rejects a medicine that already exists with the same name and unit', async () => {
+    repository.findOne.mockResolvedValue({ id: 'already-saved' });
+
+    await expect(
+      service.create({ name: 'Paracetamol', unit: MedicineUnit.VIEN }),
+    ).rejects.toMatchObject({
+      message: 'A medicine with this name and unit already exists',
+    });
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
   it('rejects a medicine without a name', async () => {
     await expect(service.create({ name: ' ', unit: MedicineUnit.GOI })).rejects.toBeInstanceOf(RpcException);
   });
