@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "rootDir": "../../",
+    "outDir": "../../dist/apps/user-service"
+  },
+  "include": [
+    "src/**/*",
+    "utils/**/*.ts",
+    "../../libs/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}

@@ -1,0 +1,32 @@
+---
+description: Luồng tuân thủ thuốc, leo thang và chuỗi nhà thuốc giao hàng
+alwaysApply: true
+---
+
+# Luồng CG–PA
+
+1. PA đăng nhập, tạo QR hoặc PIN 6 số, hạn 10–15 phút.
+2. CG quét hoặc nhập PIN. Hệ thống xác thực mã, ghi `caregiver_patient_relations`, cấp quyền quản lý đơn cho CG.
+3. CG tạo đơn: thuốc, hàm lượng, số viên, giờ uống, trước/sau ăn, số ngày. Lưu prescription, item, schedule_rule và sinh mốc nhắc kế tiếp.
+4. App PA kéo lịch về DB cục bộ và đặt exact alarm. Đúng giờ mở màn hình lớn, tương phản cao, có tiếng, kể cả khi offline.
+5. PA chọn Taken, Snooze 5–10 phút (`snooze_until`), hoặc Skipped. Có mạng thì gửi log qua gateway.
+6. Ghi `medication_logs.actual_taken_at`. Đẩy FCM hoặc WebSocket cho CG, ví dụ uống lúc 08:05 đúng giờ. App CG cập nhật tiến độ ngày và tỷ lệ tuân thủ.
+
+## Leo thang
+
+Mặc định 15 phút sau giờ nhắc mà không Taken, hoặc PA chọn Skipped: log thành `MISSED`, tăng `escalation_level`. Máy PA kêu mức 2 (âm lượng tối đa, rung liên tục). CG nhận alert ưu tiên cao kèm nút Gọi điện ngay.
+
+Ngưỡng hết thuốc: `current_stock` gần `reorder_threshold`, hoặc còn đủ khoảng 3–5 ngày. Báo CG đặt thêm.
+
+# Luồng nhà thuốc
+
+1. CG chọn đơn có sẵn, địa chỉ nhà PA hoặc nhà CG, COD hoặc VNPay/Momo. Tạo order `PENDING_REVIEW` tới nhà thuốc gần nhất còn hàng.
+2. Portal P nhận đơn realtime. P kiểm tra toa, số lượng, tồn kho. Duyệt thì trừ tồn tạm, in phiếu, dán QR, chuyển `PREPARING` rồi `READY_FOR_PICKUP`.
+3. Hệ thống phát cuốc cho DS online trong bán kính. DS nhận (`ASSIGNED`), tới quầy quét QR (`IN_TRANSIT`). CG và PA nhận mã theo dõi.
+4. Bàn giao: OTP 4 số trên app CG/PA, hoặc ảnh kiện kèm chữ ký (`pod_image_url`). Xong thì `DELIVERED`.
+5. Sau giao: cộng tồn cá nhân PA, gia hạn lịch nhắc, gửi hóa đơn cho CG.
+
+## Ngoại lệ
+
+- P từ chối: bắt buộc `rejection_reason` (hết hàng, toa hết hạn, thiếu chỉ định). Hoàn tiền nếu đã trả online, báo CG, gợi ý nhà thuốc khác. Trạng thái `CANCELLED`, nhập lại kho.
+- Giao thất bại: 3 lần gọi trong 10–15 phút. Alert CG. Vẫn thất bại thì hoàn kiện về quầy, `CANCELLED`.
