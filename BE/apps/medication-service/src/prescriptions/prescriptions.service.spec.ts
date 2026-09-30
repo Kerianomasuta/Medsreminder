@@ -35,7 +35,7 @@ describe('PrescriptionsService', () => {
     const dataSource = {
       transaction: vi.fn(async (work: (current: typeof manager) => Promise<unknown>) => work(manager)),
     };
-    service = new PrescriptionsService(dataSource as never, {} as never, {} as never, {} as never);
+    service = new PrescriptionsService(dataSource as never, {} as never, {} as never);
   }
 
   beforeEach(() => {

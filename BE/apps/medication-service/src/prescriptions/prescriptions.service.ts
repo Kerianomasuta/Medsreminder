@@ -32,7 +32,6 @@ export type CreatePrescriptionInput = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
-  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   items?: PrescriptionItemInput[];
@@ -42,7 +41,6 @@ export type UpdatePrescriptionInput = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
-  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   isActive?: boolean;
@@ -53,12 +51,6 @@ export type UpdatePrescriptionItemInput = {
   currentStock?: number;
   reorderThreshold?: number;
   instructions?: string | null;
-};
-
-export type UpdateScheduleInput = {
-  reminderTime?: string;
-  daysOfWeek?: number[];
-  isActive?: boolean;
 };
 
 type PreparedItem = {
@@ -78,8 +70,6 @@ export class PrescriptionsService {
     private readonly prescriptions: Repository<Prescription>,
     @InjectRepository(PrescriptionItem)
     private readonly prescriptionItems: Repository<PrescriptionItem>,
-    @InjectRepository(ScheduleRule)
-    private readonly scheduleRules: Repository<ScheduleRule>,
   ) {}
 
   async create(payload: CreatePrescriptionInput) {
@@ -102,7 +92,6 @@ export class PrescriptionsService {
           title,
           doctorName: this.optionalText(payload.doctorName),
           prescriptionCode: this.optionalText(payload.prescriptionCode),
-          imagePrescriptionUrl: this.optionalText(payload.imagePrescriptionUrl),
           startDate,
           endDate,
           isActive: true,
@@ -138,7 +127,6 @@ export class PrescriptionsService {
       'title',
       'doctorName',
       'prescriptionCode',
-      'imagePrescriptionUrl',
       'startDate',
       'endDate',
       'isActive',
@@ -165,9 +153,6 @@ export class PrescriptionsService {
     }
     if (payload.prescriptionCode !== undefined) {
       prescription.prescriptionCode = this.optionalText(payload.prescriptionCode);
-    }
-    if (payload.imagePrescriptionUrl !== undefined) {
-      prescription.imagePrescriptionUrl = this.optionalText(payload.imagePrescriptionUrl);
     }
     if (payload.isActive !== undefined) {
       prescription.isActive = this.requireBoolean(payload.isActive, 'isActive');
@@ -219,28 +204,6 @@ export class PrescriptionsService {
 
     const saved = await this.prescriptionItems.save(item);
     return this.toItem(saved, item.scheduleRules ?? []);
-  }
-
-  async updateSchedule(id: string, payload: UpdateScheduleInput) {
-    const hasChange = ['reminderTime', 'daysOfWeek', 'isActive'].some(
-      (field) => payload[field as keyof UpdateScheduleInput] !== undefined,
-    );
-    if (!hasChange) {
-      throw ErrorHandling.BadRequest('Provide at least one field to update');
-    }
-
-    const rule = await this.findSchedule(id);
-    if (payload.reminderTime !== undefined) {
-      rule.reminderTime = this.requireTime(payload.reminderTime);
-    }
-    if (payload.daysOfWeek !== undefined) {
-      rule.daysOfWeek = this.normalizeDays(payload.daysOfWeek);
-    }
-    if (payload.isActive !== undefined) {
-      rule.isActive = this.requireBoolean(payload.isActive, 'isActive');
-    }
-
-    return this.toSchedule(await this.scheduleRules.save(rule));
   }
 
   private async saveItem(
@@ -338,15 +301,6 @@ export class PrescriptionsService {
       throw ErrorHandling.NotFound('Prescription item not found');
     }
     return item;
-  }
-
-  private async findSchedule(id: string) {
-    this.requireUuid(id, 'schedule id');
-    const rule = await this.scheduleRules.findOne({ where: { id } });
-    if (!rule) {
-      throw ErrorHandling.NotFound('Schedule not found');
-    }
-    return rule;
   }
 
   private requireUuid(value: string | undefined, label: string) {
@@ -461,7 +415,6 @@ export class PrescriptionsService {
       title: prescription.title,
       doctorName: prescription.doctorName,
       prescriptionCode: prescription.prescriptionCode,
-      imagePrescriptionUrl: prescription.imagePrescriptionUrl,
       startDate: prescription.startDate,
       endDate: prescription.endDate,
       isActive: prescription.isActive,

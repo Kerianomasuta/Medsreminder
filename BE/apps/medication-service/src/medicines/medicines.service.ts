@@ -23,10 +23,14 @@ export class MedicinesService {
   ) {}
 
   async create(payload: MedicinePayload) {
+    const name = this.requireName(payload.name);
+    const unit = this.requireUnit(payload.unit);
+    await this.assertUnique(name, unit);
+
     const medicine = this.medicines.create({
-      name: this.requireName(payload.name),
+      name,
       genericName: this.optionalText(payload.genericName),
-      unit: this.requireUnit(payload.unit),
+      unit,
       instructionNote: this.optionalText(payload.instructionNote),
       imageUrl: this.optionalText(payload.imageUrl),
     });
@@ -60,15 +64,17 @@ export class MedicinesService {
     }
 
     const medicine = await this.findMedicine(id);
+    const nextName = payload.name !== undefined ? this.requireName(payload.name) : medicine.name;
+    const nextUnit = payload.unit !== undefined ? this.requireUnit(payload.unit) : medicine.unit;
 
-    if (payload.name !== undefined) {
-      medicine.name = this.requireName(payload.name);
+    if (payload.name !== undefined || payload.unit !== undefined) {
+      await this.assertUnique(nextName, nextUnit, medicine.id);
     }
+
+    medicine.name = nextName;
+    medicine.unit = nextUnit;
     if (payload.genericName !== undefined) {
       medicine.genericName = this.optionalText(payload.genericName);
-    }
-    if (payload.unit !== undefined) {
-      medicine.unit = this.requireUnit(payload.unit);
     }
     if (payload.instructionNote !== undefined) {
       medicine.instructionNote = this.optionalText(payload.instructionNote);
@@ -91,6 +97,16 @@ export class MedicinesService {
     }
 
     return medicine;
+  }
+
+  private async assertUnique(name: string, unit: MedicineUnit, ignoreId?: string) {
+    const existing = await this.medicines.findOne({
+      where: { name: ILike(name.replace(/[%_\\]/g, '\\$&')), unit },
+    });
+
+    if (existing && existing.id !== ignoreId) {
+      throw ErrorHandling.Conflict('A medicine with this name and unit already exists');
+    }
   }
 
   private requireName(name: string | null | undefined) {
