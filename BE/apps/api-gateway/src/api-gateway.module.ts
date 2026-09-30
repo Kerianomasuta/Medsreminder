@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config'
-import { AuthController } from './auth/auth.controller.js';
-import { AuthService } from './auth/auth.service.js';
 import { AuthModule } from './auth/auth.module.js';
+import { MedicinesModule } from './medicines/medicines.module.js';
 
 @Module({
   imports: [
@@ -12,6 +11,7 @@ import { AuthModule } from './auth/auth.module.js';
     }),
 
     AuthModule,
+    MedicinesModule,
   ],
 })
 export class ApiGatewayModule {}

@@ -1,0 +1,57 @@
+name: meds
+
+services:
+  api-gateway:
+    image: ${REGISTRY}/api-gateway:${IMAGE_TAG}
+    container_name: meds-api-gateway
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./apps/api-gateway/.env
+    environment:
+      NODE_ENV: production
+      GATEWAY_PORT: 3000
+      USER_SERVICE_HOST: user-service
+      USER_SERVICE_PORT: 3529
+      MEDICATION_SERVICE_HOST: medication-service
+      MEDICATION_SERVICE_PORT: 3530
+    depends_on:
+      - user-service
+      - medication-service
+    networks:
+      - meds-network
+    restart: unless-stopped
+
+  user-service:
+    image: ${REGISTRY}/user-service:${IMAGE_TAG}
+    container_name: meds-user-service
+    env_file:
+      - ./apps/user-service/.env
+    environment:
+      NODE_ENV: production
+      USER_SERVICE_HOST: 0.0.0.0
+      USER_SERVICE_PORT: 3529
+    expose:
+      - "3529"
+    networks:
+      - meds-network
+    restart: unless-stopped
+
+  medication-service:
+    image: ${REGISTRY}/medication-service:${IMAGE_TAG}
+    container_name: meds-medication-service
+    env_file:
+      - ./apps/medication-service/.env
+    environment:
+      NODE_ENV: production
+      MEDICATION_SERVICE_HOST: 0.0.0.0
+      MEDICATION_SERVICE_PORT: 3530
+    expose:
+      - "3530"
+    networks:
+      - meds-network
+    restart: unless-stopped
+
+networks:
+  meds-network:
+    driver: bridge
