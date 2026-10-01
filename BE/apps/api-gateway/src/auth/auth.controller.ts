@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Post, Req, Res, UnauthorizedException, UseGuards, HttpException } from "@nestjs/common";
 import { AuthService } from "./auth.service.js";
 import { LoginDto } from "./dto/login.dto.js";
 import { lastValueFrom } from "rxjs";
@@ -41,8 +41,12 @@ export class AuthController {
         @Body() loginDto: LoginDto,
         @Res({ passthrough: true }) res: Response,
     ) {
-        const tcpResponse = await lastValueFrom(this.authService.login(loginDto))
-
+        let tcpResponse;
+        try {
+            tcpResponse = await lastValueFrom(this.authService.login(loginDto));
+        } catch (error) {
+            throw new HttpException(error.message || 'Internal server error', error.status || 500);
+        }
         if (tcpResponse?.status === 200) {
             res.cookie('accessToken', tcpResponse?.data?.accessToken, {
                 httpOnly: true,
