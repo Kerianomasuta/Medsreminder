@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
+import 'prescriptions/prescription_list_screen.dart';
 
 class CaregiverHome extends StatelessWidget {
   const CaregiverHome({
@@ -307,65 +308,26 @@ class CaregiverPrescriptionPage extends StatelessWidget {
     super.key,
     required this.added,
     required this.onAdded,
+    this.patientId,
+    this.patientName,
   });
 
   final bool added;
   final VoidCallback onAdded;
+  // These come from the active patient selection in AppShell.
+  // Replace with real UUID from auth/patient state in production.
+  final String? patientId;
+  final String? patientName;
 
   @override
-  Widget build(BuildContext context) => AppScroll(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const PageIntro(
-          'Đơn thuốc của cô Lan',
-          'Quản lý và thiết lập lịch nhắc',
-        ),
-        const Glass(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.link_rounded, color: Color(0xFF249D76)),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Đã liên kết tài khoản PA\nNguyễn Thị Lan',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Icon(Icons.check_circle_rounded, color: Color(0xFF249D76)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        const PrescriptionCard(
-          'Liệu trình huyết áp & tiểu đường',
-          '16/09 - 16/10/2026',
-          '3 thuốc · 3 khung giờ',
-        ),
-        const SizedBox(height: 12),
-        if (added)
-          const PrescriptionCard(
-            'Vitamin tổng hợp',
-            '16/09 - 16/11/2026',
-            '1 thuốc · 08:00',
-          ),
-        const SizedBox(height: 18),
-        OutlinedButton.icon(
-          onPressed: () => showAddMedicineModal(
-            context,
-            onAdded: onAdded,
-            isPatient: false,
-          ),
-          icon: const Icon(Icons.add_circle_outline_rounded),
-          label: const Text('Thêm đơn thuốc & giờ nhắc'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
-          ),
-        ),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final pid = patientId ?? 'demo-patient-id-not-set';
+    final pname = patientName ?? 'Bệnh nhân';
+    return PrescriptionListScreen(
+      patientId: pid,
+      patientName: pname,
+    );
+  }
 }
 
 class CaregiverProfilePage extends StatefulWidget {
