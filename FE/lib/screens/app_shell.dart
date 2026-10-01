@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/models.dart';
 import '../widgets/widgets.dart';
 
@@ -16,6 +17,8 @@ class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
     required this.role,
+    required this.userName,
+    required this.onLogout,
     required this.doseTaken,
     required this.doseMissed,
     required this.prescriptionAdded,
@@ -33,6 +36,8 @@ class AppShell extends StatefulWidget {
   });
 
   final AppRole role;
+  final String userName;
+  final Future<void> Function() onLogout;
   final bool doseTaken, doseMissed, prescriptionAdded;
   final List<PatientProfileItem> linkedPatients;
   final int activePatientIndex;
@@ -40,7 +45,8 @@ class AppShell extends StatefulWidget {
   final ValueChanged<AppRole> onRoleChanged;
   final VoidCallback onTaken, onMissed, onPrescriptionAdded;
   final ValueChanged<OrderStage> onOrderStageChanged;
-  final void Function(String code, {String? name, String? relation}) onAddPatient;
+  final void Function(String code, {String? name, String? relation})
+  onAddPatient;
   final ValueChanged<int> onRemovePatient;
   final ValueChanged<int> onSelectPatient;
 
@@ -113,7 +119,11 @@ class _AppShellState extends State<AppShell>
       body: SafeArea(
         child: Column(
           children: [
-            TopBar(role: widget.role, onRoleChanged: widget.onRoleChanged),
+            TopBar(
+              role: widget.role,
+              userName: widget.userName,
+              onLogout: widget.onLogout,
+            ),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 420),
@@ -154,59 +164,62 @@ class _AppShellState extends State<AppShell>
       onTaken: widget.onTaken,
     ),
 
-    AppRole.caregiver => tab == 2
-        ? CaregiverPharmacyScreen(
-      key: ValueKey('${widget.role}$tab'),
-      onSendRefill: () => widget.onRoleChanged(AppRole.pharmacist),
-    )
-        : tab == 3
-        ? CaregiverTrackingScreen(
-      key: ValueKey('${widget.role}$tab'),
-      onReceiptConfirmed: () => setState(() => tab = 0),
-    )
-        : CaregiverHome(
-      key: ValueKey('${widget.role}$tab${widget.activePatientIndex}'),
-      tab: tab,
-      doseTaken: widget.doseTaken,
-      doseMissed: widget.doseMissed,
-      prescriptionAdded: widget.prescriptionAdded,
-      linkedPatients: widget.linkedPatients,
-      activePatientIndex: widget.activePatientIndex,
-      onMissed: widget.onMissed,
-      onPrescriptionAdded: widget.onPrescriptionAdded,
-      onAddPatient: widget.onAddPatient,
-      onRemovePatient: widget.onRemovePatient,
-      onSelectPatient: widget.onSelectPatient,
-    ),
+    AppRole.caregiver =>
+      tab == 2
+          ? CaregiverPharmacyScreen(
+              key: ValueKey('${widget.role}$tab'),
+              onSendRefill: () => widget.onRoleChanged(AppRole.pharmacist),
+            )
+          : tab == 3
+          ? CaregiverTrackingScreen(
+              key: ValueKey('${widget.role}$tab'),
+              onReceiptConfirmed: () => setState(() => tab = 0),
+            )
+          : CaregiverHome(
+              key: ValueKey('${widget.role}$tab${widget.activePatientIndex}'),
+              tab: tab,
+              doseTaken: widget.doseTaken,
+              doseMissed: widget.doseMissed,
+              prescriptionAdded: widget.prescriptionAdded,
+              linkedPatients: widget.linkedPatients,
+              activePatientIndex: widget.activePatientIndex,
+              onMissed: widget.onMissed,
+              onPrescriptionAdded: widget.onPrescriptionAdded,
+              onAddPatient: widget.onAddPatient,
+              onRemovePatient: widget.onRemovePatient,
+              onSelectPatient: widget.onSelectPatient,
+            ),
 
-    AppRole.pharmacist => tab == 0
-        ? PharmacistVerificationScreen(
-      key: ValueKey('${widget.role}$tab'),
-      onApproveAndDispatch: () => widget.onRoleChanged(AppRole.shipper),
-    )
-        : PharmacistHome(
-      key: ValueKey('${widget.role}$tab'),
-      tab: tab,
-      orderStage: widget.orderStage,
-      onOrderStageChanged: widget.onOrderStageChanged,
-    ),
+    AppRole.pharmacist =>
+      tab == 0
+          ? PharmacistVerificationScreen(
+              key: ValueKey('${widget.role}$tab'),
+              onApproveAndDispatch: () => widget.onRoleChanged(AppRole.shipper),
+            )
+          : PharmacistHome(
+              key: ValueKey('${widget.role}$tab'),
+              tab: tab,
+              orderStage: widget.orderStage,
+              onOrderStageChanged: widget.onOrderStageChanged,
+            ),
 
-    AppRole.shipper => tab == 0
-        ? ShipperTaskScreen(
-      key: ValueKey('${widget.role}$tab'),
-      onConfirmPickup: () {
-        widget.onRoleChanged(AppRole.caregiver);
-        Future.delayed(const Duration(milliseconds: 150), () {
-          if (mounted) setState(() => tab = 3);
-        });
-      },
-    )
-        : ShipperHome(
-      key: ValueKey('${widget.role}$tab'),
-      tab: tab,
-      orderStage: widget.orderStage,
-      onOrderStageChanged: widget.onOrderStageChanged,
-    ),
+    AppRole.shipper =>
+      tab == 0
+          ? ShipperTaskScreen(
+              key: ValueKey('${widget.role}$tab'),
+              onConfirmPickup: () {
+                widget.onRoleChanged(AppRole.caregiver);
+                Future.delayed(const Duration(milliseconds: 150), () {
+                  if (mounted) setState(() => tab = 3);
+                });
+              },
+            )
+          : ShipperHome(
+              key: ValueKey('${widget.role}$tab'),
+              tab: tab,
+              orderStage: widget.orderStage,
+              onOrderStageChanged: widget.onOrderStageChanged,
+            ),
 
     AppRole.admin => AdminHome(
       key: ValueKey('${widget.role}$tab'),
@@ -216,9 +229,15 @@ class _AppShellState extends State<AppShell>
 }
 
 class TopBar extends StatelessWidget {
-  const TopBar({super.key, required this.role, required this.onRoleChanged});
+  const TopBar({
+    super.key,
+    required this.role,
+    required this.userName,
+    required this.onLogout,
+  });
   final AppRole role;
-  final ValueChanged<AppRole> onRoleChanged;
+  final String userName;
+  final Future<void> Function() onLogout;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -228,7 +247,7 @@ class TopBar extends StatelessWidget {
         const BrandMark(),
         const Spacer(),
         GestureDetector(
-          onTap: () => _showRoles(context),
+          onTap: () => _showAccount(context),
           child: Glass(
             radius: 18,
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
@@ -241,9 +260,13 @@ class TopBar extends StatelessWidget {
                   child: Icon(role.icon, color: Colors.white, size: 15),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  role.code,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 145),
+                  child: Text(
+                    userName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
                 const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
               ],
@@ -254,7 +277,7 @@ class TopBar extends StatelessWidget {
     ),
   );
 
-  void _showRoles(BuildContext context) => showModalBottomSheet(
+  void _showAccount(BuildContext context) => showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     builder: (_) => Container(
@@ -275,35 +298,31 @@ class TopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Chuyển vai trò demo',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+          Text(
+            userName,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
           ),
-          const SizedBox(height: 10),
-          ...AppRole.values.map(
-                (item) => ListTile(
-              leading: CircleAvatar(
-                backgroundColor: item == role
-                    ? const Color(0xFF5268F5)
-                    : const Color(0xFFE6E9FF),
-                child: Icon(
-                  item.icon,
-                  color: item == role ? Colors.white : const Color(0xFF33418C),
-                ),
+          const SizedBox(height: 4),
+          Text(role.label, style: const TextStyle(color: Color(0xFF66738A))),
+          const SizedBox(height: 14),
+          Material(
+            color: const Color(0xFFFFE9EC),
+            borderRadius: BorderRadius.circular(16),
+            child: ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              title: Text(
-                item.label,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              leading: const Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFC34B55),
               ),
-              trailing: item == role
-                  ? const Icon(
-                Icons.check_circle_rounded,
-                color: Color(0xFF5268F5),
-              )
-                  : null,
+              title: const Text(
+                'Đăng xuất',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
               onTap: () {
                 Navigator.pop(context);
-                onRoleChanged(item);
+                onLogout();
               },
             ),
           ),

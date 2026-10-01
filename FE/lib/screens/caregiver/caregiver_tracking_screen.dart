@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_components.dart';
+import '../../widgets/custom_components.dart';
 
 /// Màn hình 4: Theo Dõi Trực Tiếp Lộ Trình Giao Thuốc (Live Tracking)
 class CaregiverTrackingScreen extends StatelessWidget {
