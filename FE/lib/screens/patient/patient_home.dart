@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/widgets.dart';
+import 'medicine_catalog_page.dart';
 
 class PatientHome extends StatelessWidget {
   const PatientHome({
@@ -22,6 +23,8 @@ class PatientHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (tab == 1) return const MedicineCatalogPage();
+
     if (tab == 1) {
       return AppScroll(
         child: Column(

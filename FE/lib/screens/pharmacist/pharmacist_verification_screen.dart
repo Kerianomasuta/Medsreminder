@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_components.dart';
+import '../../widgets/custom_components.dart';
 
 /// Màn hình 2: Quy trình Xác minh & Phê duyệt của Dược sĩ (Pharmacist)
 class PharmacistVerificationScreen extends StatelessWidget {
