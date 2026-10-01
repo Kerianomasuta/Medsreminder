@@ -15,11 +15,14 @@ services:
       GATEWAY_PORT: 3000
       USER_SERVICE_HOST: user-service
       USER_SERVICE_PORT: 3529
+      MEDICATION_SERVICE_HOST: medication-service
+      MEDICATION_SERVICE_PORT: 3530
     volumes:
       - .:/app
       - /app/node_modules
     depends_on:
       - user-service
+      - medication-service
     networks:
       - meds-network
   
@@ -46,6 +49,29 @@ services:
     depends_on:
       - mongodb
       - redis
+    networks:
+      - meds-network
+
+  medication-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        APP_NAME: medication-service
+    container_name: meds-medication-service
+    command: ["npm", "run", "start:dev", "--", "medication-service"]
+    env_file:
+      - ./apps/medication-service/.env
+    environment:
+      NODE_ENV: development
+      MEDICATION_SERVICE_HOST: 0.0.0.0
+      MEDICATION_SERVICE_PORT: 3530
+    expose:
+      - "3530"
+    volumes:
+      - .:/app
+      - /app/node_modules
     networks:
       - meds-network
 
