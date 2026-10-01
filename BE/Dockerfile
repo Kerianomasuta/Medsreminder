@@ -7,7 +7,7 @@ COPY package*.json ./
 FROM base AS development
 
     #cai toan bo thu vien bao gom ca dependency
-RUN npm install
+RUN npm install --legacy-peer-deps
     #copy src code vao container
 COPY . .
 
@@ -18,7 +18,7 @@ CMD ["npm", "run", "start:dev"]
 
 #BUILD CODE PHRASE
 FROM base AS builder
-RUN npm install
+RUN npm install --legacy-peer-deps
 COPY . .
 
     #build app duoc chi dinh
