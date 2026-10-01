@@ -1,0 +1,11 @@
+# Generated Flutter/Dart files accidentally created at the repository root.
+/.dart_tool/
+/build/
+
+# Root-level IDE and platform artifacts. The Flutter application lives in FE/.
+/.idea/
+/android/
+/ios/
+/macos/
+/*.iml
+
