@@ -46,21 +46,18 @@ class MedicineInput {
     required this.unit,
     this.genericName,
     this.instructionNote,
-    this.imageUrl,
   });
 
   final String name;
   final String? genericName;
   final MedicineUnit unit;
   final String? instructionNote;
-  final String? imageUrl;
 
   Map<String, dynamic> toJson() => {
     'name': name.trim(),
     'genericName': _optional(genericName),
     'unit': unit.apiValue,
     'instructionNote': _optional(instructionNote),
-    'imageUrl': _optional(imageUrl),
   };
 
   static String? _optional(String? value) {

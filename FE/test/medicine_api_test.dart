@@ -18,6 +18,7 @@ void main() {
 
   test('calls all four medicine endpoints with the BE contract', () async {
     final calls = <String>[];
+    final requestBodies = <Map<String, dynamic>>[];
     final client = MockClient((request) async {
       calls.add(
         '${request.method} ${request.url.path}${request.url.hasQuery ? '?${request.url.query}' : ''}',
@@ -28,6 +29,9 @@ void main() {
           200,
           headers: const {'content-type': 'application/json; charset=utf-8'},
         );
+      }
+      if (request.body.isNotEmpty) {
+        requestBodies.add(jsonDecode(request.body) as Map<String, dynamic>);
       }
       return http.Response(
         jsonEncode(medicineJson),
@@ -54,5 +58,7 @@ void main() {
       'POST /api/v1/medicines',
       'PATCH /api/v1/medicines/${medicineJson['id']}',
     ]);
+    expect(requestBodies, hasLength(2));
+    expect(requestBodies, everyElement(isNot(contains('imageUrl'))));
   });
 }

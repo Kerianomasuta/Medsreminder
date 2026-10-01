@@ -58,12 +58,25 @@ class _MedicineCatalogPageState extends State<MedicineCatalogPage> {
   }
 
   Future<void> _openCreate() async {
-    final input = await showDialog<MedicineInput>(
+    final inputs = await showDialog<List<MedicineInput>>(
       context: context,
       builder: (_) => const MedicineFormDialog(),
     );
-    if (input == null) return;
-    await _runMutation(() => _api.create(input), 'Đã thêm thuốc mới');
+    if (inputs == null || inputs.isEmpty) return;
+
+    try {
+      await Future.wait(inputs.map(_api.create));
+      if (!mounted) return;
+      _showMessage(
+        inputs.length == 1
+            ? 'Đã thêm thuốc mới'
+            : 'Đã thêm ${inputs.length} thuốc mới',
+      );
+      await _load();
+    } catch (error) {
+      _showMessage(error.toString(), isError: true);
+      await _load();
+    }
   }
 
   Future<void> _openDetails(Medicine summary) async {
@@ -81,13 +94,13 @@ class _MedicineCatalogPageState extends State<MedicineCatalogPage> {
   }
 
   Future<void> _openEdit(Medicine medicine) async {
-    final input = await showDialog<MedicineInput>(
+    final inputs = await showDialog<List<MedicineInput>>(
       context: context,
       builder: (_) => MedicineFormDialog(medicine: medicine),
     );
-    if (input == null) return;
+    if (inputs == null || inputs.isEmpty) return;
     await _runMutation(
-      () => _api.update(medicine.id, input),
+      () => _api.update(medicine.id, inputs.single),
       'Đã cập nhật thuốc',
     );
   }
@@ -330,96 +343,101 @@ class MedicineFormDialog extends StatefulWidget {
 
 class _MedicineFormDialogState extends State<MedicineFormDialog> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _name;
-  late final TextEditingController _genericName;
-  late final TextEditingController _note;
-  late final TextEditingController _imageUrl;
-  late MedicineUnit _unit;
+  final List<_MedicineDraft> _drafts = [];
+
+  bool get _isEditing => widget.medicine != null;
 
   @override
   void initState() {
     super.initState();
-    final medicine = widget.medicine;
-    _name = TextEditingController(text: medicine?.name);
-    _genericName = TextEditingController(text: medicine?.genericName);
-    _note = TextEditingController(text: medicine?.instructionNote);
-    _imageUrl = TextEditingController(text: medicine?.imageUrl);
-    _unit = medicine?.unit ?? MedicineUnit.vien;
+    _drafts.add(_MedicineDraft.fromMedicine(widget.medicine));
   }
 
   @override
   void dispose() {
-    _name.dispose();
-    _genericName.dispose();
-    _note.dispose();
-    _imageUrl.dispose();
+    for (final draft in _drafts) {
+      draft.dispose();
+    }
     super.dispose();
+  }
+
+  void _addDraft() {
+    setState(() => _drafts.add(_MedicineDraft.fromMedicine(null)));
+  }
+
+  void _removeDraft(int index) {
+    if (_drafts.length == 1) return;
+    final draft = _drafts.removeAt(index);
+    draft.dispose();
+    setState(() {});
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(
+      context,
+      _drafts
+          .map(
+            (draft) => MedicineInput(
+              name: draft.name.text,
+              genericName: draft.genericName.text,
+              unit: draft.unit,
+              instructionNote: draft.note.text,
+            ),
+          )
+          .toList(),
+    );
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-    title: Text(widget.medicine == null ? 'Thêm thuốc' : 'Chỉnh sửa thuốc'),
+    titlePadding: const EdgeInsets.fromLTRB(24, 22, 16, 0),
+    title: Row(
+      children: [
+        Expanded(child: Text(_isEditing ? 'Chỉnh sửa thuốc' : 'Thêm thuốc')),
+        if (!_isEditing)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9EDFF),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${_drafts.length} thuốc',
+              style: const TextStyle(
+                color: Color(0xFF4F62D7),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+      ],
+    ),
     content: SizedBox(
-      width: 460,
+      width: 560,
       child: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _name,
-                autofocus: true,
-                decoration: _decoration(
-                  'Tên thuốc *',
-                  Icons.medication_outlined,
-                ),
-                validator: (value) => value?.trim().isEmpty == true
-                    ? 'Vui lòng nhập tên thuốc'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _genericName,
-                decoration: _decoration(
-                  'Tên hoạt chất',
-                  Icons.science_outlined,
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<MedicineUnit>(
-                initialValue: _unit,
-                decoration: _decoration('Đơn vị *', Icons.straighten_rounded),
-                items: MedicineUnit.values
-                    .map(
-                      (unit) => DropdownMenuItem(
-                        value: unit,
-                        child: Text(unit.label),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _unit = value ?? _unit),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _note,
-                maxLines: 2,
-                decoration: _decoration(
-                  'Hướng dẫn sử dụng',
-                  Icons.notes_rounded,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _imageUrl,
-                keyboardType: TextInputType.url,
-                decoration: _decoration(
-                  'URL hình ảnh (không bắt buộc)',
-                  Icons.image_outlined,
-                ),
-              ),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.64,
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: _drafts.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => _MedicineDraftCard(
+              key: ObjectKey(_drafts[index]),
+              draft: _drafts[index],
+              index: index,
+              autofocus: index == 0,
+              canRemove: !_isEditing && _drafts.length > 1,
+              onRemove: () => _removeDraft(index),
+              decoration: _decoration,
+              onUnitChanged: (unit) {
+                setState(() => _drafts[index].unit = unit);
+              },
+            ),
           ),
         ),
       ),
@@ -429,21 +447,21 @@ class _MedicineFormDialogState extends State<MedicineFormDialog> {
         onPressed: () => Navigator.pop(context),
         child: const Text('Hủy'),
       ),
+      if (!_isEditing)
+        OutlinedButton.icon(
+          onPressed: _addDraft,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Thêm thuốc khác'),
+        ),
       FilledButton(
-        onPressed: () {
-          if (!_formKey.currentState!.validate()) return;
-          Navigator.pop(
-            context,
-            MedicineInput(
-              name: _name.text,
-              genericName: _genericName.text,
-              unit: _unit,
-              instructionNote: _note.text,
-              imageUrl: _imageUrl.text,
-            ),
-          );
-        },
-        child: Text(widget.medicine == null ? 'Thêm thuốc' : 'Lưu thay đổi'),
+        onPressed: _submit,
+        child: Text(
+          _isEditing
+              ? 'Lưu thay đổi'
+              : _drafts.length == 1
+              ? 'Thêm thuốc'
+              : 'Thêm ${_drafts.length} thuốc',
+        ),
       ),
     ],
   );
@@ -456,6 +474,136 @@ class _MedicineFormDialogState extends State<MedicineFormDialog> {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
       borderSide: BorderSide.none,
+    ),
+  );
+}
+
+class _MedicineDraft {
+  _MedicineDraft.fromMedicine(Medicine? medicine)
+    : name = TextEditingController(text: medicine?.name),
+      genericName = TextEditingController(text: medicine?.genericName),
+      note = TextEditingController(text: medicine?.instructionNote),
+      unit = medicine?.unit ?? MedicineUnit.vien;
+
+  final TextEditingController name;
+  final TextEditingController genericName;
+  final TextEditingController note;
+  MedicineUnit unit;
+
+  void dispose() {
+    name.dispose();
+    genericName.dispose();
+    note.dispose();
+  }
+}
+
+class _MedicineDraftCard extends StatelessWidget {
+  const _MedicineDraftCard({
+    super.key,
+    required this.draft,
+    required this.index,
+    required this.autofocus,
+    required this.canRemove,
+    required this.onRemove,
+    required this.decoration,
+    required this.onUnitChanged,
+  });
+
+  final _MedicineDraft draft;
+  final int index;
+  final bool autofocus;
+  final bool canRemove;
+  final VoidCallback onRemove;
+  final InputDecoration Function(String, IconData) decoration;
+  final ValueChanged<MedicineUnit> onUnitChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8F9FE),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE1E6F5)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE4E9FF),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '${index + 1}',
+                style: const TextStyle(
+                  color: Color(0xFF4F62D7),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Thuốc ${index + 1}',
+                style: const TextStyle(
+                  color: Color(0xFF263653),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (canRemove)
+              IconButton(
+                tooltip: 'Xóa thuốc này',
+                onPressed: onRemove,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFC44955),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: draft.name,
+          autofocus: autofocus,
+          textInputAction: TextInputAction.next,
+          decoration: decoration('Tên thuốc *', Icons.medication_outlined),
+          validator: (value) =>
+              (value ?? '').trim().isEmpty ? 'Vui lòng nhập tên thuốc' : null,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: draft.genericName,
+          textInputAction: TextInputAction.next,
+          decoration: decoration('Tên hoạt chất', Icons.science_outlined),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<MedicineUnit>(
+          initialValue: draft.unit,
+          decoration: decoration('Đơn vị *', Icons.straighten_rounded),
+          items: MedicineUnit.values
+              .map(
+                (unit) =>
+                    DropdownMenuItem(value: unit, child: Text(unit.label)),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value != null) onUnitChanged(value);
+          },
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: draft.note,
+          maxLines: 2,
+          decoration: decoration('Hướng dẫn sử dụng', Icons.notes_rounded),
+        ),
+      ],
     ),
   );
 }
