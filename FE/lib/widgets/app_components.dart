@@ -411,22 +411,15 @@ class DayStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final activeDay = selectedDay ?? now.weekday;
-    // Thứ Hai của tuần hiện tại
-    final monday = DateTime(now.year, now.month, now.day).subtract(
-      Duration(days: now.weekday - 1),
-    );
 
     return Glass(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       child: Row(
         children: _days.map((item) {
           final int day = item['day'] as int;
           final String label = item['label'] as String;
-          final date = monday.add(Duration(days: day - 1));
-          final int dateNum = date.day;
           final bool isSelected = day == activeDay;
           final bool isToday = day == now.weekday;
-          final int count = badgeCounts?[day] ?? 0;
 
           return Expanded(
             child: Padding(
@@ -438,7 +431,8 @@ class DayStrip extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF5368F4)
@@ -454,45 +448,16 @@ class DayStrip extends StatelessWidget {
                             ]
                           : null,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : (isToday ? const Color(0xFF5167F2) : const Color(0xFF566080)),
-                            fontWeight: isSelected || isToday ? FontWeight.w800 : FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$dateNum',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : (isToday ? const Color(0xFF1E293B) : const Color(0xFF64748B)),
-                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (count > 0)
-                          Container(
-                            width: 5,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isSelected ? Colors.white : const Color(0xFF5368F4),
-                            ),
-                          )
-                        else
-                          const SizedBox(height: 5),
-                      ],
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : (isToday ? const Color(0xFF5167F2) : const Color(0xFF566080)),
+                        fontWeight: isSelected || isToday ? FontWeight.w800 : FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
