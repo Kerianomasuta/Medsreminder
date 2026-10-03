@@ -16,4 +16,14 @@ export class UserService {
     async findById(userId: string): Promise<UserDocument | null> {
         return this.userModel.findOne({ _id: userId }).select("-password").exec();
     }
+
+    async createNewUser(input: {
+        email: string,
+        password: string,
+        fullName: string,
+        role: string,
+        phone: string,
+    }) {
+        return this.userModel.create(input);
+    }
 }
