@@ -6,6 +6,7 @@ import type { Request, Response } from "express";
 import { ConfigService } from "@nestjs/config";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "./guards/jwt-auth.guards.js";
+import { RegisterDto } from "./dto/register.dto.js";
 
 const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000
@@ -44,7 +45,7 @@ export class AuthController {
         let tcpResponse;
         try {
             tcpResponse = await lastValueFrom(this.authService.login(loginDto));
-        } catch (error) {
+        } catch (error: any) {
             throw new HttpException(error.message || 'Internal server error', error.status || 500);
         }
         if (tcpResponse?.status === 200) {
@@ -171,6 +172,48 @@ export class AuthController {
         return {
             status: 200,
             message: 'refresh token successfully!'
+        }
+    }
+
+    @Post('register')
+    @ApiOperation({ summary: 'Register a new user' })
+    @ApiResponse({
+        status: 201,
+        description: 'User registered successfully.',
+        schema: {
+            example: {
+                status: 201,
+                message: 'Register successfully',
+                data: {
+                    userWithoutPassword: {
+                        email: 'user@example.com',
+                        role: 'PATIENT',
+                        fullName: 'Nguyen Van A',
+                        phone: '0912345678',
+                    },
+                },
+            },
+        },
+    })
+    @ApiResponse({ status: 400, description: 'Invalid registration data.' })
+    @ApiResponse({ status: 409, description: 'Email or phone number is already registered.' })
+    async register(
+        @Body() registerDto: RegisterDto,
+    ) {
+        const tcpResponse = await lastValueFrom(
+            this.authService.register(registerDto)
+        )
+
+        const user = tcpResponse?.data?.newUser;
+
+        const { password, _id, __v, ...userWithoutPassword } = user
+
+        return {
+            status: 201,
+            message: 'Register successfully',
+            data: {
+                userWithoutPassword,
+            }
         }
     }
 }

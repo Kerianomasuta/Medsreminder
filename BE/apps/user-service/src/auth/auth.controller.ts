@@ -22,4 +22,9 @@ export class AuthController {
     async handleUserRefreshToken(@Payload() data: any) {
         return this.authService.handleUserRefreshToken(data)
     }
+    
+    @MessagePattern({ cmd: 'handle_user_register' })
+    async handleUserRegister(@Payload() data: any) {
+        return this.authService.handleUserRegister(data)
+    }
 } 
