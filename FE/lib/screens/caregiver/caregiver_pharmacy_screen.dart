@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_components.dart';
+import '../../widgets/custom_components.dart';
 
 /// Màn hình 1: Hiệu thuốc Kỹ thuật số dành cho Người chăm sóc (Caregiver)
 class CaregiverPharmacyScreen extends StatelessWidget {

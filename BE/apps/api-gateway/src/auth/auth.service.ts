@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ClientProxy } from "@nestjs/microservices";
 import { LoginDto } from "./dto/login.dto.js";
+import { RegisterDto } from "./dto/register.dto.js";
 
 @Injectable()
 export class AuthService {
@@ -26,5 +27,11 @@ export class AuthService {
         oldRefreshToken: string
     }) {
         return this.userClient.send({ cmd: `handle_user_refresh_token` }, input)
+    }
+
+    register(
+        registerDto: RegisterDto,
+    ) {
+        return this.userClient.send({ cmd: 'handle_user_register' }, registerDto);
     }
 }

@@ -385,38 +385,89 @@ class MedicationRow extends StatelessWidget {
 }
 
 class DayStrip extends StatelessWidget {
-  const DayStrip({super.key});
+  const DayStrip({
+    super.key,
+    this.selectedDay,
+    this.onDaySelected,
+    this.badgeCounts,
+  });
+
+  /// 1 = Thứ 2, 2 = Thứ 3, ..., 7 = Chủ Nhật
+  final int? selectedDay;
+  final ValueChanged<int>? onDaySelected;
+  final Map<int, int>? badgeCounts;
+
+  static const List<Map<String, dynamic>> _days = [
+    {'day': 1, 'label': 'T2'},
+    {'day': 2, 'label': 'T3'},
+    {'day': 3, 'label': 'T4'},
+    {'day': 4, 'label': 'T5'},
+    {'day': 5, 'label': 'T6'},
+    {'day': 6, 'label': 'T7'},
+    {'day': 7, 'label': 'CN'},
+  ];
 
   @override
-  Widget build(BuildContext context) => Glass(
-    padding: const EdgeInsets.all(10),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: ['T2\n16', 'T3\n17', 'T4\n18', 'T5\n19', 'T6\n20']
-          .asMap()
-          .entries
-          .map(
-            (e) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: e.key == 0
-                ? const Color(0xFF5368F4)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            e.value,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: e.key == 0 ? Colors.white : const Color(0xFF566080),
-              fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final activeDay = selectedDay ?? now.weekday;
+
+    return Glass(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Row(
+        children: _days.map((item) {
+          final int day = item['day'] as int;
+          final String label = item['label'] as String;
+          final bool isSelected = day == activeDay;
+          final bool isToday = day == now.weekday;
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onDaySelected != null ? () => onDaySelected!(day) : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF5368F4)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF5368F4).withValues(alpha: .32),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : (isToday ? const Color(0xFF5167F2) : const Color(0xFF566080)),
+                        fontWeight: isSelected || isToday ? FontWeight.w800 : FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      )
-          .toList(),
-    ),
-  );
+          );
+        }).toList(),
+      ),
+    );
+  }
 }
 
 class TimelineItem extends StatelessWidget {

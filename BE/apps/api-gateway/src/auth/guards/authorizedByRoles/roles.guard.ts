@@ -1,7 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ROLES_KEY, UserRole } from "./roles.decorator.js"
 import { Reflector } from "@nestjs/core";
-import { Observable } from "rxjs";
 
 type AccessTokenPayload = {
     userId: string,

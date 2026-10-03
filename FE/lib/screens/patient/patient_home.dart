@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/widgets.dart';
+import 'medicine_catalog_page.dart';
+import 'patient_today_view.dart';
+import 'schedule_timeline_page.dart';
 
 class PatientHome extends StatelessWidget {
   const PatientHome({
@@ -22,6 +25,8 @@ class PatientHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (tab == 1) return const MedicineCatalogPage();
+
     if (tab == 1) {
       return AppScroll(
         child: Column(
@@ -130,37 +135,7 @@ class PatientHome extends StatelessWidget {
       );
     }
     if (tab == 2) {
-      return AppScroll(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const PageIntro('Lịch uống thuốc', 'Thứ Hai, 16 tháng 9'),
-            const DayStrip(),
-            const SizedBox(height: 18),
-            TimelineItem(
-              '07:30',
-              'Sáng',
-              'Metformin · Vitamin D3',
-              doseTaken ? 'Đã hoàn thành' : 'Đã đến giờ',
-              doseTaken ? const Color(0xFF259F78) : const Color(0xFF5469F5),
-            ),
-            const TimelineItem(
-              '12:30',
-              'Trưa',
-              'Amlodipine 5mg',
-              'Sắp tới',
-              Color(0xFFF0A042),
-            ),
-            const TimelineItem(
-              '20:00',
-              'Tối',
-              'Atorvastatin 10mg',
-              'Sắp tới',
-              Color(0xFF9A72DB),
-            ),
-          ],
-        ),
-      );
+      return const ScheduleTimelinePage();
     }
     if (tab == 3) {
       return AppScroll(
@@ -325,116 +300,10 @@ class PatientHome extends StatelessWidget {
         ),
       );
     }
-    return AppScroll(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const PageIntro(
-            'Chào buổi sáng, cô Lan',
-            'Hôm nay là một ngày tuyệt vời',
-          ),
-          Glass(
-            padding: const EdgeInsets.all(20),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF5368F4), Color(0xFF8068DD)],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.wb_sunny_rounded,
-                  color: Color(0xFFFFE39A),
-                  size: 35,
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '16 tháng 9',
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                      Text(
-                        'Hôm nay có 3 liều thuốc',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: const BoxDecoration(
-                    color: Colors.white24,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.calendar_today_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          if (doseMissed) const EmergencyPatientCard(),
-          Text(
-            doseTaken ? 'Tuyệt vời, cô đã hoàn thành!' : 'Đến giờ uống thuốc',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          DoseCard(taken: doseTaken, missed: doseMissed, onTaken: onTaken),
-          const SizedBox(height: 20),
-          const Text(
-            'Tiến độ hôm nay',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          Glass(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        value: doseTaken ? .34 : 0.0,
-                        strokeWidth: 7,
-                        backgroundColor: const Color(0xFFE6E8F8),
-                      ),
-                      Text(
-                        doseTaken ? '1/3' : '0/3',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Chăm sóc sức khoẻ mỗi ngày',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      SizedBox(height: 3),
-                      Text('Còn 2 liều thuốc trong hôm nay'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return PatientTodayView(
+      doseTaken: doseTaken,
+      doseMissed: doseMissed,
+      onTaken: onTaken,
     );
   }
 }
