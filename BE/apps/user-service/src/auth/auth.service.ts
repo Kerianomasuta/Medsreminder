@@ -108,4 +108,43 @@ export class AuthService {
             }
         }
     }
+
+    async handleUserRegister(registerData: any) {
+        const {
+            email,
+            password,
+            role,
+            fullName,
+            phone
+        } = registerData;
+
+        const normalizedEmail = email.trim().toLowerCase();
+
+
+        const existingUser = await this.userService.findByEmail(normalizedEmail);
+        if (existingUser) {
+            throw ErrorHandling.BadRequest(`This user already existed!`);
+        }
+
+        const hashedPassword = await bcrypt.hashSync(password, 12);
+
+        const newUser = await this.userService.createNewUser({
+            email: email,
+            password: hashedPassword,
+            role: role,
+            fullName: fullName,
+            phone: phone,
+        });
+
+        if (!newUser) {
+            throw ErrorHandling.InternalServerError(`cannot create new User!`)
+        }
+
+        return {
+            status: 201,
+            data: {
+                newUser,
+            }
+        }
+    }
 }
