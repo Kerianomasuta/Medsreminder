@@ -49,6 +49,9 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+    depends_on:
+      - mongodb
+      - redis
     networks:
       - meds-network
 
@@ -95,6 +98,22 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+    networks:
+      - meds-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: meds-mongodb
+    ports:
+      - "27017:27017"
+    networks:
+      - meds-network
+
+  redis:
+    image: redis:alpine
+    container_name: meds-redis
+    ports:
+      - "6379:6379"
     networks:
       - meds-network
 

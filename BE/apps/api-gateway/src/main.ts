@@ -10,6 +10,11 @@ async function bootstrap() {
 
   app.use(cookieParser())
 
+  app.enableCors({
+    origin: true,
+    credentials: true
+  })
+
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
@@ -21,6 +26,7 @@ async function bootstrap() {
     .setDescription('API documentation for the Meds Reminder gateway')
     .setVersion('1.0')
     .addCookieAuth('accessToken')
+    .addCookieAuth('refreshToken')
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
