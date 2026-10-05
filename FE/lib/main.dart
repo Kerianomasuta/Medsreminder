@@ -7,10 +7,12 @@ import 'screens/app_shell.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'services/auth_api.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configureUrlStrategy();
+  await NotificationService.instance.init();
   // Đặt thanh trạng thái iOS / Android trong suốt như yêu cầu
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
