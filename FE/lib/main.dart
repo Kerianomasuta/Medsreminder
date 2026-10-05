@@ -5,6 +5,7 @@ import 'models/models.dart';
 import 'routing/url_strategy.dart';
 import 'screens/app_shell.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'services/auth_api.dart';
 import 'services/notification_service.dart';
@@ -37,6 +38,7 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   late final AuthApi _authApi;
   AuthUser? _currentUser;
   bool _checkingSession = true;
+  bool _showingRegistration = false;
   AppRole role = AppRole.patient;
   bool doseTaken = false;
   bool doseMissed = false;
@@ -73,45 +75,49 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   }
 
   Future<void> _restoreSession() async {
-    var authenticated = false;
+    AuthUser? restoredUser;
     try {
-      await Future.wait<Object?>([
+      final results = await Future.wait<Object?>([
         _authApi.refreshSession(),
         Future<void>.delayed(const Duration(milliseconds: 900)),
       ]);
-      authenticated = true;
-    } catch (_) {
-      authenticated = false;
-    }
+      restoredUser = results.first as AuthUser;
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
-      _currentUser = authenticated
-          ? const AuthUser(
-              id: '',
-              email: '',
-              fullName: 'Bệnh nhân',
-              role: AppRole.patient,
-            )
-          : null;
-      role = AppRole.patient;
+      _currentUser = restoredUser;
+      if (restoredUser != null) role = restoredUser.role;
       _checkingSession = false;
     });
-    _replaceRoute(authenticated ? '/patient' : '/login');
+    _replaceRoute(restoredUser?.role.route ?? '/login');
   }
 
   Future<void> _login(String email, String password) async {
-    await _authApi.login(email: email, password: password);
+    final user = await _authApi.login(email: email, password: password);
     if (!mounted) return;
     setState(() {
-      _currentUser = AuthUser(
-        id: '',
-        email: email,
-        fullName: email.split('@').first,
-        role: AppRole.patient,
-      );
-      role = AppRole.patient;
+      _currentUser = user;
+      role = user.role;
+      _showingRegistration = false;
     });
-    _replaceRoute('/patient');
+    _replaceRoute(user.role.route);
+  }
+
+  Future<void> _register(
+    String email,
+    String password,
+    String fullName,
+    String phone,
+    AppRole selectedRole,
+  ) async {
+    await _authApi.register(
+      email: email,
+      password: password,
+      fullName: fullName,
+      phone: phone,
+      role: selectedRole,
+    );
+    await _login(email, password);
   }
 
   Future<void> _logout() async {
@@ -120,7 +126,12 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
     } catch (_) {
       // The server session may already be expired; still clear local UI state.
     } finally {
-      if (mounted) setState(() => _currentUser = null);
+      if (mounted) {
+        setState(() {
+          _currentUser = null;
+          _showingRegistration = false;
+        });
+      }
       _replaceRoute('/login');
     }
   }
@@ -221,7 +232,23 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
     child: _checkingSession
         ? const SplashScreen(key: ValueKey('splash'))
         : _currentUser == null
-        ? LoginScreen(key: const ValueKey('login'), onLogin: _login)
+        ? _showingRegistration
+              ? RegisterScreen(
+                  key: const ValueKey('register'),
+                  onRegister: _register,
+                  onBackToLogin: () {
+                    setState(() => _showingRegistration = false);
+                    _replaceRoute('/login');
+                  },
+                )
+              : LoginScreen(
+                  key: const ValueKey('login'),
+                  onLogin: _login,
+                  onOpenRegister: () {
+                    setState(() => _showingRegistration = true);
+                    _replaceRoute('/register');
+                  },
+                )
         : AppShell(
             key: const ValueKey('app-shell'),
             role: role,
