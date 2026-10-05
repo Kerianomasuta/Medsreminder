@@ -15,9 +15,12 @@ services:
       USER_SERVICE_PORT: 3529
       MEDICATION_SERVICE_HOST: medication-service
       MEDICATION_SERVICE_PORT: 3530
+      PHARMACY_SERVICE_HOST: pharmacy-order-service
+      PHARMACY_SERVICE_PORT: 3531
     depends_on:
       - user-service
       - medication-service
+      - pharmacy-order-service
     networks:
       - meds-network
     restart: unless-stopped
@@ -48,6 +51,21 @@ services:
       MEDICATION_SERVICE_PORT: 3530
     expose:
       - "3530"
+    networks:
+      - meds-network
+    restart: unless-stopped
+
+  pharmacy-order-service:
+    image: ${REGISTRY}/pharmacy-order-service:${IMAGE_TAG}
+    container_name: meds-pharmacy-order-service
+    env_file:
+      - ./apps/pharmacy-order-service/.env
+    environment:
+      NODE_ENV: production
+      PHARMACY_SERVICE_HOST: 0.0.0.0
+      PHARMACY_SERVICE_PORT: 3531
+    expose:
+      - "3531"
     networks:
       - meds-network
     restart: unless-stopped

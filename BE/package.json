@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
-    "build:ci": "nest build api-gateway && nest build user-service && nest build medication-service",
+    "build:ci": "nest build api-gateway && nest build user-service && nest build medication-service && nest build pharmacy-order-service",
     "deploy": "nest deploy",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "start": "nest start",

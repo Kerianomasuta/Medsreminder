@@ -17,12 +17,15 @@ services:
       USER_SERVICE_PORT: 3529
       MEDICATION_SERVICE_HOST: medication-service
       MEDICATION_SERVICE_PORT: 3530
+      PHARMACY_SERVICE_HOST: pharmacy-order-service
+      PHARMACY_SERVICE_PORT: 3531
     volumes:
       - .:/app
       - /app/node_modules
     depends_on:
       - user-service
       - medication-service
+      - pharmacy-order-service
     networks:
       - meds-network
   
@@ -66,6 +69,29 @@ services:
       MEDICATION_SERVICE_PORT: 3530
     expose:
       - "3530"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - meds-network
+
+  pharmacy-order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        APP_NAME: pharmacy-order-service
+    container_name: meds-pharmacy-order-service
+    command: ["npm", "run", "start:dev", "--", "pharmacy-order-service"]
+    env_file:
+      - ./apps/pharmacy-order-service/.env
+    environment:
+      NODE_ENV: development
+      PHARMACY_SERVICE_HOST: 0.0.0.0
+      PHARMACY_SERVICE_PORT: 3531
+    expose:
+      - "3531"
     volumes:
       - .:/app
       - /app/node_modules

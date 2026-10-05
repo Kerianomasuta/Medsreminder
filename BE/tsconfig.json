@@ -39,6 +39,9 @@
     },
     {
       "path": "./apps/medication-service/tsconfig.app.json"
+    },
+    {
+      "path": "./apps/pharmacy-order-service/tsconfig.app.json"
     }
   ]
 }
