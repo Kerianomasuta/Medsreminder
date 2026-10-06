@@ -7,10 +7,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.RingtoneManager
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -21,13 +22,24 @@ class ReminderAlarmService : Service() {
         private const val TAG = "ReminderAlarmService"
         const val CHANNEL_ID = "meds_alarm_wake_channel"
         const val NOTIF_ID = 9998
+        const val ACTION_STOP_ALARM = "STOP_ALARM"
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var alarmPlayer: MediaPlayer? = null
 
     @Suppress("DEPRECATION")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "ReminderAlarmService onStartCommand")
+        Log.d(TAG, "ReminderAlarmService onStartCommand: action=${intent?.action}")
+
+        // Xử lý nút "Tắt báo thức" từ notification hoặc từ Activity
+        if (intent?.action == ACTION_STOP_ALARM) {
+            Log.d(TAG, "STOP_ALARM received — stopping sound and service")
+            stopAlarmSound()
+            stopForeground(true)
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         val medicineName = intent?.getStringExtra("medicine_name") ?: "Đến giờ uống thuốc!"
         val dosage = intent?.getStringExtra("dosage") ?: "Hãy uống thuốc đúng cữ"
@@ -41,16 +53,16 @@ class ReminderAlarmService : Service() {
                         PowerManager.ON_AFTER_RELEASE,
                 "medsreminder:alarm_service_wake"
             )
-            wakeLock?.acquire(60_000L)
+            wakeLock?.acquire(120_000L)
             Log.d(TAG, "WakeLock acquired in ReminderAlarmService")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to acquire WakeLock", e)
         }
 
-        // 2. Tạo notification channel
+        // 2. Tạo notification channel (không có âm thanh — MediaPlayer xử lý thay)
         createNotificationChannel()
 
-        // 3. Intent để mở ReminderLockActivity
+        // 3. Intent mở ReminderLockActivity (fullScreenIntent)
         val activityIntent = Intent(this, ReminderLockActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -71,7 +83,15 @@ class ReminderAlarmService : Service() {
             this, NOTIF_ID, activityIntent, pendingFlags
         )
 
-        // 4. Build foreground notification với fullScreenIntent
+        // 4. Intent Tắt báo thức cho nút action trên notification
+        val stopIntent = Intent(this, ReminderAlarmService::class.java).apply {
+            action = ACTION_STOP_ALARM
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this, NOTIF_ID + 1, stopIntent, pendingFlags
+        )
+
+        // 5. Build foreground notification với nút "Tắt báo thức"
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("⏰ Đến giờ uống thuốc!")
@@ -82,12 +102,16 @@ class ReminderAlarmService : Service() {
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setAutoCancel(false)
             .setOngoing(true)
+            .addAction(android.R.drawable.ic_delete, "Tắt báo thức", stopPendingIntent)
             .build()
 
-        // 5. Start foreground (Service context được phép bật màn hình)
+        // 6. Start foreground
         startForeground(NOTIF_ID, notification)
 
-        // 6. Mở ReminderLockActivity trực tiếp từ Service context
+        // 7. Phát nhạc báo thức lặp liên tục trong Service
+        startAlarmSound()
+
+        // 8. Mở ReminderLockActivity (nếu được phép)
         try {
             startActivity(activityIntent)
             Log.d(TAG, "ReminderLockActivity started from Service")
@@ -95,12 +119,42 @@ class ReminderAlarmService : Service() {
             Log.e(TAG, "Failed to start ReminderLockActivity from service", e)
         }
 
-        // 7. Tự stop service sau 5 giây (Activity đã hiện rồi)
-        Handler(Looper.getMainLooper()).postDelayed({
-            stopSelf()
-        }, 5000)
-
         return START_NOT_STICKY
+    }
+
+    private fun startAlarmSound() {
+        try {
+            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            alarmPlayer = MediaPlayer().apply {
+                setDataSource(this@ReminderAlarmService, alarmUri)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                isLooping = true
+                prepare()
+                start()
+            }
+            Log.d(TAG, "Alarm sound started (looping)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start alarm sound", e)
+        }
+    }
+
+    private fun stopAlarmSound() {
+        try {
+            alarmPlayer?.apply {
+                if (isPlaying) stop()
+                release()
+            }
+            alarmPlayer = null
+            Log.d(TAG, "Alarm sound stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping alarm sound", e)
+        }
     }
 
     private fun createNotificationChannel() {
@@ -113,6 +167,8 @@ class ReminderAlarmService : Service() {
                 description = "Thông báo bật màn hình nhắc uống thuốc"
                 setBypassDnd(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                // Tắt âm thanh của notification channel — MediaPlayer xử lý thay
+                setSound(null, null)
             }
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(channel)
@@ -120,6 +176,7 @@ class ReminderAlarmService : Service() {
     }
 
     override fun onDestroy() {
+        stopAlarmSound()
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()

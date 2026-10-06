@@ -3,6 +3,7 @@ package com.medsreminder.meds_reminder
 import android.app.Activity
 import android.app.KeyguardManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -23,6 +24,7 @@ class ReminderLockActivity : Activity() {
 
     private val autoDismissRunnable = Runnable {
         if (!isFinishing) {
+            stopAlarmService()
             finish()
         }
     }
@@ -45,7 +47,6 @@ class ReminderLockActivity : Activity() {
             )
         }
 
-        // Thêm FLAG_KEEP_SCREEN_ON để màn hình không tắt
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
@@ -61,7 +62,7 @@ class ReminderLockActivity : Activity() {
                         PowerManager.ON_AFTER_RELEASE,
                 "medsreminder:reminder_activity_wake"
             )
-            wakeLock?.acquire(60000L) // giữ sáng 60 giây
+            wakeLock?.acquire(60000L)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -84,18 +85,32 @@ class ReminderLockActivity : Activity() {
         tvMedicineName.text = medicineName
         tvDosageInstructions.text = dosage
 
-        // 4. Xử lý nút bấm
+        // 4. Xử lý nút bấm — dừng nhạc báo thức (đang chạy trong Service)
         btnTaken.setOnClickListener {
+            stopAlarmService()
             Toast.makeText(this, "✓ Đã ghi nhận cữ uống thuốc!", Toast.LENGTH_SHORT).show()
             finish()
         }
 
         btnDismiss.setOnClickListener {
+            stopAlarmService()
             finish()
         }
 
-        // 5. Tự động đóng sau 60 giây nếu người dùng không thao tác
+        // 5. Tự động tắt báo thức và đóng sau 60 giây nếu không thao tác
         autoDismissHandler.postDelayed(autoDismissRunnable, 60000)
+    }
+
+    // Gửi STOP_ALARM đến ReminderAlarmService để dừng nhạc + dừng service
+    private fun stopAlarmService() {
+        try {
+            val stopIntent = Intent(this, ReminderAlarmService::class.java).apply {
+                action = ReminderAlarmService.ACTION_STOP_ALARM
+            }
+            startService(stopIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onDestroy() {

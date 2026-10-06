@@ -1,6 +1,8 @@
 package com.medsreminder.meds_reminder
 
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.PowerManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -25,13 +27,18 @@ class MainActivity : FlutterActivity() {
                     val med = call.argument<String>("medicineName") ?: "Paracetamol 500mg"
                     val dose = call.argument<String>("dosage") ?: "1 viên · Sau khi ăn"
                     val time = call.argument<String>("time") ?: ""
-                    val intent = android.content.Intent(this, ReminderLockActivity::class.java).apply {
-                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    // Khởi động ReminderAlarmService — service sẽ phát nhạc lặp
+                    // và tự mở ReminderLockActivity bên trong
+                    val serviceIntent = Intent(this, ReminderAlarmService::class.java).apply {
                         putExtra("medicine_name", med)
                         putExtra("dosage", dose)
                         putExtra("time", time)
                     }
-                    startActivity(intent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent)
+                    } else {
+                        startService(serviceIntent)
+                    }
                     result.success(true)
                 }
                 else -> {
