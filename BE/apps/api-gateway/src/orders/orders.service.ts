@@ -1,22 +1,12 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
-<<<<<<< HEAD
 import { CancelOrderDto, CreateOrderDto, ListOrdersQueryDto, ShipOrderDto } from './dto/create-order.dto.js';
-=======
-import { CreateOrderDto } from './dto/create-order.dto.js';
-import { ListOrdersQueryDto } from './dto/list-orders.query.js';
-import { UpdateOrderStatusDto } from './dto/update-order-status.dto.js';
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
 
 @Injectable()
 export class OrdersService {
   constructor(
-<<<<<<< HEAD
     @Inject('PHARMACY_ORDER_SERVICE')
-=======
-    @Inject('PHARMACY_SERVICE')
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
     private readonly pharmacyClient: ClientProxy,
   ) {}
 
@@ -32,7 +22,6 @@ export class OrdersService {
     return this.send({ cmd: 'get_order' }, { id });
   }
 
-<<<<<<< HEAD
   accept(id: string) {
     return this.send({ cmd: 'accept_order' }, { id });
   }
@@ -51,10 +40,6 @@ export class OrdersService {
 
   cancel(id: string, dto: CancelOrderDto) {
     return this.send({ cmd: 'cancel_order' }, { id, ...dto });
-=======
-  updateStatus(id: string, dto: UpdateOrderStatusDto) {
-    return this.send({ cmd: 'update_order_status' }, { id, ...dto });
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
   }
 
   private async send<T>(pattern: { cmd: string }, payload: unknown): Promise<T> {
@@ -69,21 +54,12 @@ export class OrdersService {
     if (error instanceof HttpException) {
       return error;
     }
-<<<<<<< HEAD
-=======
-
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
     if (typeof error === 'object' && error !== null) {
       const record = error as { status?: number; message?: unknown };
       if (typeof record.status === 'number' && typeof record.message === 'string') {
         return new HttpException(record.message, record.status);
       }
     }
-<<<<<<< HEAD
     return new HttpException('Pharmacy order service is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
-=======
-
-    return new HttpException('Pharmacy service is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
   }
 }

@@ -5,8 +5,6 @@ import { MedicinesModule } from './medicines/medicines.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PharmaciesModule } from './pharmacies/pharmacies.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
-import { OrdersModule } from './orders/orders.module.js';
-import { PharmaciesModule } from './pharmacies/pharmacies.module.js';
 import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
 
 @Module({

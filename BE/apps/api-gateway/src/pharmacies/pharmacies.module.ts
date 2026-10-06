@@ -8,22 +8,13 @@ import { PharmaciesService } from './pharmacies.service.js';
   imports: [
     ClientsModule.registerAsync([
       {
-<<<<<<< HEAD
         name: 'PHARMACY_ORDER_SERVICE',
-=======
-        name: 'PHARMACY_SERVICE',
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
         inject: [ConfigService],
         useFactory: (configService: ConfigService) => ({
           transport: Transport.TCP,
           options: {
-<<<<<<< HEAD
             host: configService.get<string>('PHARMACY_ORDER_SERVICE_HOST'),
             port: configService.get<number>('PHARMACY_ORDER_SERVICE_PORT'),
-=======
-            host: configService.get<string>('PHARMACY_SERVICE_HOST'),
-            port: configService.get<number>('PHARMACY_SERVICE_PORT'),
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
           },
         }),
       },
@@ -31,9 +22,6 @@ import { PharmaciesService } from './pharmacies.service.js';
   ],
   controllers: [PharmaciesController],
   providers: [PharmaciesService],
-<<<<<<< HEAD
   exports: [ClientsModule],
-=======
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
 })
 export class PharmaciesModule {}

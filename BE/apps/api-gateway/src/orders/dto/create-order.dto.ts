@@ -3,32 +3,21 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
-<<<<<<< HEAD
   IsIn,
   IsInt,
   IsNumber,
-=======
-  IsInt,
-  IsLatitude,
-  IsLongitude,
-  IsNotEmpty,
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   Min,
-<<<<<<< HEAD
   MinLength,
-=======
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
   ValidateNested,
 } from 'class-validator';
 
 export class CreateOrderItemDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
-<<<<<<< HEAD
   prescriptionItemId: string;
 
   @ApiProperty({ format: 'uuid' })
@@ -44,14 +33,6 @@ export class CreateOrderItemDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   unitPrice: number;
-=======
-  medicineId: string;
-
-  @ApiProperty({ example: 2 })
-  @IsInt()
-  @Min(1)
-  quantity: number;
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
 }
 
 export class CreateOrderDto {
@@ -71,7 +52,6 @@ export class CreateOrderDto {
   @IsUUID()
   prescriptionId: string;
 
-<<<<<<< HEAD
   @ApiProperty({ enum: ['PICKUP', 'DELIVERY'] })
   @IsIn(['PICKUP', 'DELIVERY'])
   fulfillmentType: 'PICKUP' | 'DELIVERY';
@@ -99,29 +79,6 @@ export class CreateOrderDto {
   @IsString()
   @MaxLength(2000)
   patientNote?: string;
-=======
-  @ApiProperty({ example: '12 Nguyễn Huệ, Quận 1' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  deliveryAddress: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsLatitude()
-  deliveryLat?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsLongitude()
-  deliveryLng?: number;
-
-  @ApiProperty({ example: '0901234567' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(20)
-  recipientPhone: string;
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
 
   @ApiProperty({ type: [CreateOrderItemDto] })
   @IsArray()
@@ -130,7 +87,6 @@ export class CreateOrderDto {
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];
 }
-<<<<<<< HEAD
 
 export class ListOrdersQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
@@ -180,5 +136,3 @@ export class CancelOrderDto {
   @IsIn(['CAREGIVER', 'PHARMACIST'])
   actor: 'CAREGIVER' | 'PHARMACIST';
 }
-=======
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
