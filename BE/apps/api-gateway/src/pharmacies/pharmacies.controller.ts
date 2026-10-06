@@ -42,7 +42,7 @@ export class PharmaciesController {
   }
 
   @Put(':id/inventory')
-  @ApiOperation({ summary: 'Set stock and price for one medicine' })
+  @ApiOperation({ summary: 'Set stock and price for many medicines at once' })
   upsertInventory(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpsertInventoryDto) {
     return this.pharmaciesService.upsertInventory(id, dto);
   }

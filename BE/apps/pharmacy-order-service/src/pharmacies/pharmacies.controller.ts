@@ -56,9 +56,8 @@ export class PharmaciesController {
   }
 
   @MessagePattern({ cmd: 'upsert_pharmacy_inventory' })
-  upsertInventory(@Payload() payload: Parameters<PharmaciesService['upsertInventory']>[1] & { pharmacyId: string }) {
-    const { pharmacyId, ...item } = payload;
-    return this.pharmaciesService.upsertInventory(pharmacyId, item);
+  upsertInventory(@Payload() payload: { pharmacyId: string; items: Parameters<PharmaciesService['upsertInventory']>[1] }) {
+    return this.pharmaciesService.upsertInventory(payload.pharmacyId, payload.items);
   }
 =======
   update(@Payload() payload: PharmacyMessage & { id: string }) {

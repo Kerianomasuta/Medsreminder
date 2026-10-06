@@ -108,19 +108,39 @@ export class PharmaciesService {
     return rows.map((row) => this.toInventory(row));
   }
 
-  async upsertInventory(pharmacyId: string, payload: InventoryInput) {
+  async upsertInventory(pharmacyId: string, items: InventoryInput[] | undefined) {
     await this.findPharmacy(pharmacyId);
-    const medicineId = this.requireUuid(payload.medicineId, 'medicineId');
-    const stockQuantity = this.requireWholeNumber(payload.stockQuantity, 'stockQuantity');
-    const pricePerUnit = this.requireMoney(payload.pricePerUnit, 'pricePerUnit');
+    if (!Array.isArray(items) || items.length === 0) {
+      throw ErrorHandling.BadRequest('items must contain at least one medicine');
+    }
 
-    const existing = await this.inventory.findOne({ where: { pharmacyId, medicineId } });
-    const saved = await this.inventory.save(
-      existing
-        ? Object.assign(existing, { stockQuantity, pricePerUnit })
-        : this.inventory.create({ pharmacyId, medicineId, stockQuantity, pricePerUnit }),
-    );
-    return this.toInventory(saved);
+    const prepared = items.map((item, index) => ({
+      medicineId: this.requireUuid(item?.medicineId, `items[${index}].medicineId`),
+      stockQuantity: this.requireWholeNumber(item?.stockQuantity, `items[${index}].stockQuantity`),
+      pricePerUnit: this.requireMoney(item?.pricePerUnit, `items[${index}].pricePerUnit`),
+    }));
+    const seen = new Set<string>();
+    for (const item of prepared) {
+      if (seen.has(item.medicineId)) {
+        throw ErrorHandling.BadRequest('Each medicineId can appear only once');
+      }
+      seen.add(item.medicineId);
+    }
+
+    const saved = await this.inventory.manager.transaction(async (manager) => {
+      const inventory = manager.getRepository(PharmacyInventory);
+      const rows: PharmacyInventory[] = [];
+      for (const item of prepared) {
+        const existing = await inventory.findOne({ where: { pharmacyId, medicineId: item.medicineId } });
+        rows.push(await inventory.save(
+          existing
+            ? Object.assign(existing, { stockQuantity: item.stockQuantity, pricePerUnit: item.pricePerUnit })
+            : inventory.create({ pharmacyId, ...item }),
+        ));
+      }
+      return rows;
+    });
+    return saved.map((row) => this.toInventory(row));
   }
 
   private async findPharmacy(id: string) {

@@ -34,7 +34,7 @@ export class PharmaciesService {
   }
 
   upsertInventory(pharmacyId: string, dto: UpsertInventoryDto) {
-    return this.send({ cmd: 'upsert_pharmacy_inventory' }, { pharmacyId, ...dto });
+    return this.send({ cmd: 'upsert_pharmacy_inventory' }, { pharmacyId, items: dto.items });
   }
 
   private async send<T>(pattern: { cmd: string }, payload: unknown): Promise<T> {
