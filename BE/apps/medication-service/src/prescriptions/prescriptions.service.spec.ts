@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DoseStatus } from '../enums/dose-status.enum.js';
+import { MedicationLog } from '../medication-logs/schema/medication-log.entity.js';
 import { Medicine } from '../medicines/schema/medicine.entity.js';
 import { ScheduleRule } from '../schedule-rules/schema/schedule-rule.entity.js';
 import { PrescriptionsService } from './prescriptions.service.js';
@@ -60,6 +62,12 @@ describe('PrescriptionsService', () => {
     expect(scheduleSaves.every((entry) => entry.value.patientId === patientId)).toBe(true);
     expect(created.items).toHaveLength(1);
     expect(created.items[0].schedules).toHaveLength(2);
+    expect(created.items[0].currentStock).toBe(30);
+
+    const logSaves = manager.saves.filter((entry) => entry.entity === MedicationLog.name);
+    expect(logSaves).toHaveLength(62);
+    expect(logSaves.every((entry) => entry.value.status === DoseStatus.SCHEDULED)).toBe(true);
+    expect(logSaves[0].value.scheduledAt).toEqual(new Date('2026-10-01T01:00:00.000Z'));
   });
 });
 

@@ -54,3 +54,4 @@ jobs:
           docker build --build-arg APP_NAME=api-gateway -t test-gateway .
           docker build --build-arg APP_NAME=user-service -t test-user .
           docker build --build-arg APP_NAME=medication-service -t test-medication .
+          docker build --build-arg APP_NAME=pharmacy-order-service -t test-pharmacy .
