@@ -22,6 +22,9 @@ export class Prescription {
   @Column({ type: 'text', name: 'prescription_code', nullable: true })
   prescriptionCode: string | null;
 
+  @Column({ type: 'text', name: 'image_prescription_url', nullable: true })
+  imagePrescriptionUrl: string | null;
+
   @Column({ type: 'date', name: 'start_date' })
   startDate: string;
 

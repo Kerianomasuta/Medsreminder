@@ -17,8 +17,8 @@ export class PrescriptionItem {
   @Column({ type: 'numeric', precision: 10, scale: 2, name: 'dosage_per_time' })
   dosagePerTime: string;
 
-  @Column({ type: 'int', name: 'current_stock', default: 0 })
-  currentStock: number;
+  @Column({ type: 'numeric', precision: 10, scale: 2, name: 'current_stock', default: 0 })
+  currentStock: string;
 
   @Column({ type: 'int', name: 'reorder_threshold', default: 6 })
   reorderThreshold: number;

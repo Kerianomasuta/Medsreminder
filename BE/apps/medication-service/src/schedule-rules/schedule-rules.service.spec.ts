@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DoseStatus } from '../enums/dose-status.enum.js';
+import { MedicationLog } from '../medication-logs/schema/medication-log.entity.js';
+import { ScheduleRule } from './schema/schedule-rule.entity.js';
 import { ScheduleRulesService } from './schedule-rules.service.js';
 
 const patientId = '11111111-1111-4111-8111-111111111111';
@@ -28,22 +31,38 @@ function createItem() {
 
 describe('ScheduleRulesService', () => {
   const rules = {
-    create: vi.fn((value) => value),
-    save: vi.fn(async (value) => ({ id: 'rule-1', ...value })),
     find: vi.fn(),
     findOne: vi.fn(),
   };
   const items = {
     findOne: vi.fn(),
   };
+  const manager = {
+    creates: [] as Array<{ entity: string; value: Record<string, unknown> }>,
+    create: vi.fn((entity: { name: string }, value: Record<string, unknown>) => {
+      manager.creates.push({ entity: entity.name, value });
+      return value;
+    }),
+    save: vi.fn(async (entity: { name: string }, value: Record<string, unknown>) => {
+      if (entity === ScheduleRule) {
+        return { id: 'rule-1', ...value };
+      }
+      return value;
+    }),
+  };
+  const dataSource = {
+    transaction: vi.fn(async (work: (current: typeof manager) => Promise<unknown>) => work(manager)),
+  };
   let service: ScheduleRulesService;
 
   beforeEach(() => {
-    rules.create.mockClear();
-    rules.save.mockClear();
     rules.find.mockReset();
+    rules.findOne.mockReset();
     items.findOne.mockReset();
-    service = new ScheduleRulesService(rules as never, items as never);
+    manager.creates = [];
+    manager.create.mockClear();
+    manager.save.mockClear();
+    service = new ScheduleRulesService(dataSource as never, rules as never, items as never);
   });
 
   it('rejects a schedule for a medicine line that does not exist', async () => {
@@ -52,7 +71,7 @@ describe('ScheduleRulesService', () => {
     await expect(service.create(itemId, { reminderTime: '08:00' })).rejects.toMatchObject({
       message: 'Prescription item not found',
     });
-    expect(rules.save).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it('copies the patient from the prescription when adding a dose time', async () => {
@@ -60,13 +79,16 @@ describe('ScheduleRulesService', () => {
 
     const created = await service.create(itemId, { reminderTime: '20:00' });
 
-    expect(rules.create).toHaveBeenCalledWith({
+    expect(manager.create).toHaveBeenCalledWith(ScheduleRule, {
       prescriptionItemId: itemId,
       patientId,
       reminderTime: '20:00:00',
       daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
       isActive: true,
     });
+    const logs = manager.creates.filter((entry) => entry.entity === MedicationLog.name);
+    expect(logs).toHaveLength(31);
+    expect(logs.every((entry) => entry.value.status === DoseStatus.SCHEDULED)).toBe(true);
     expect(created.patientId).toBe(patientId);
     expect(created.medicine.name).toBe('Paracetamol');
     expect(created.medicine.imageUrl).toBe('https://example.com/paracetamol.png');
