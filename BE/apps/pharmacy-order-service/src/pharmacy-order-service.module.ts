@@ -1,10 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-<<<<<<< HEAD
-=======
-import { InventoryModule } from './inventory/inventory.module.js';
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
 import { OrdersModule } from './orders/orders.module.js';
 import { PharmaciesModule } from './pharmacies/pharmacies.module.js';
 
@@ -26,10 +22,6 @@ import { PharmaciesModule } from './pharmacies/pharmacies.module.js';
       }),
     }),
     PharmaciesModule,
-<<<<<<< HEAD
-=======
-    InventoryModule,
->>>>>>> f8787549117cce75ddd3b4459fd77c4f0f0ad9cb
     OrdersModule,
   ],
 })

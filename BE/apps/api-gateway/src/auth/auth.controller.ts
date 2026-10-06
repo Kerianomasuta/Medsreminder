@@ -206,7 +206,7 @@ export class AuthController {
 
         const user = tcpResponse?.data?.newUser;
 
-        const { password, _id, __v, ...userWithoutPassword } = user
+        const { password: _password, _id, __v, ...userWithoutPassword } = user
 
         return {
             status: 201,
