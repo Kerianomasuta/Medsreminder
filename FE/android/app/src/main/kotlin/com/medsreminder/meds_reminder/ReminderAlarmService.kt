@@ -1,5 +1,6 @@
 package com.medsreminder.meds_reminder
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -26,9 +27,14 @@ class ReminderAlarmService : Service() {
     companion object {
         private const val TAG = "ReminderAlarmService"
         const val CHANNEL_ID = "meds_alarm_wake_channel"
+        const val SNOOZE_CHANNEL_ID = "meds_snooze_channel"
         const val NOTIF_ID = 9998
         const val ACTION_STOP_ALARM = "STOP_ALARM"
-        private const val AUTO_STOP_DELAY_MS = 180_000L // 3 phút tự tắt nếu không ai tương tác
+        const val ACTION_SNOOZE = "SNOOZE_ALARM"
+        const val ACTION_TAKEN = "TAKEN_ALARM"
+        const val MAX_SNOOZE_COUNT = 5
+        private const val SNOOZE_DELAY_MS = 5 * 60 * 1000L // 5 phút nhắc lại
+        private const val AUTO_STOP_DELAY_MS = 180_000L // 3 phút tự tắt và chuyển sang nhắc lại
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -36,47 +42,73 @@ class ReminderAlarmService : Service() {
     private var vibrator: Vibrator? = null
     private val autoStopHandler = Handler(Looper.getMainLooper())
 
+    private var currentMedicineName: String = "Đến giờ uống thuốc!"
+    private var currentDosage: String = "Hãy uống thuốc đúng cữ"
+    private var currentTime: String = ""
+    private var currentNotifId: Int = NOTIF_ID
+    private var currentSnoozeCount: Int = 0
+
+    // Khi chuông reo đủ 3 phút mà người dùng không bấm gì -> Tự động chuyển sang Nhắc lại sau 5 phút
     private val autoStopRunnable = Runnable {
-        Log.d(TAG, "Alarm auto-stopped after timeout")
-        stopAlarm()
-        stopForeground(true)
-        stopSelf()
+        Log.d(TAG, "Alarm auto-stopped after 3 minutes — auto snoozing for 5 minutes")
+        executeSnooze()
     }
 
     @Suppress("DEPRECATION")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "ReminderAlarmService onStartCommand: action=${intent?.action}")
+        val receivedAction = intent?.action
+        Log.d(TAG, "ReminderAlarmService onStartCommand: action=$receivedAction")
 
-        // 1. Xử lý nút "Tắt báo thức" từ notification hoặc từ ReminderLockActivity
-        if (intent?.action == ACTION_STOP_ALARM) {
-            Log.d(TAG, "STOP_ALARM received — stopping alarm sound and service")
+        val notifId = intent?.getIntExtra("notification_id", currentNotifId) ?: currentNotifId
+
+        // 1. Người dùng bấm "✓ ĐÃ UỐNG" hoặc "Bỏ qua cữ này (Tắt hẳn)"
+        if (receivedAction == ACTION_TAKEN || receivedAction == ACTION_STOP_ALARM) {
+            Log.d(TAG, "Stop or Taken received — canceling all alarms and stopping service")
             stopAlarm()
+            cancelPendingSnoozeAlarm(notifId)
+            dismissNotification(notifId)
             stopForeground(true)
             stopSelf()
             return START_NOT_STICKY
         }
 
-        val medicineName = intent?.getStringExtra("medicine_name") ?: "Đến giờ uống thuốc!"
-        val dosage = intent?.getStringExtra("dosage") ?: "Hãy uống thuốc đúng cữ"
-        val time = intent?.getStringExtra("time") ?: ""
-        val notifId = intent?.getIntExtra("notification_id", NOTIF_ID) ?: NOTIF_ID
+        // 2. Người dùng chủ động bấm "⏰ Nhắc lại"
+        if (receivedAction == ACTION_SNOOZE) {
+            currentMedicineName = intent?.getStringExtra("medicine_name") ?: currentMedicineName
+            currentDosage = intent?.getStringExtra("dosage") ?: currentDosage
+            currentTime = intent?.getStringExtra("time") ?: currentTime
+            currentNotifId = notifId
+            currentSnoozeCount = intent?.getIntExtra("snooze_count", currentSnoozeCount) ?: currentSnoozeCount
 
-        // 2. Bật sáng màn hình ngay lập tức bằng WakeLock
+            executeSnooze()
+            return START_NOT_STICKY
+        }
+
+        // 3. Khởi động chuông báo thức mới hoặc lần reo tiếp theo của Snooze
+        currentMedicineName = intent?.getStringExtra("medicine_name") ?: "Đến giờ uống thuốc!"
+        currentDosage = intent?.getStringExtra("dosage") ?: "Hãy uống thuốc đúng cữ"
+        currentTime = intent?.getStringExtra("time") ?: ""
+        currentNotifId = notifId
+        currentSnoozeCount = intent?.getIntExtra("snooze_count", 0) ?: 0
+
+        // Bật sáng màn hình ngay lập tức bằng WakeLock
         acquireWakeLock()
 
-        // 3. Tạo Notification Channel độ ưu tiên cao nhất
-        createNotificationChannel()
+        // Tạo Notification Channels
+        createNotificationChannels()
 
-        // 4. Intent mở Activity đè lên màn hình khóa
+        // Intent mở Activity đè lên màn hình khóa
         val activityIntent = Intent(this, ReminderLockActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_CLEAR_TOP or
                 Intent.FLAG_ACTIVITY_SINGLE_TOP
             )
-            putExtra("medicine_name", medicineName)
-            putExtra("dosage", dosage)
-            putExtra("time", time)
+            putExtra("medicine_name", currentMedicineName)
+            putExtra("dosage", currentDosage)
+            putExtra("time", currentTime)
+            putExtra("notification_id", currentNotifId)
+            putExtra("snooze_count", currentSnoozeCount)
         }
 
         val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -86,20 +118,44 @@ class ReminderAlarmService : Service() {
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
-            this, notifId, activityIntent, pendingFlags
+            this, currentNotifId, activityIntent, pendingFlags
         )
 
-        // 5. Intent cho nút "Tắt báo thức" trên thanh Notification
+        // Intent: Tắt hẳn / Bỏ qua
         val stopIntent = Intent(this, ReminderAlarmService::class.java).apply {
-            action = ACTION_STOP_ALARM
+            setAction(ACTION_STOP_ALARM)
+            putExtra("notification_id", currentNotifId)
         }
         val stopPendingIntent = PendingIntent.getService(
-            this, notifId + 1, stopIntent, pendingFlags
+            this, currentNotifId + 1, stopIntent, pendingFlags
         )
 
-        // 6. Xây dựng Foreground Notification (có nút Tắt báo thức)
-        val titleText = if (time.isNotBlank()) "⏰ Đến giờ uống thuốc! ($time)" else "⏰ Đến giờ uống thuốc!"
-        val bodyText = "$medicineName · $dosage"
+        // Intent: Nhắc lại (Snooze)
+        val snoozeIntent = Intent(this, ReminderAlarmService::class.java).apply {
+            setAction(ACTION_SNOOZE)
+            putExtra("medicine_name", currentMedicineName)
+            putExtra("dosage", currentDosage)
+            putExtra("time", currentTime)
+            putExtra("notification_id", currentNotifId)
+            putExtra("snooze_count", currentSnoozeCount)
+        }
+        val snoozePendingIntent = PendingIntent.getService(
+            this, currentNotifId + 2, snoozeIntent, pendingFlags
+        )
+
+        // Intent: Đã uống
+        val takenIntent = Intent(this, ReminderAlarmService::class.java).apply {
+            setAction(ACTION_TAKEN)
+            putExtra("notification_id", currentNotifId)
+        }
+        val takenPendingIntent = PendingIntent.getService(
+            this, currentNotifId + 3, takenIntent, pendingFlags
+        )
+
+        // Tiêu đề & nội dung notification
+        val titleText = if (currentTime.isNotBlank()) "⏰ Đến giờ uống thuốc! ($currentTime)" else "⏰ Đến giờ uống thuốc!"
+        val snoozeSuffix = if (currentSnoozeCount > 0) " (Nhắc lại lần $currentSnoozeCount/$MAX_SNOOZE_COUNT)" else ""
+        val bodyText = "$currentMedicineName · $currentDosage$snoozeSuffix"
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -112,18 +168,18 @@ class ReminderAlarmService : Service() {
             .setContentIntent(fullScreenPendingIntent)
             .setAutoCancel(false)
             .setOngoing(true)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Tắt báo thức", stopPendingIntent)
+            .addAction(android.R.drawable.ic_input_add, "✓ ĐÃ UỐNG", takenPendingIntent)
+            .addAction(android.R.drawable.ic_popup_reminder, "⏰ Nhắc lại (5p)", snoozePendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Tắt", stopPendingIntent)
             .build()
 
-        startForeground(notifId, notification)
+        startForeground(currentNotifId, notification)
 
-        // 7. Phát nhạc báo thức lặp liên tục
+        // Phát nhạc báo thức lặp liên tục & rung
         startAlarmSound()
-
-        // 8. Rung liên tục theo nhịp
         startVibration()
 
-        // 9. Mở ReminderLockActivity
+        // Mở ReminderLockActivity
         try {
             startActivity(activityIntent)
             Log.d(TAG, "ReminderLockActivity started from Service")
@@ -131,11 +187,147 @@ class ReminderAlarmService : Service() {
             Log.e(TAG, "Failed to start ReminderLockActivity from service", e)
         }
 
-        // 10. Đặt hẹn giờ tự tắt sau 3 phút nếu không có thao tác
+        // Hẹn giờ tự ngắt sau 3 phút nếu không tương tác -> Tự chuyển sang Snooze
         autoStopHandler.removeCallbacks(autoStopRunnable)
         autoStopHandler.postDelayed(autoStopRunnable, AUTO_STOP_DELAY_MS)
 
         return START_NOT_STICKY
+    }
+
+    private fun executeSnooze() {
+        autoStopHandler.removeCallbacks(autoStopRunnable)
+        stopAlarm()
+        stopForeground(true)
+
+        if (currentSnoozeCount < MAX_SNOOZE_COUNT) {
+            val nextCount = currentSnoozeCount + 1
+            val triggerAtMillis = System.currentTimeMillis() + SNOOZE_DELAY_MS
+
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            val snoozeIntent = Intent(this, AlarmReceiver::class.java).apply {
+                action = "com.medsreminder.ALARM_TRIGGER"
+                putExtra("medicine_name", currentMedicineName)
+                putExtra("dosage", currentDosage)
+                putExtra("time", currentTime)
+                putExtra("notification_id", currentNotifId)
+                putExtra("snooze_count", nextCount)
+            }
+
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(this, currentNotifId, snoozeIntent, flags)
+
+            try {
+                if (alarmManager != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerAtMillis,
+                            pendingIntent
+                        )
+                    } else {
+                        alarmManager.setExact(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerAtMillis,
+                            pendingIntent
+                        )
+                    }
+                }
+                Log.d(TAG, "Snoozed alarm $currentNotifId for 5 min (Count $nextCount/$MAX_SNOOZE_COUNT)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to schedule snooze alarm", e)
+            }
+
+            showSnoozedNotification(currentNotifId, currentMedicineName, nextCount)
+        } else {
+            Log.d(TAG, "Max snooze reached ($MAX_SNOOZE_COUNT times). Marking as missed.")
+            showMissedNotification(currentNotifId, currentMedicineName, currentTime)
+        }
+
+        stopSelf()
+    }
+
+    private fun cancelPendingSnoozeAlarm(notifId: Int) {
+        try {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val intent = Intent(this, AlarmReceiver::class.java).apply {
+                action = "com.medsreminder.ALARM_TRIGGER"
+            }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_NO_CREATE
+            }
+            val pendingIntent = PendingIntent.getBroadcast(this, notifId, intent, flags)
+            if (pendingIntent != null) {
+                alarmManager.cancel(pendingIntent)
+                pendingIntent.cancel()
+                Log.d(TAG, "Canceled pending snooze alarm for id $notifId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error canceling snooze alarm", e)
+        }
+    }
+
+    private fun showSnoozedNotification(notifId: Int, medicineName: String, snoozeCount: Int) {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            val takenIntent = Intent(this, ReminderAlarmService::class.java).apply {
+                setAction(ACTION_TAKEN)
+                putExtra("notification_id", notifId)
+            }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val takenPendingIntent = PendingIntent.getService(this, notifId + 10, takenIntent, flags)
+
+            val notification = NotificationCompat.Builder(this, SNOOZE_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle("⏰ Đã hoãn: Nhắc lại sau 5 phút ($snoozeCount/$MAX_SNOOZE_COUNT)")
+                .setContentText("$medicineName · Chuông sẽ tự động reo lại")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .addAction(android.R.drawable.ic_input_add, "✓ Đã uống", takenPendingIntent)
+                .build()
+
+            nm.notify(notifId, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing snoozed notification", e)
+        }
+    }
+
+    private fun showMissedNotification(notifId: Int, medicineName: String, time: String) {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val timeText = if (time.isNotBlank()) " lúc $time" else ""
+            val notification = NotificationCompat.Builder(this, SNOOZE_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_notify_error)
+                .setContentTitle("⚠️ Đã bỏ lỡ cữ thuốc: $medicineName")
+                .setContentText("Đã nhắc nhở 5 lần$timeText nhưng chưa có xác nhận uống.")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .build()
+
+            nm.notify(notifId, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing missed notification", e)
+        }
+    }
+
+    private fun dismissNotification(notifId: Int) {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(notifId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error dismissing notification", e)
+        }
     }
 
     private fun acquireWakeLock() {
@@ -231,9 +423,12 @@ class ReminderAlarmService : Service() {
         stopVibration()
     }
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val nm = getSystemService(NotificationManager::class.java)
+
+            // Kênh báo thức reo
+            val alarmChannel = NotificationChannel(
                 CHANNEL_ID,
                 "Nhắc uống thuốc (Báo thức)",
                 NotificationManager.IMPORTANCE_HIGH
@@ -241,12 +436,21 @@ class ReminderAlarmService : Service() {
                 description = "Thông báo chuông báo thức nhắc uống thuốc"
                 setBypassDnd(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                // Tắt tiếng của channel để MediaPlayer phát chuông lặp riêng
                 setSound(null, null)
                 enableVibration(false)
             }
-            val nm = getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(channel)
+            nm.createNotificationChannel(alarmChannel)
+
+            // Kênh thông báo hoãn / bỏ lỡ
+            val snoozeChannel = NotificationChannel(
+                SNOOZE_CHANNEL_ID,
+                "Trạng thái nhắc lại thuốc",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Thông báo trạng thái hoãn nhắc lại hoặc bỏ lỡ thuốc"
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+            nm.createNotificationChannel(snoozeChannel)
         }
     }
 

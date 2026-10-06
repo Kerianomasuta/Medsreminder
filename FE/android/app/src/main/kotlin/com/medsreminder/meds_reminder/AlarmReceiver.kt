@@ -19,8 +19,9 @@ class AlarmReceiver : BroadcastReceiver() {
         val time = intent.getStringExtra("time") ?: ""
         val notifId = intent.getIntExtra("notification_id", 9998)
         val triggerAtMillis = intent.getLongExtra("trigger_at_millis", 0L)
+        val snoozeCount = intent.getIntExtra("snooze_count", 0)
 
-        Log.d(TAG, "AlarmReceiver triggered for $medicineName at $time (id=$notifId)")
+        Log.d(TAG, "AlarmReceiver triggered for $medicineName at $time (id=$notifId, snoozeCount=$snoozeCount)")
 
         // 1. Khởi động ReminderAlarmService để bật màn hình, phát nhạc lặp và hiện notification
         val serviceIntent = Intent(context, ReminderAlarmService::class.java).apply {
@@ -28,6 +29,7 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra("dosage", dosage)
             putExtra("time", time)
             putExtra("notification_id", notifId)
+            putExtra("snooze_count", snoozeCount)
         }
 
         try {
@@ -40,8 +42,8 @@ class AlarmReceiver : BroadcastReceiver() {
             Log.e(TAG, "Error starting ReminderAlarmService from AlarmReceiver", e)
         }
 
-        // 2. Tự động lên lịch lại cho 7 ngày sau (để duy trì lặp hàng tuần kể cả không mở app)
-        if (triggerAtMillis > 0L) {
+        // 2. Chỉ lên lịch lại cho 7 ngày sau nếu đây là báo thức gốc (snoozeCount == 0)
+        if (triggerAtMillis > 0L && snoozeCount == 0) {
             val nextWeekMillis = triggerAtMillis + 7L * 24 * 60 * 60 * 1000L
             rescheduleNextWeek(context, intent, notifId, nextWeekMillis)
         }
@@ -59,6 +61,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 action = "com.medsreminder.ALARM_TRIGGER"
                 putExtras(originalIntent)
                 putExtra("trigger_at_millis", nextTriggerMillis)
+                putExtra("snooze_count", 0)
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
