@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [api-gateway, user-service, medication-service]
+        app: [api-gateway, user-service, medication-service, pharmacy-order-service]
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4

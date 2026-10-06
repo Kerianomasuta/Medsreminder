@@ -22,6 +22,7 @@ type CreatePrescriptionMessage = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
+  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   items?: ItemMessage[];
@@ -32,6 +33,7 @@ type UpdatePrescriptionMessage = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
+  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   isActive?: boolean;
@@ -66,6 +68,13 @@ export class PrescriptionsController {
   addItem(@Payload() payload: ItemMessage & { prescriptionId?: string }) {
     const { prescriptionId, ...item } = payload;
     return this.prescriptionsService.addItem(prescriptionId, item);
+  }
+
+  @MessagePattern({ cmd: 'replenish_prescription_stock' })
+  replenishStock(
+    @Payload() payload: { items?: Array<{ prescriptionItemId?: string; quantity?: number }> },
+  ) {
+    return this.prescriptionsService.replenishStock(payload?.items);
   }
 
   @MessagePattern({ cmd: 'update_prescription_item' })

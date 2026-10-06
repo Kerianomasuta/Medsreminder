@@ -24,11 +24,11 @@ export class RegisterDto {
 
     @ApiProperty({
         example: 'PATIENT',
-        enum: ['PATIENT', 'CARE_GIVER', 'PHARMACIST', 'DRUGSHIPPER'],
+        enum: ['PATIENT', 'CARE_GIVER', 'PHARMACIST'],
         description: 'Role assigned to the new account',
     })
     @IsNotEmpty({ message: 'Role is required!' })
-    @IsEnum(["PATIENT", "CARE_GIVER", "PHARMACIST", "DRUGSHIPPER"])
+    @IsEnum(["PATIENT", "CARE_GIVER", "PHARMACIST"])
     role: string;
 
     @ApiProperty({

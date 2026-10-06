@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
+import 'prescriptions/prescription_list_screen.dart';
 
 class CaregiverHome extends StatelessWidget {
   const CaregiverHome({
@@ -16,9 +17,13 @@ class CaregiverHome extends StatelessWidget {
     required this.onAddPatient,
     required this.onRemovePatient,
     required this.onSelectPatient,
+    required this.userName,
+    required this.userEmail,
   });
 
   final int tab;
+  final String userName;
+  final String userEmail;
   final bool doseTaken, doseMissed, prescriptionAdded;
   final List<PatientProfileItem> linkedPatients;
   final int activePatientIndex;
@@ -42,261 +47,20 @@ class CaregiverHome extends StatelessWidget {
         onAddPatient: onAddPatient,
         onRemovePatient: onRemovePatient,
         onSelectPatient: onSelectPatient,
+        userName: userName,
+        userEmail: userEmail,
       );
     }
-    final hasPatients = linkedPatients.isNotEmpty;
-    final currentPatient =
-    hasPatients ? linkedPatients[activePatientIndex] : null;
-
-    return AppScroll(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const PageIntro('Chào Anh!', 'Theo dõi sức khoẻ người thân'),
-          if (doseMissed) const AlertCard(),
-          if (!hasPatients)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 14),
-              child: Glass(
-                padding: EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    Icon(Icons.link_off_rounded, color: Color(0xFFE2794D)),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Chưa liên kết bệnh nhân nào. Hãy chuyển sang tab "Hồ sơ" để nhập mã kết nối.',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF8B4513),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          if (linkedPatients.length > 1) ...[
-            SizedBox(
-              height: 38,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: linkedPatients.length,
-                separatorBuilder: (_, index) => const SizedBox(width: 8),
-                itemBuilder: (context, idx) {
-                  final p = linkedPatients[idx];
-                  final isSelected = idx == activePatientIndex;
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(19),
-                    onTap: () => onSelectPatient(idx),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 13,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF5065F2)
-                            : Colors.white.withValues(alpha: .7),
-                        borderRadius: BorderRadius.circular(19),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF5065F2)
-                              : const Color(0xFFD6DBF5),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            p.avatarIcon,
-                            size: 16,
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF5065F2),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${p.name} (${p.relation})',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected
-                                  ? Colors.white
-                                  : const Color(0xFF2C3E6E),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (currentPatient != null)
-            Glass(
-              padding: const EdgeInsets.all(17),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: currentPatient.avatarBg,
-                    child: Icon(
-                      currentPatient.avatarIcon,
-                      color: const Color(0xFFAD6047),
-                      size: 34,
-                    ),
-                  ),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              currentPatient.name,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE9EDFF),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                currentPatient.relation,
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF485EE8),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${currentPatient.age} tuổi · Mã: ${currentPatient.code} · ${currentPatient.condition}',
-                          style: const TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: Color(0xFF249D76),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 18),
-          const Text(
-            'Liệu trình hôm nay',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          Glass(
-            padding: const EdgeInsets.all(17),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      '16 tháng 9',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    StatusChip(
-                      doseTaken ? 'Hoàn thành 1/3' : 'Chờ xác nhận',
-                      doseTaken
-                          ? const Color(0xFF249D76)
-                          : const Color(0xFFF09B3C),
-                    ),
-                  ],
-                ),
-                const Divider(height: 25),
-                MedicationRow(
-                  '07:30',
-                  'Metformin + Vitamin D3',
-                  doseTaken ? 'Đã uống' : 'Đang chờ',
-                  doseTaken ? const Color(0xFF259F78) : const Color(0xFFF0A042),
-                ),
-                const SizedBox(height: 14),
-                const MedicationRow(
-                  '12:30',
-                  'Amlodipine 5mg',
-                  'Sắp tới',
-                  Color(0xFF5C70F2),
-                ),
-                const SizedBox(height: 14),
-                const MedicationRow(
-                  '20:00',
-                  'Atorvastatin 10mg',
-                  'Sắp tới',
-                  Color(0xFF5C70F2),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: onMissed,
-            icon: const Icon(Icons.warning_amber_rounded),
-            label: const Text('Demo: quá 15 phút chưa phản hồi'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              foregroundColor: const Color(0xFFD35A44),
-              side: const BorderSide(color: Color(0xFFF0B1A5)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Mức thuốc còn lại',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          const Glass(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.medication_liquid_rounded,
-                  color: Color(0xFFE1784C),
-                  size: 30,
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Metformin 500mg',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      Text('Còn khoảng 4 ngày · Nên đặt thuốc'),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Color(0xFF5267F4),
-                ),
-              ],
-            ),
-          ),
-        ],
+    
+    // Tab 0 (Tổng quan), or any other fallback
+    return const Center(
+      child: Text(
+        'Tính năng đang phát triển',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.black54,
+        ),
       ),
     );
   }
@@ -307,65 +71,26 @@ class CaregiverPrescriptionPage extends StatelessWidget {
     super.key,
     required this.added,
     required this.onAdded,
+    this.patientId,
+    this.patientName,
   });
 
   final bool added;
   final VoidCallback onAdded;
+  // These come from the active patient selection in AppShell.
+  // Replace with real UUID from auth/patient state in production.
+  final String? patientId;
+  final String? patientName;
 
   @override
-  Widget build(BuildContext context) => AppScroll(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const PageIntro(
-          'Đơn thuốc của cô Lan',
-          'Quản lý và thiết lập lịch nhắc',
-        ),
-        const Glass(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.link_rounded, color: Color(0xFF249D76)),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Đã liên kết tài khoản PA\nNguyễn Thị Lan',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Icon(Icons.check_circle_rounded, color: Color(0xFF249D76)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        const PrescriptionCard(
-          'Liệu trình huyết áp & tiểu đường',
-          '16/09 - 16/10/2026',
-          '3 thuốc · 3 khung giờ',
-        ),
-        const SizedBox(height: 12),
-        if (added)
-          const PrescriptionCard(
-            'Vitamin tổng hợp',
-            '16/09 - 16/11/2026',
-            '1 thuốc · 08:00',
-          ),
-        const SizedBox(height: 18),
-        OutlinedButton.icon(
-          onPressed: () => showAddMedicineModal(
-            context,
-            onAdded: onAdded,
-            isPatient: false,
-          ),
-          icon: const Icon(Icons.add_circle_outline_rounded),
-          label: const Text('Thêm đơn thuốc & giờ nhắc'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
-          ),
-        ),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final pid = patientId ?? 'demo-patient-id-not-set';
+    final pname = patientName ?? 'Bệnh nhân';
+    return PrescriptionListScreen(
+      patientId: pid,
+      patientName: pname,
+    );
+  }
 }
 
 class CaregiverProfilePage extends StatefulWidget {
@@ -376,6 +101,8 @@ class CaregiverProfilePage extends StatefulWidget {
     required this.onAddPatient,
     required this.onRemovePatient,
     required this.onSelectPatient,
+    required this.userName,
+    required this.userEmail,
   });
 
   final List<PatientProfileItem> linkedPatients;
@@ -383,6 +110,8 @@ class CaregiverProfilePage extends StatefulWidget {
   final void Function(String code, {String? name, String? relation}) onAddPatient;
   final ValueChanged<int> onRemovePatient;
   final ValueChanged<int> onSelectPatient;
+  final String userName;
+  final String userEmail;
 
   @override
   State<CaregiverProfilePage> createState() => _CaregiverProfilePageState();
@@ -418,8 +147,8 @@ class _CaregiverProfilePageState extends State<CaregiverProfilePage> {
           'Hồ sơ người chăm sóc',
           'Quản lý thông tin & liên kết bệnh nhân',
         ),
-        const Glass(
-          padding: EdgeInsets.all(18),
+        Glass(
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
               CircleAvatar(
@@ -437,21 +166,21 @@ class _CaregiverProfilePageState extends State<CaregiverProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Trần Minh Anh',
-                      style: TextStyle(
+                      widget.userName,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Người chăm sóc chính (Con gái)',
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Vai trò: Đang cập nhật',
                       style: TextStyle(color: Color(0xFF6B7280), fontSize: 13),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      '090 123 4567 · minhanh@gmail.com',
-                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                      'SĐT: Đang cập nhật · ${widget.userEmail}',
+                      style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
                     ),
                   ],
                 ),

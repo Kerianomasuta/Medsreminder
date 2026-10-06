@@ -6,7 +6,6 @@ export enum UserRole {
     PATIENT = 'PATIENT',
     CARE_GIVER = 'CARE_GIVER',
     PHARMACIST = 'PHARMACIST',
-    DRUGSHIPPER = 'DRUGSHIPPER',
     ADMIN = 'ADMIN'
 }
 

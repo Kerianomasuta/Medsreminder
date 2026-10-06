@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
+import { DoseStatus } from '../enums/dose-status.enum.js';
+import { MedicationLog } from '../medication-logs/schema/medication-log.entity.js';
+import { scheduledDoseInstants } from '../medication-logs/scheduled-doses.js';
 import { Medicine } from '../medicines/schema/medicine.entity.js';
 import { ScheduleRule } from '../schedule-rules/schema/schedule-rule.entity.js';
 import { PrescriptionItem } from './schema/prescription-item.entity.js';
@@ -32,6 +35,7 @@ export type CreatePrescriptionInput = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
+  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   items?: PrescriptionItemInput[];
@@ -41,6 +45,7 @@ export type UpdatePrescriptionInput = {
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
+  imagePrescriptionUrl?: string | null;
   startDate?: string;
   endDate?: string | null;
   isActive?: boolean;
@@ -92,6 +97,7 @@ export class PrescriptionsService {
           title,
           doctorName: this.optionalText(payload.doctorName),
           prescriptionCode: this.optionalText(payload.prescriptionCode),
+          imagePrescriptionUrl: this.optionalText(payload.imagePrescriptionUrl),
           startDate,
           endDate,
           isActive: true,
@@ -100,7 +106,7 @@ export class PrescriptionsService {
 
       const savedItems = [];
       for (const item of items) {
-        savedItems.push(await this.saveItem(manager, saved.id, patientId, item));
+        savedItems.push(await this.saveItem(manager, saved, item));
       }
 
       return this.toPrescription(saved, savedItems);
@@ -127,6 +133,7 @@ export class PrescriptionsService {
       'title',
       'doctorName',
       'prescriptionCode',
+      'imagePrescriptionUrl',
       'startDate',
       'endDate',
       'isActive',
@@ -154,6 +161,9 @@ export class PrescriptionsService {
     if (payload.prescriptionCode !== undefined) {
       prescription.prescriptionCode = this.optionalText(payload.prescriptionCode);
     }
+    if (payload.imagePrescriptionUrl !== undefined) {
+      prescription.imagePrescriptionUrl = this.optionalText(payload.imagePrescriptionUrl);
+    }
     if (payload.isActive !== undefined) {
       prescription.isActive = this.requireBoolean(payload.isActive, 'isActive');
     }
@@ -176,7 +186,7 @@ export class PrescriptionsService {
       }
 
       await this.assertMedicinesExist(manager, [item]);
-      return this.saveItem(manager, prescription.id, prescription.patientId, item);
+      return this.saveItem(manager, prescription, item);
     });
   }
 
@@ -193,7 +203,7 @@ export class PrescriptionsService {
       item.dosagePerTime = this.requireDosage(payload.dosagePerTime);
     }
     if (payload.currentStock !== undefined) {
-      item.currentStock = this.requireWholeNumber(payload.currentStock, 'currentStock');
+      item.currentStock = this.requireWholeNumber(payload.currentStock, 'currentStock').toFixed(2);
     }
     if (payload.reorderThreshold !== undefined) {
       item.reorderThreshold = this.requireWholeNumber(payload.reorderThreshold, 'reorderThreshold');
@@ -206,19 +216,48 @@ export class PrescriptionsService {
     return this.toItem(saved, item.scheduleRules ?? []);
   }
 
+  async replenishStock(items: Array<{ prescriptionItemId?: string; quantity?: number }> | undefined) {
+    if (!items?.length) {
+      throw ErrorHandling.BadRequest('Replenish needs at least one item');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const updated = [];
+      for (const item of items) {
+        const id = this.requireUuid(item.prescriptionItemId, 'prescriptionItemId');
+        const quantity = this.requireWholeNumber(item.quantity ?? -1, 'quantity');
+        if (quantity < 1) {
+          throw ErrorHandling.BadRequest('quantity must be at least 1');
+        }
+        const row = await manager.findOne(PrescriptionItem, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!row) {
+          throw ErrorHandling.NotFound('Prescription item not found');
+        }
+        row.currentStock = (Number(row.currentStock) + quantity).toFixed(2);
+        updated.push(await manager.save(PrescriptionItem, row));
+      }
+      return updated.map((row) => ({
+        prescriptionItemId: row.id,
+        currentStock: Number(row.currentStock),
+      }));
+    });
+  }
+
   private async saveItem(
     manager: EntityManager,
-    prescriptionId: string,
-    patientId: string,
+    prescription: Pick<Prescription, 'id' | 'patientId' | 'startDate' | 'endDate'>,
     item: PreparedItem,
   ) {
     const savedItem = await manager.save(
       PrescriptionItem,
       manager.create(PrescriptionItem, {
-        prescriptionId,
+        prescriptionId: prescription.id,
         medicineId: item.medicineId,
         dosagePerTime: item.dosagePerTime,
-        currentStock: item.currentStock,
+        currentStock: item.currentStock.toFixed(2),
         reorderThreshold: item.reorderThreshold,
         instructions: item.instructions,
       }),
@@ -226,21 +265,47 @@ export class PrescriptionsService {
 
     const savedSchedules = [];
     for (const schedule of item.schedules) {
-      savedSchedules.push(
-        await manager.save(
-          ScheduleRule,
-          manager.create(ScheduleRule, {
-            prescriptionItemId: savedItem.id,
-            patientId,
-            reminderTime: schedule.reminderTime,
-            daysOfWeek: schedule.daysOfWeek,
-            isActive: true,
-          }),
-        ),
+      const savedSchedule = await manager.save(
+        ScheduleRule,
+        manager.create(ScheduleRule, {
+          prescriptionItemId: savedItem.id,
+          patientId: prescription.patientId,
+          reminderTime: schedule.reminderTime,
+          daysOfWeek: schedule.daysOfWeek,
+          isActive: true,
+        }),
       );
+      await this.saveScheduledLogs(manager, savedSchedule, prescription);
+      savedSchedules.push(savedSchedule);
     }
 
     return this.toItem(savedItem, savedSchedules);
+  }
+
+  private async saveScheduledLogs(
+    manager: EntityManager,
+    rule: Pick<ScheduleRule, 'id' | 'patientId' | 'reminderTime' | 'daysOfWeek'>,
+    prescription: Pick<Prescription, 'startDate' | 'endDate'>,
+  ) {
+    const instants = scheduledDoseInstants({
+      startDate: prescription.startDate,
+      endDate: prescription.endDate,
+      reminderTime: rule.reminderTime,
+      daysOfWeek: rule.daysOfWeek,
+    });
+
+    for (const scheduledAt of instants) {
+      await manager.save(
+        MedicationLog,
+        manager.create(MedicationLog, {
+          scheduleRuleId: rule.id,
+          patientId: rule.patientId,
+          scheduledAt,
+          status: DoseStatus.SCHEDULED,
+          escalationLevel: 0,
+        }),
+      );
+    }
   }
 
   private async assertMedicinesExist(manager: EntityManager, items: PreparedItem[]) {
@@ -415,6 +480,7 @@ export class PrescriptionsService {
       title: prescription.title,
       doctorName: prescription.doctorName,
       prescriptionCode: prescription.prescriptionCode,
+      imagePrescriptionUrl: prescription.imagePrescriptionUrl,
       startDate: prescription.startDate,
       endDate: prescription.endDate,
       isActive: prescription.isActive,
@@ -430,7 +496,7 @@ export class PrescriptionsService {
       prescriptionId: item.prescriptionId,
       medicineId: item.medicineId,
       dosagePerTime: Number(item.dosagePerTime),
-      currentStock: item.currentStock,
+      currentStock: Number(item.currentStock),
       reorderThreshold: item.reorderThreshold,
       instructions: item.instructions,
       schedules: [...schedules]
