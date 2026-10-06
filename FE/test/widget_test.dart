@@ -5,15 +5,25 @@ import 'package:meds_reminder/screens/app_shell.dart';
 import 'package:meds_reminder/screens/auth/login_screen.dart';
 import 'package:meds_reminder/screens/auth/splash_screen.dart';
 import 'package:meds_reminder/services/auth_api.dart';
+import 'package:meds_reminder/models/auth_user.dart';
+import 'package:meds_reminder/models/app_role.dart';
 
 class FakeAuthApi extends AuthApi {
   @override
-  Future<void> refreshSession() async {
+  Future<AuthUser> refreshSession() async {
     throw const AuthApiException('No session');
   }
 
   @override
-  Future<void> login({required String email, required String password}) async {}
+  Future<AuthUser> login({
+    required String email,
+    required String password,
+  }) async => AuthUser(
+    id: 'user-1',
+    email: email,
+    fullName: 'Dược sĩ Demo',
+    role: AppRole.pharmacist,
+  );
 
   @override
   Future<void> logout() async {}
@@ -41,6 +51,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.byType(AppShell), findsOneWidget);
-    expect(find.text('memaybeo'), findsOneWidget);
+    expect(find.text('Dược sĩ Demo'), findsOneWidget);
+    expect(find.text('Xử lý đơn'), findsOneWidget);
   });
 }

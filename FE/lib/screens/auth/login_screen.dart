@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import 'auth_backdrop.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onLogin});
+  const LoginScreen({
+    super.key,
+    required this.onLogin,
+    required this.onOpenRegister,
+  });
   final Future<void> Function(String email, String password) onLogin;
+  final VoidCallback onOpenRegister;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -189,10 +194,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                   const SizedBox(height: 18),
-                  const Text(
-                    'Tài khoản được quản lý bởi hệ thống MedsReminder.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Color(0xFF8290A5)),
+                  TextButton(
+                    onPressed: _loading ? null : widget.onOpenRegister,
+                    child: const Text('Chưa có tài khoản? Đăng ký ngay'),
                   ),
                 ],
               ),
