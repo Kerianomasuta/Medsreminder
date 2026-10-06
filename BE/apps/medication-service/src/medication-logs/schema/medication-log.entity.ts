@@ -30,6 +30,9 @@ export class MedicationLog {
   @Column({ type: 'smallint', name: 'escalation_level', default: 0 })
   escalationLevel: number;
 
+  @Column({ type: 'text', name: 'skip_reason', nullable: true })
+  skipReason: string | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 

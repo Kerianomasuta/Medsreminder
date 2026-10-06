@@ -36,6 +36,15 @@
       "compilerOptions": {
         "tsConfigPath": "apps/user-service/tsconfig.app.json"
       }
+    },
+    "pharmacy-order-service": {
+      "type": "application",
+      "root": "apps/pharmacy-order-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/pharmacy-order-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/pharmacy-order-service/tsconfig.app.json"
+      }
     }
   }
 }

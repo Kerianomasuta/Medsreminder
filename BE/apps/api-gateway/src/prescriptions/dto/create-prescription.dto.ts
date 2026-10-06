@@ -94,6 +94,12 @@ export class CreatePrescriptionDto {
   @MaxLength(100)
   prescriptionCode?: string;
 
+  @ApiPropertyOptional({ description: 'URL of the paper prescription photo used by AI scan' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  imagePrescriptionUrl?: string;
+
   @ApiProperty({ example: '2026-10-01' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   startDate: string;
