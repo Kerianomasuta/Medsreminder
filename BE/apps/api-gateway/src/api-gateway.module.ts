@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { MedicinesModule } from './medicines/medicines.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
 import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
+import { UserModule } from './users/user.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
     MedicinesModule,
     PrescriptionsModule,
     ScheduleRulesModule,
+    UserModule,
   ],
 })
 export class ApiGatewayModule {}
