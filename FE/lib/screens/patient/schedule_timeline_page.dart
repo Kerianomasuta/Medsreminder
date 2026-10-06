@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../services/notification_service.dart';
 import '../../services/schedule_api.dart';
 import '../../widgets/widgets.dart';
 
@@ -72,6 +73,8 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
           _schedules = items;
           _isLoading = false;
         });
+        // Tự động đồng bộ báo thức cho toàn bộ cữ thuốc
+        NotificationService.instance.syncAllSchedules(items);
       }
     } catch (e) {
       if (mounted) {
@@ -80,6 +83,33 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _testLockScreenNotification() async {
+    try {
+      final firstMed = _schedules.isNotEmpty ? _schedules.first.medicine.name : 'Paracetamol 500mg';
+      await NotificationService.instance.scheduleTestNotificationAfterSeconds(
+        seconds: 5,
+        medicineName: firstMed,
+        dosage: '1 viên · Sau khi ăn',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⏰ Đã hẹn thông báo sau 5 giây! Hãy bấm nút NGUỒN khóa màn hình để thử nghiệm.'),
+          backgroundColor: Color(0xFF5065F2),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi kích hoạt thông báo: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -158,10 +188,23 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const PageIntro('Lịch uống thuốc', 'Theo dõi và chỉnh sửa cữ uống'),
-              IconButton(
-                onPressed: _loadSchedules,
-                icon: const Icon(Icons.refresh_rounded, color: Color(0xFF5167F2)),
-                tooltip: 'Làm mới lịch uống',
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: _testLockScreenNotification,
+                    icon: const Icon(
+                      Icons.notifications_active_rounded,
+                      color: Color(0xFFE05688),
+                    ),
+                    tooltip: 'Thử nghiệm thông báo sau 5 giây (Test màn hình khóa)',
+                  ),
+                  IconButton(
+                    onPressed: _loadSchedules,
+                    icon: const Icon(Icons.refresh_rounded, color: Color(0xFF5167F2)),
+                    tooltip: 'Làm mới lịch uống',
+                  ),
+                ],
               ),
             ],
           ),

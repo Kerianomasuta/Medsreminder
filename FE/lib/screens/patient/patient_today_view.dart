@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../services/notification_service.dart';
 import '../../services/schedule_api.dart';
 import '../../widgets/widgets.dart';
 
@@ -46,6 +47,7 @@ class _PatientTodayViewState extends State<PatientTodayView> {
           _schedules = items;
           _isLoading = false;
         });
+        NotificationService.instance.syncAllSchedules(items);
       }
     } catch (e) {
       if (mounted) {

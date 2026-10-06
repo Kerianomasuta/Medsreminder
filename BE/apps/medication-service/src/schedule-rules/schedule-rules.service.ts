@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
+import { DoseStatus } from '../enums/dose-status.enum.js';
+import { MedicationLog } from '../medication-logs/schema/medication-log.entity.js';
+import { scheduledDoseInstants } from '../medication-logs/scheduled-doses.js';
+import { Prescription } from '../prescriptions/schema/prescription.entity.js';
 import { PrescriptionItem } from '../prescriptions/schema/prescription-item.entity.js';
 import { ScheduleRule } from './schema/schedule-rule.entity.js';
 
@@ -30,6 +34,7 @@ export type UpdateScheduleInput = {
 @Injectable()
 export class ScheduleRulesService {
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(ScheduleRule)
     private readonly rules: Repository<ScheduleRule>,
     @InjectRepository(PrescriptionItem)
@@ -60,15 +65,20 @@ export class ScheduleRulesService {
 
   async create(prescriptionItemId: string | undefined, payload: CreateScheduleInput) {
     const item = await this.findItem(prescriptionItemId);
-    const saved = await this.rules.save(
-      this.rules.create({
-        prescriptionItemId: item.id,
-        patientId: item.prescription.patientId,
-        reminderTime: this.requireTime(payload.reminderTime),
-        daysOfWeek: this.normalizeDays(payload.daysOfWeek),
-        isActive: true,
-      }),
-    );
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const rule = await manager.save(
+        ScheduleRule,
+        manager.create(ScheduleRule, {
+          prescriptionItemId: item.id,
+          patientId: item.prescription.patientId,
+          reminderTime: this.requireTime(payload.reminderTime),
+          daysOfWeek: this.normalizeDays(payload.daysOfWeek),
+          isActive: true,
+        }),
+      );
+      await this.saveScheduledLogs(manager, rule, item.prescription);
+      return rule;
+    });
     saved.prescriptionItem = item;
     return this.toResponse(saved);
   }
@@ -95,6 +105,32 @@ export class ScheduleRulesService {
     const saved = await this.rules.save(rule);
     saved.prescriptionItem = rule.prescriptionItem;
     return this.toResponse(saved);
+  }
+
+  private async saveScheduledLogs(
+    manager: EntityManager,
+    rule: Pick<ScheduleRule, 'id' | 'patientId' | 'reminderTime' | 'daysOfWeek'>,
+    prescription: Pick<Prescription, 'startDate' | 'endDate'>,
+  ) {
+    const instants = scheduledDoseInstants({
+      startDate: prescription.startDate,
+      endDate: prescription.endDate,
+      reminderTime: rule.reminderTime,
+      daysOfWeek: rule.daysOfWeek,
+    });
+
+    for (const scheduledAt of instants) {
+      await manager.save(
+        MedicationLog,
+        manager.create(MedicationLog, {
+          scheduleRuleId: rule.id,
+          patientId: rule.patientId,
+          scheduledAt,
+          status: DoseStatus.SCHEDULED,
+          escalationLevel: 0,
+        }),
+      );
+    }
   }
 
   private async findItem(id: string | undefined) {
