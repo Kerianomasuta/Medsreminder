@@ -5,6 +5,22 @@ enum AppRole { patient, caregiver, pharmacist, shipper, admin }
 enum OrderStage { review, verified, pickedUp, delivering, delivered }
 
 extension RoleData on AppRole {
+  String get apiValue => switch (this) {
+    AppRole.patient => 'PATIENT',
+    AppRole.caregiver => 'CARE_GIVER',
+    AppRole.pharmacist => 'PHARMACIST',
+    AppRole.shipper => 'DRUGSHIPPER',
+    AppRole.admin => 'ADMIN',
+  };
+
+  String get route => switch (this) {
+    AppRole.patient => '/patient',
+    AppRole.caregiver => '/caregiver',
+    AppRole.pharmacist => '/pharmacist',
+    AppRole.shipper => '/shipper',
+    AppRole.admin => '/admin',
+  };
+
   String get label => switch (this) {
     AppRole.patient => 'Bệnh nhân',
     AppRole.caregiver => 'Người chăm sóc',
