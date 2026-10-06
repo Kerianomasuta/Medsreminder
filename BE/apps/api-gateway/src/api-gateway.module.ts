@@ -6,6 +6,7 @@ import { OrdersModule } from './orders/orders.module.js';
 import { PharmaciesModule } from './pharmacies/pharmacies.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
 import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
+import { UserModule } from './users/user.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
     MedicinesModule,
     PrescriptionsModule,
     ScheduleRulesModule,
+    UserModule,
     PharmaciesModule,
     OrdersModule,
   ],

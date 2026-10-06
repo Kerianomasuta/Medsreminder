@@ -18,6 +18,7 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.role,
     required this.userName,
+    required this.userEmail,
     required this.onLogout,
     required this.doseTaken,
     required this.doseMissed,
@@ -37,6 +38,7 @@ class AppShell extends StatefulWidget {
 
   final AppRole role;
   final String userName;
+  final String userEmail;
   final Future<void> Function() onLogout;
   final bool doseTaken, doseMissed, prescriptionAdded;
   final List<PatientProfileItem> linkedPatients;
@@ -178,6 +180,8 @@ class _AppShellState extends State<AppShell>
           : CaregiverHome(
               key: ValueKey('${widget.role}$tab${widget.activePatientIndex}'),
               tab: tab,
+              userName: widget.userName,
+              userEmail: widget.userEmail,
               doseTaken: widget.doseTaken,
               doseMissed: widget.doseMissed,
               prescriptionAdded: widget.prescriptionAdded,
