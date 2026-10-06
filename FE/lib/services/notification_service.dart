@@ -189,51 +189,7 @@ class NotificationService {
     );
   }
 
-  /// Hẹn giờ thông báo thử nghiệm sau X giây (Dùng để test khóa màn hình)
-  Future<void> scheduleTestNotificationAfterSeconds({
-    int seconds = 5,
-    String? medicineName,
-    String? dosage,
-  }) async {
-    if (!_isSupported) return;
-    await init();
-
-    final scheduledDate = tz.TZDateTime.now(tz.local).add(Duration(seconds: seconds));
-
-    final drug = medicineName ?? 'Paracetamol 500mg';
-    final dose = dosage ?? '1 viên · Sau khi ăn';
-
-    // 1. In-process timer: Đảm bảo bắn thông báo sau [seconds] giây ngay khi vừa khóa máy
-    Future.delayed(Duration(seconds: seconds), () async {
-      try {
-        await showInstantNotification(
-          title: '⏰ Đến giờ uống thuốc!',
-          body: '$drug\nLiều lượng: $dose',
-          id: 8888,
-          medicineName: drug,
-          dosage: dose,
-        );
-      } catch (e) {
-        debugPrint('Timer show notification error: $e');
-      }
-    });
-
-    // 2. AlarmManager hệ thống (cho phép thức dậy ngay cả khi app bị đóng)
-    try {
-      await _plugin.zonedSchedule(
-        id: 8889,
-        title: '⏰ Đến giờ uống thuốc!',
-        body: '$drug\nLiều lượng: $dose',
-        scheduledDate: scheduledDate,
-        notificationDetails: _notificationDetails(),
-        androidScheduleMode: AndroidScheduleMode.alarmClock,
-      );
-    } catch (e) {
-      debugPrint('AlarmManager zonedSchedule error: $e');
-    }
-  }
-
-  /// Hẹn giờ cho một cữ thuốc cụ thể theo ScheduleRule
+  /// Hẹn giờ báo thức cho một cữ thuốc cụ thể theo ScheduleRule
   Future<void> scheduleMedicationRule(ScheduleRule rule) async {
     if (!_isSupported || !rule.isActive) return;
     await init();
@@ -257,7 +213,7 @@ class NotificationService {
         minute,
       );
 
-      // Điều chỉnh theo ngày trong tuần
+      // Điều chỉnh theo ngày trong tuần: nếu ngày đã qua trong tuần hoặc giờ đã qua hôm nay, nhảy sang tuần tới
       while (scheduledDate.weekday != day || scheduledDate.isBefore(now)) {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
       }
@@ -266,18 +222,36 @@ class NotificationService {
       final notifId = (rule.id.hashCode ^ (day * 100)).abs() % 100000;
 
       final title = '⏰ Đến giờ uống thuốc (${rule.period})';
-      final body = '${rule.medicine.name} - ${rule.dosagePerTime.toInt()} ${rule.medicine.unit}'
+      final drug = rule.medicine.name;
+      final dose = '${rule.dosagePerTime.toInt()} ${rule.medicine.unit}'
           '${rule.instructions != null ? " · ${rule.instructions}" : ""}';
 
-      await _plugin.zonedSchedule(
-        id: notifId,
-        title: title,
-        body: body,
-        scheduledDate: scheduledDate,
-        notificationDetails: _notificationDetails(),
-        androidScheduleMode: AndroidScheduleMode.alarmClock,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      );
+      if (Platform.isAndroid) {
+        // Trên Android: Sử dụng Exact Alarm native để đánh thức máy, phát chuông lặp và mở màn hình khóa
+        try {
+          await _wakeChannel.invokeMethod('scheduleExactAlarm', {
+            'id': notifId,
+            'triggerAtMillis': scheduledDate.millisecondsSinceEpoch,
+            'medicineName': drug,
+            'dosage': dose,
+            'time': rule.reminderTime,
+          });
+          debugPrint('Đã hẹn báo thức Android cho $drug lúc ${scheduledDate.toString()} (ID: $notifId)');
+        } catch (e) {
+          debugPrint('Lỗi hẹn báo thức exact alarm: $e');
+        }
+      } else {
+        // Trên iOS hoặc nền tảng khác: Fallback qua FlutterLocalNotifications
+        await _plugin.zonedSchedule(
+          id: notifId,
+          title: title,
+          body: '$drug - $dose',
+          scheduledDate: scheduledDate,
+          notificationDetails: _notificationDetails(),
+          androidScheduleMode: AndroidScheduleMode.alarmClock,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        );
+      }
     }
   }
 
@@ -287,7 +261,7 @@ class NotificationService {
     await init();
 
     // Hủy các lịch hẹn cũ để đồng bộ mới chính xác
-    await _plugin.cancelAll();
+    await cancelAll();
 
     for (final rule in rules) {
       if (rule.isActive) {
@@ -297,9 +271,16 @@ class NotificationService {
     debugPrint('Đã đồng bộ ${rules.length} cữ thuốc vào hệ thống thông báo báo thức.');
   }
 
-  /// Hủy tất cả thông báo
+  /// Hủy tất cả thông báo và báo thức
   Future<void> cancelAll() async {
     if (!_isSupported) return;
     await _plugin.cancelAll();
+    if (Platform.isAndroid) {
+      try {
+        await _wakeChannel.invokeMethod('cancelAllAlarms');
+      } catch (e) {
+        debugPrint('Lỗi cancelAllAlarms: $e');
+      }
+    }
   }
 }
