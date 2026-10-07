@@ -6,13 +6,13 @@ import { OrdersService } from './orders.service.js';
 import { OrderItem } from './schema/order-item.entity.js';
 import { Order } from './schema/order.entity.js';
 
-const patientId = '11111111-1111-4111-8111-111111111111';
-const caregiverId = '22222222-2222-4222-8222-222222222222';
+const patientId = '507f1f77bcf86cd799439011';
+const caregiverId = '507f1f77bcf86cd799439012';
 const pharmacyId = '33333333-3333-4333-8333-333333333333';
 const prescriptionId = '44444444-4444-4444-8444-444444444444';
 const prescriptionItemId = '55555555-5555-4555-8555-555555555555';
 const orderId = '77777777-7777-4777-8777-777777777777';
-const pharmacistId = '88888888-8888-4888-8888-888888888888';
+const pharmacistId = '507f1f77bcf86cd799439013';
 
 function createManager() {
   const orders = new Map<string, Record<string, unknown>>();

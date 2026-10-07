@@ -6,7 +6,7 @@ export class Pharmacy {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', name: 'pharmacist_id' })
+  @Column({ type: 'varchar', length: 24, name: 'pharmacist_id' })
   pharmacistId: string;
 
   @Column({ type: 'varchar', length: 150 })

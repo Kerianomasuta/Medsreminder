@@ -1,10 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsMongoId, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class UpdatePharmacyDto {
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439013', description: 'MongoDB ObjectId of the pharmacist' })
   @IsOptional()
-  @IsUUID()
+  @IsMongoId()
   pharmacistId?: string;
 
   @ApiPropertyOptional()

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsMongoId, IsOptional, IsUUID } from 'class-validator';
 
 export const ORDER_STATUSES = [
   'PENDING_REVIEW',
@@ -12,14 +12,14 @@ export const ORDER_STATUSES = [
 ] as const;
 
 export class ListOrdersQueryDto {
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
   @IsOptional()
-  @IsUUID()
+  @IsMongoId()
   patientId?: string;
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
   @IsOptional()
-  @IsUUID()
+  @IsMongoId()
   caregiverId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })

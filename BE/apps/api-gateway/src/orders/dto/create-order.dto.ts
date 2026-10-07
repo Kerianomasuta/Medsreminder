@@ -5,6 +5,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsMongoId,
   IsOptional,
   IsString,
   IsUUID,
@@ -26,12 +27,12 @@ export class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @IsMongoId()
   patientId: string;
 
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
+  @IsMongoId()
   caregiverId: string;
 
   @ApiProperty({ format: 'uuid' })
@@ -86,14 +87,14 @@ export class ListMyOrdersQueryDto {
 }
 
 export class ListOrdersQueryDto {
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
   @IsOptional()
-  @IsUUID()
+  @IsMongoId()
   patientId?: string;
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
   @IsOptional()
-  @IsUUID()
+  @IsMongoId()
   caregiverId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })

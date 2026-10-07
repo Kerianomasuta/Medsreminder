@@ -11,6 +11,7 @@ import { PrescriptionItem } from './schema/prescription-item.entity.js';
 import { Prescription } from './schema/prescription.entity.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 const ALL_WEEK = [1, 2, 3, 4, 5, 6, 7];
@@ -88,8 +89,8 @@ export class PrescriptionsService {
   ) {}
 
   async create(payload: CreatePrescriptionInput) {
-    const patientId = this.requireUuid(payload.patientId, 'patientId');
-    const createdByCgId = this.requireUuid(payload.createdByCgId, 'createdByCgId');
+    const patientId = this.requireObjectId(payload.patientId, 'patientId');
+    const createdByCgId = this.requireObjectId(payload.createdByCgId, 'createdByCgId');
     const title = this.requireText(payload.title, 'title');
     const startDate = this.requireDate(payload.startDate, 'startDate');
     const endDate = this.optionalDate(payload.endDate, 'endDate');
@@ -122,7 +123,7 @@ export class PrescriptionsService {
   }
 
   async list(patientId?: string) {
-    const id = this.requireUuid(patientId, 'patientId');
+    const id = this.requireObjectId(patientId, 'patientId');
     const rows = await this.prescriptions.find({
       where: { patientId: id },
       relations: { items: { scheduleRules: true } },
@@ -394,6 +395,13 @@ export class PrescriptionsService {
   private requireUuid(value: string | undefined, label: string) {
     if (!value || !UUID_PATTERN.test(value)) {
       throw ErrorHandling.BadRequest(`${label} must be a UUID`);
+    }
+    return value;
+  }
+
+  private requireObjectId(value: string | undefined, label: string) {
+    if (!value || !OBJECT_ID_PATTERN.test(value)) {
+      throw ErrorHandling.BadRequest(`${label} must be an ObjectId`);
     }
     return value;
   }

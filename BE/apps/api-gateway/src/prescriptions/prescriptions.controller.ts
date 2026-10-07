@@ -42,7 +42,7 @@ export class PrescriptionsController {
     description: 'Pharmacists can read a prescription while reviewing an order. The response includes medicine lines and dose times. Allowed roles: PATIENT, CARE_GIVER, PHARMACIST, ADMIN.',
   })
   @ApiOkResponse({ type: PrescriptionResponseDto, isArray: true, description: 'Prescriptions for the patient, newest first.' })
-  @ApiBadRequestResponse({ description: 'patientId is missing or is not a UUID.' })
+  @ApiBadRequestResponse({ description: 'patientId is missing or is not an ObjectId.' })
   list(@Query() query: ListPrescriptionsQueryDto) {
     return this.prescriptionsService.list(query);
   }
