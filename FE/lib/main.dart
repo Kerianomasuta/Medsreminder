@@ -253,6 +253,7 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
             key: const ValueKey('app-shell'),
             role: role,
             userName: _currentUser!.fullName,
+            userEmail: _currentUser!.email,
             onLogout: _logout,
             doseTaken: doseTaken,
             doseMissed: doseMissed,
