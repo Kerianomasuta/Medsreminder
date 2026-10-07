@@ -1,6 +1,7 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
+import { toRpcHttpException } from '../rpc-http-exception.js';
 import { CreateMedicineDto } from './dto/create-medicine.dto.js';
 import { UpdateMedicineDto } from './dto/update-medicine.dto.js';
 
@@ -36,17 +37,6 @@ export class MedicinesService {
   }
 
   private toHttpException(error: unknown) {
-    if (error instanceof HttpException) {
-      return error;
-    }
-
-    if (typeof error === 'object' && error !== null) {
-      const record = error as { status?: number; message?: unknown };
-      if (typeof record.status === 'number' && typeof record.message === 'string') {
-        return new HttpException(record.message, record.status);
-      }
-    }
-
-    return new HttpException('Medication service is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
+    return toRpcHttpException(error, 'Medication service is unavailable');
   }
 }

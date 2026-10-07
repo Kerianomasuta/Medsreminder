@@ -52,6 +52,19 @@ describe('PrescriptionsService', () => {
     expect(manager.save).not.toHaveBeenCalled();
   });
 
+  it('stores the signed-in patient as the prescription owner', async () => {
+    const created = await service.create({
+      ...validPrescription(),
+      patientId: caregiverId,
+      createdByCgId: caregiverId,
+      actorUserId: patientId,
+      actorRole: 'PATIENT',
+    });
+
+    expect(created.patientId).toBe(patientId);
+    expect(created.createdByCgId).toBe(patientId);
+  });
+
   it('saves two schedules when one medicine is taken twice a day', async () => {
     const created = await service.create(validPrescription());
 
