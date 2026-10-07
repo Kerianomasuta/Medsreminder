@@ -5,7 +5,6 @@ import {
   IsArray,
   IsIn,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -16,23 +15,14 @@ import {
 } from 'class-validator';
 
 export class CreateOrderItemDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ format: 'uuid', description: 'Prescription line to buy. The pharmacy reviews the name stored on that line.' })
   @IsUUID()
   prescriptionItemId: string;
-
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
-  medicineId: string;
 
   @ApiProperty({ example: 30 })
   @IsInt()
   @Min(1)
   quantity: number;
-
-  @ApiProperty({ example: 12000 })
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  unitPrice: number;
 }
 
 export class CreateOrderDto {
@@ -123,6 +113,14 @@ export class ShipOrderDto {
   @IsString()
   @MaxLength(255)
   trackingCodeOrLink?: string;
+}
+
+export class RejectOrderDto {
+  @ApiProperty({ example: 'Hết hàng' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  rejectionReason: string;
 }
 
 export class CancelOrderDto {

@@ -1,19 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DoseStatus } from '../enums/dose-status.enum.js';
 import { MedicationLog } from '../medication-logs/schema/medication-log.entity.js';
-import { Medicine } from '../medicines/schema/medicine.entity.js';
 import { ScheduleRule } from '../schedule-rules/schema/schedule-rule.entity.js';
+import { PrescriptionItem } from './schema/prescription-item.entity.js';
 import { PrescriptionsService } from './prescriptions.service.js';
 
 const patientId = '11111111-1111-4111-8111-111111111111';
 const caregiverId = '22222222-2222-4222-8222-222222222222';
-const medicineId = '33333333-3333-4333-8333-333333333333';
 
-function createManager(medicine: { id: string } | null) {
+function createManager() {
   const saves: Array<{ entity: string; value: Record<string, unknown> }> = [];
   return {
     saves,
-    findOne: vi.fn(async (entity: { name: string }) => (entity === Medicine ? medicine : null)),
     create: vi.fn((_entity: unknown, value: Record<string, unknown>) => ({ ...value })),
     save: vi.fn(async (entity: { name: string }, value: Record<string, unknown>) => {
       const saved = {
@@ -32,8 +30,8 @@ describe('PrescriptionsService', () => {
   let manager: ReturnType<typeof createManager>;
   let service: PrescriptionsService;
 
-  function buildService(medicine: { id: string } | null) {
-    manager = createManager(medicine);
+  function buildService() {
+    manager = createManager();
     const dataSource = {
       transaction: vi.fn(async (work: (current: typeof manager) => Promise<unknown>) => work(manager)),
     };
@@ -41,14 +39,15 @@ describe('PrescriptionsService', () => {
   }
 
   beforeEach(() => {
-    buildService({ id: medicineId });
+    buildService();
   });
 
-  it('rejects a medicine that is not in the catalog', async () => {
-    buildService(null);
+  it('rejects a medicine line that has no name', async () => {
+    const payload = validPrescription();
+    payload.items[0].name = '   ';
 
-    await expect(service.create(validPrescription())).rejects.toMatchObject({
-      message: 'Medicine not found',
+    await expect(service.create(payload)).rejects.toMatchObject({
+      message: 'Medicine name is required',
     });
     expect(manager.save).not.toHaveBeenCalled();
   });
@@ -63,6 +62,16 @@ describe('PrescriptionsService', () => {
     expect(created.items).toHaveLength(1);
     expect(created.items[0].schedules).toHaveLength(2);
     expect(created.items[0].currentStock).toBe(30);
+    expect(created.items[0].name).toBe('Paracetamol');
+    expect(created.items[0].unit).toBe('VIEN');
+
+    const itemSave = manager.saves.find((entry) => entry.entity === PrescriptionItem.name);
+    expect(itemSave?.value).toMatchObject({
+      name: 'Paracetamol',
+      unit: 'VIEN',
+      imageUrl: null,
+    });
+    expect(itemSave?.value).not.toHaveProperty('medicineId');
 
     const logSaves = manager.saves.filter((entry) => entry.entity === MedicationLog.name);
     expect(logSaves).toHaveLength(62);
@@ -80,7 +89,8 @@ function validPrescription() {
     endDate: '2026-10-31',
     items: [
       {
-        medicineId,
+        name: 'Paracetamol',
+        unit: 'VIEN',
         dosagePerTime: 2,
         currentStock: 30,
         schedules: [

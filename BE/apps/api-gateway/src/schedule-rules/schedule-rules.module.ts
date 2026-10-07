@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { AuthModule } from '../auth/auth.module.js';
 import { ScheduleRulesController } from './schedule-rules.controller.js';
 import { ScheduleRulesService } from './schedule-rules.service.js';
 
 @Module({
   imports: [
+    AuthModule,
     ClientsModule.registerAsync([
       {
         name: 'MEDICATION_SERVICE',

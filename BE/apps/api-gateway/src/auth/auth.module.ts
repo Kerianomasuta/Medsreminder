@@ -32,6 +32,7 @@ import { RolesGuard } from "./guards/authorizedByRoles/roles.guard.js";
         RolesGuard,
     ],
     exports: [
+        JwtModule,
         JwtAuthGuard,
         RolesGuard,
     ]

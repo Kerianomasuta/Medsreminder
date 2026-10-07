@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
-import { CancelOrderDto, CreateOrderDto, ListOrdersQueryDto, ShipOrderDto } from './dto/create-order.dto.js';
+import { CancelOrderDto, CreateOrderDto, ListOrdersQueryDto, RejectOrderDto, ShipOrderDto } from './dto/create-order.dto.js';
 
 @Injectable()
 export class OrdersService {
@@ -24,6 +24,10 @@ export class OrdersService {
 
   accept(id: string) {
     return this.send({ cmd: 'accept_order' }, { id });
+  }
+
+  reject(id: string, dto: RejectOrderDto) {
+    return this.send({ cmd: 'reject_order' }, { id, ...dto });
   }
 
   markReady(id: string) {
