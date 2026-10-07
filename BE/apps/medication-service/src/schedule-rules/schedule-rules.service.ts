@@ -15,7 +15,6 @@ const ALL_WEEK = [1, 2, 3, 4, 5, 6, 7];
 
 const RULE_RELATIONS = {
   prescriptionItem: {
-    medicine: true,
     prescription: true,
   },
 } as const;
@@ -137,9 +136,9 @@ export class ScheduleRulesService {
     const itemId = this.requireUuid(id, 'prescriptionItemId');
     const item = await this.items.findOne({
       where: { id: itemId },
-      relations: { medicine: true, prescription: true },
+      relations: { prescription: true },
     });
-    if (!item?.prescription || !item.medicine) {
+    if (!item?.prescription) {
       throw ErrorHandling.NotFound('Prescription item not found');
     }
     return item;
@@ -151,7 +150,7 @@ export class ScheduleRulesService {
       where: { id },
       relations: RULE_RELATIONS,
     });
-    if (!rule?.prescriptionItem?.prescription || !rule.prescriptionItem.medicine) {
+    if (!rule?.prescriptionItem?.prescription) {
       throw ErrorHandling.NotFound('Schedule not found');
     }
     return rule;
@@ -206,10 +205,10 @@ export class ScheduleRulesService {
       dosagePerTime: Number(item.dosagePerTime),
       instructions: item.instructions,
       medicine: {
-        id: item.medicine.id,
-        name: item.medicine.name,
-        unit: item.medicine.unit,
-        imageUrl: item.medicine.imageUrl,
+        name: item.name,
+        genericName: item.genericName,
+        unit: item.unit,
+        imageUrl: item.imageUrl,
       },
       prescription: {
         id: item.prescription.id,

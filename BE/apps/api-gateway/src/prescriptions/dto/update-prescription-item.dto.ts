@@ -1,7 +1,32 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+
+const MEDICINE_UNITS = ['VIEN', 'GOI', 'CHAI'] as const;
 
 export class UpdatePrescriptionItemDto {
+  @ApiPropertyOptional({ example: 'Paracetamol' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  name?: string;
+
+  @ApiPropertyOptional({ example: 'Acetaminophen' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  genericName?: string | null;
+
+  @ApiPropertyOptional({ enum: MEDICINE_UNITS, example: 'VIEN' })
+  @IsOptional()
+  @IsIn(MEDICINE_UNITS)
+  unit?: (typeof MEDICINE_UNITS)[number];
+
+  @ApiPropertyOptional({ example: 'https://example.com/paracetamol.png' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  imageUrl?: string | null;
+
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })

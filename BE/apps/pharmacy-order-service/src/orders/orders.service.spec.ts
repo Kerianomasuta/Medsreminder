@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FulfillmentType } from '../enums/fulfillment-type.enum.js';
 import { OrderStatus } from '../enums/order-status.enum.js';
-import { PharmacyInventory } from '../pharmacies/schema/pharmacy-inventory.entity.js';
 import { Pharmacy } from '../pharmacies/schema/pharmacy.entity.js';
 import { OrdersService } from './orders.service.js';
 import { OrderItem } from './schema/order-item.entity.js';
@@ -12,27 +11,15 @@ const caregiverId = '22222222-2222-4222-8222-222222222222';
 const pharmacyId = '33333333-3333-4333-8333-333333333333';
 const prescriptionId = '44444444-4444-4444-8444-444444444444';
 const prescriptionItemId = '55555555-5555-4555-8555-555555555555';
-const medicineId = '66666666-6666-4666-8666-666666666666';
 const orderId = '77777777-7777-4777-8777-777777777777';
 
 function createManager() {
-  const inventory = {
-    id: 'inv-1',
-    pharmacyId,
-    medicineId,
-    stockQuantity: 10,
-    pricePerUnit: '12000.00',
-  };
   const orders = new Map<string, Record<string, unknown>>();
   return {
-    inventory,
     orders,
     findOne: vi.fn(async (entity: { name: string }, options: { where: { id?: string } }) => {
       if (entity === Pharmacy) {
         return { id: pharmacyId, isActive: true };
-      }
-      if (entity === PharmacyInventory) {
-        return inventory;
       }
       if (entity === Order) {
         return orders.get(options.where.id ?? '') ?? null;
@@ -43,6 +30,12 @@ function createManager() {
       const order = [...orders.values()][0] as { items?: unknown[] } | undefined;
       return order?.items ?? [];
     }),
+    query: vi.fn(async () => [{
+      id: prescriptionItemId,
+      name: 'Paracetamol',
+      unit: 'VIEN',
+      image_url: null,
+    }]),
     create: vi.fn((_entity: unknown, value: Record<string, unknown>) => ({ ...value })),
     save: vi.fn(async (entity: { name: string }, value: Record<string, unknown>) => {
       if (entity === Order) {
@@ -86,21 +79,39 @@ describe('OrdersService', () => {
     })).rejects.toMatchObject({ message: 'recipientName is required' });
   });
 
-  it('reserves stock when the pharmacist accepts the order', async () => {
+  it('submits the prescription lines and lets the pharmacy accept without a stock check', async () => {
     const created = await service.create(baseOrder());
-    created.items = [{
-      id: 'item-1',
+    expect(created.status).toBe(OrderStatus.PENDING_REVIEW);
+    expect(created.totalAmount).toBe(0);
+    expect(created.items[0]).toMatchObject({
       prescriptionItemId,
-      medicineId,
+      name: 'Paracetamol',
+      unit: 'VIEN',
       quantity: 4,
-      unitPrice: 12000,
-    }];
+    });
     manager.orders.set(orderId, { ...created, id: orderId, items: created.items });
 
     const accepted = await service.accept(orderId);
 
     expect(accepted.status).toBe(OrderStatus.PREPARING);
-    expect(manager.inventory.stockQuantity).toBe(6);
+  });
+
+  it('rejects a submitted order only when a reason is given', async () => {
+    manager.orders.set(orderId, {
+      id: orderId,
+      status: OrderStatus.PENDING_REVIEW,
+      fulfillmentType: FulfillmentType.PICKUP,
+      items: [],
+    });
+
+    await expect(service.reject(orderId, {})).rejects.toMatchObject({
+      message: 'rejectionReason is required',
+    });
+
+    const rejected = await service.reject(orderId, { rejectionReason: 'Hết hàng' });
+
+    expect(rejected.status).toBe(OrderStatus.CANCELLED);
+    expect(rejected.rejectionReason).toBe('Hết hàng');
   });
 
   it('refuses to ship a pickup order', async () => {
@@ -122,7 +133,7 @@ describe('OrdersService', () => {
       status: OrderStatus.PREPARING,
       fulfillmentType: FulfillmentType.PICKUP,
       pharmacyId,
-      items: [{ medicineId, quantity: 4 }],
+      items: [],
     });
 
     await expect(service.cancel(orderId, {
@@ -131,16 +142,15 @@ describe('OrdersService', () => {
     })).rejects.toMatchObject({
       message: 'Contact the pharmacy to cancel an order that is already being prepared',
     });
-    expect(manager.inventory.stockQuantity).toBe(10);
   });
 
-  it('restores stock when the pharmacist cancels a packed order', async () => {
+  it('lets the pharmacist cancel a packed order with a reason', async () => {
     manager.orders.set(orderId, {
       id: orderId,
       status: OrderStatus.PREPARING,
       fulfillmentType: FulfillmentType.DELIVERY,
       pharmacyId,
-      items: [{ medicineId, quantity: 4 }],
+      items: [],
     });
 
     const cancelled = await service.cancel(orderId, {
@@ -149,7 +159,7 @@ describe('OrdersService', () => {
     });
 
     expect(cancelled.status).toBe(OrderStatus.CANCELLED);
-    expect(manager.inventory.stockQuantity).toBe(14);
+    expect(cancelled.rejectionReason).toBe('Hết hàng');
   });
 
   it('adds the delivered quantity back to the patient stock', async () => {
@@ -157,7 +167,7 @@ describe('OrdersService', () => {
       id: orderId,
       status: OrderStatus.SHIPPED,
       fulfillmentType: FulfillmentType.DELIVERY,
-      items: [{ prescriptionItemId, medicineId, quantity: 4, unitPrice: '12000.00' }],
+      items: [{ prescriptionItemId, quantity: 4 }],
     });
 
     const completed = await service.complete(orderId);
@@ -176,9 +186,7 @@ function baseOrder() {
     fulfillmentType: FulfillmentType.PICKUP,
     items: [{
       prescriptionItemId,
-      medicineId,
       quantity: 4,
-      unitPrice: 12000,
     }],
   };
 }
