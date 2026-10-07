@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { RpcExceptionFilter } from './filter/rpc-exception.filter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(ApiGatewayModule);
@@ -20,6 +21,8 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
     transform: true,
   }))
+
+  app.useGlobalFilters(new RpcExceptionFilter())
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Meds Reminder API')
