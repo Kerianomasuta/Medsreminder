@@ -13,10 +13,10 @@ export class Order {
   @Column({ type: 'varchar', length: 20, name: 'order_code', unique: true })
   orderCode: string;
 
-  @Column({ type: 'uuid', name: 'patient_id' })
+  @Column({ type: 'varchar', length: 24, name: 'patient_id' })
   patientId: string;
 
-  @Column({ type: 'uuid', name: 'caregiver_id' })
+  @Column({ type: 'varchar', length: 24, name: 'caregiver_id' })
   caregiverId: string;
 
   @Column({ type: 'uuid', name: 'pharmacy_id' })

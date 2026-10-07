@@ -10,6 +10,7 @@ import { OrderItem } from './schema/order-item.entity.js';
 import { Order } from './schema/order.entity.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 export type OrderItemInput = {
@@ -88,8 +89,8 @@ export class OrdersService {
         Order,
         manager.create(Order, {
           orderCode: this.createOrderCode(),
-          patientId: this.requireUuid(payload.patientId, 'patientId'),
-          caregiverId: this.requireUuid(payload.caregiverId, 'caregiverId'),
+          patientId: this.requireObjectId(payload.patientId, 'patientId'),
+          caregiverId: this.requireObjectId(payload.caregiverId, 'caregiverId'),
           pharmacyId,
           prescriptionId,
           status: OrderStatus.PENDING_REVIEW,
@@ -115,13 +116,13 @@ export class OrdersService {
   async list(query: ListOrdersInput = {}) {
     const where: FindOptionsWhere<Order> = {};
     if (query.patientId !== undefined) {
-      where.patientId = this.requireUuid(query.patientId, 'patientId');
+      where.patientId = this.requireObjectId(query.patientId, 'patientId');
     }
     if (query.caregiverId !== undefined) {
-      where.caregiverId = this.requireUuid(query.caregiverId, 'caregiverId');
+      where.caregiverId = this.requireObjectId(query.caregiverId, 'caregiverId');
     }
     if (query.pharmacistId !== undefined) {
-      const pharmacistId = this.requireUuid(query.pharmacistId, 'pharmacistId');
+      const pharmacistId = this.requireObjectId(query.pharmacistId, 'pharmacistId');
       const pharmacies = await this.dataSource.getRepository(Pharmacy).find({
         where: { pharmacistId },
         select: { id: true },
@@ -154,7 +155,7 @@ export class OrdersService {
   }
 
   async accept(id: string, pharmacistId: string | undefined) {
-    const ownerId = this.requireUuid(pharmacistId, 'pharmacistId');
+    const ownerId = this.requireObjectId(pharmacistId, 'pharmacistId');
     return this.dataSource.transaction(async (manager) => {
       const order = await this.lockOrder(manager, id);
       const pharmacy = await manager.findOne(Pharmacy, { where: { id: order.pharmacyId } });
@@ -239,7 +240,7 @@ export class OrdersService {
 
   async cancel(id: string, payload: CancelOrderInput) {
     const reason = this.requireText(payload.rejectionReason, 'rejectionReason', 2000);
-    const userId = this.requireUuid(payload.userId, 'userId');
+    const userId = this.requireObjectId(payload.userId, 'userId');
 
     return this.dataSource.transaction(async (manager) => {
       const order = await this.lockOrder(manager, id);
@@ -419,6 +420,13 @@ export class OrdersService {
   private requireUuid(value: string | undefined, label: string) {
     if (!value || !UUID_PATTERN.test(value)) {
       throw ErrorHandling.BadRequest(`${label} must be a UUID`);
+    }
+    return value;
+  }
+
+  private requireObjectId(value: string | undefined, label: string) {
+    if (!value || !OBJECT_ID_PATTERN.test(value)) {
+      throw ErrorHandling.BadRequest(`${label} must be an ObjectId`);
     }
     return value;
   }

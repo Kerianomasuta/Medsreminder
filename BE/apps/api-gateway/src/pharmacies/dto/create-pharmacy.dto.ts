@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsMongoId, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreatePharmacyDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439013', description: 'MongoDB ObjectId of the pharmacist' })
+  @IsMongoId()
   pharmacistId: string;
 
   @ApiProperty({ example: 'Nhà thuốc An Khang' })

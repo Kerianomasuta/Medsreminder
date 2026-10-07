@@ -5,8 +5,8 @@ import { ScheduleRule } from '../schedule-rules/schema/schedule-rule.entity.js';
 import { PrescriptionItem } from './schema/prescription-item.entity.js';
 import { PrescriptionsService } from './prescriptions.service.js';
 
-const patientId = '11111111-1111-4111-8111-111111111111';
-const caregiverId = '22222222-2222-4222-8222-222222222222';
+const patientId = '507f1f77bcf86cd799439011';
+const caregiverId = '507f1f77bcf86cd799439012';
 
 function createManager() {
   const saves: Array<{ entity: string; value: Record<string, unknown> }> = [];

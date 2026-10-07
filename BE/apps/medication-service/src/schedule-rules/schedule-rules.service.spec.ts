@@ -4,7 +4,7 @@ import { MedicationLog } from '../medication-logs/schema/medication-log.entity.j
 import { ScheduleRule } from './schema/schedule-rule.entity.js';
 import { ScheduleRulesService } from './schedule-rules.service.js';
 
-const patientId = '11111111-1111-4111-8111-111111111111';
+const patientId = '507f1f77bcf86cd799439011';
 const itemId = '44444444-4444-4444-8444-444444444444';
 
 function createItem() {

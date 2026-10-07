@@ -6,6 +6,7 @@ import { PharmacyInventory } from './schema/pharmacy-inventory.entity.js';
 import { Pharmacy } from './schema/pharmacy.entity.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 
 export type PharmacyInput = {
   pharmacistId?: string;
@@ -139,7 +140,7 @@ export class PharmaciesService {
   private preparePharmacy(payload: PharmacyInput, creating: boolean) {
     const changes: Partial<Pharmacy> = {};
     if (creating || payload.pharmacistId !== undefined) {
-      changes.pharmacistId = this.requireUuid(payload.pharmacistId, 'pharmacistId');
+      changes.pharmacistId = this.requireObjectId(payload.pharmacistId, 'pharmacistId');
     }
     if (creating || payload.name !== undefined) {
       changes.name = this.requireText(payload.name, 'name', 150);
@@ -214,6 +215,13 @@ export class PharmaciesService {
   private requireUuid(value: string | undefined, label: string) {
     if (!value || !UUID_PATTERN.test(value)) {
       throw ErrorHandling.BadRequest(`${label} must be a UUID`);
+    }
+    return value;
+  }
+
+  private requireObjectId(value: string | undefined, label: string) {
+    if (!value || !OBJECT_ID_PATTERN.test(value)) {
+      throw ErrorHandling.BadRequest(`${label} must be an ObjectId`);
     }
     return value;
   }

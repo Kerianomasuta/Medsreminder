@@ -12,7 +12,7 @@ export class MedicationLog {
   @Column({ type: 'uuid', name: 'schedule_rule_id' })
   scheduleRuleId: string;
 
-  @Column({ type: 'uuid', name: 'patient_id' })
+  @Column({ type: 'varchar', length: 24, name: 'patient_id' })
   patientId: string;
 
   @Column({ type: 'timestamptz', name: 'scheduled_at' })
