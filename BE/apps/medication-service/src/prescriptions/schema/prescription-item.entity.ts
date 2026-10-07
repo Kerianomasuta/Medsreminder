@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import { Medicine } from '../../medicines/schema/medicine.entity.js';
+import { MedicineUnit } from '../../enums/medicine-unit.enum.js';
 import { ScheduleRule } from '../../schedule-rules/schema/schedule-rule.entity.js';
 import { Prescription } from './prescription.entity.js';
 
@@ -11,8 +11,17 @@ export class PrescriptionItem {
   @Column({ type: 'uuid', name: 'prescription_id' })
   prescriptionId: string;
 
-  @Column({ type: 'uuid', name: 'medicine_id' })
-  medicineId: string;
+  @Column({ type: 'text' })
+  name: string;
+
+  @Column({ type: 'text', name: 'generic_name', nullable: true })
+  genericName: string | null;
+
+  @Column({ type: 'enum', enum: MedicineUnit, enumName: 'medicine_unit' })
+  unit: MedicineUnit;
+
+  @Column({ type: 'text', name: 'image_url', nullable: true })
+  imageUrl: string | null;
 
   @Column({ type: 'numeric', precision: 10, scale: 2, name: 'dosage_per_time' })
   dosagePerTime: string;
@@ -35,10 +44,6 @@ export class PrescriptionItem {
   @ManyToOne(() => Prescription, (prescription) => prescription.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'prescription_id' })
   prescription: Prescription;
-
-  @ManyToOne(() => Medicine, (medicine) => medicine.prescriptionItems, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'medicine_id' })
-  medicine: Medicine;
 
   @OneToMany(() => ScheduleRule, (rule) => rule.prescriptionItem)
   scheduleRules: ScheduleRule[];

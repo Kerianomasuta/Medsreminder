@@ -8,7 +8,10 @@ type ScheduleMessage = {
 };
 
 type ItemMessage = {
-  medicineId?: string;
+  name?: string;
+  genericName?: string | null;
+  unit?: string;
+  imageUrl?: string | null;
   dosagePerTime?: number;
   currentStock?: number;
   reorderThreshold?: number;
@@ -81,6 +84,10 @@ export class PrescriptionsController {
   updateItem(
     @Payload() payload: {
       id: string;
+      name?: string;
+      genericName?: string | null;
+      unit?: string;
+      imageUrl?: string | null;
       dosagePerTime?: number;
       currentStock?: number;
       reorderThreshold?: number;

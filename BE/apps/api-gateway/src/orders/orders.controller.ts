@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CancelOrderDto, CreateOrderDto, ListOrdersQueryDto, ShipOrderDto } from './dto/create-order.dto.js';
+import { CancelOrderDto, CreateOrderDto, ListOrdersQueryDto, RejectOrderDto, ShipOrderDto } from './dto/create-order.dto.js';
 import { OrdersService } from './orders.service.js';
 
 @Controller('api/v1/orders')
@@ -9,7 +9,7 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Place a refill order for pickup or delivery' })
+  @ApiOperation({ summary: 'Submit a prescription order for a pharmacy to review' })
   create(@Body() dto: CreateOrderDto) {
     return this.ordersService.create(dto);
   }
@@ -27,9 +27,15 @@ export class OrdersController {
   }
 
   @Post(':id/accept')
-  @ApiOperation({ summary: 'Pharmacist accepts the order and stock is reserved' })
+  @ApiOperation({ summary: 'Pharmacy accepts a submitted order' })
   accept(@Param('id', ParseUUIDPipe) id: string) {
     return this.ordersService.accept(id);
+  }
+
+  @Post(':id/reject')
+  @ApiOperation({ summary: 'Pharmacy rejects a submitted order and must give a reason' })
+  reject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectOrderDto) {
+    return this.ordersService.reject(id, dto);
   }
 
   @Post(':id/ready')
@@ -51,7 +57,7 @@ export class OrdersController {
   }
 
   @Post(':id/cancel')
-  @ApiOperation({ summary: 'Reject or cancel an order and restore stock when it was reserved' })
+  @ApiOperation({ summary: 'Cancel an order. A caregiver can cancel only before the pharmacy accepts it' })
   cancel(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelOrderDto) {
     return this.ordersService.cancel(id, dto);
   }

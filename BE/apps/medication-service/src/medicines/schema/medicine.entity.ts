@@ -1,6 +1,5 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { MedicineUnit } from '../../enums/medicine-unit.enum.js';
-import { PrescriptionItem } from '../../prescriptions/schema/prescription-item.entity.js';
 
 @Entity({ schema: 'medication', name: 'medicines' })
 export class Medicine {
@@ -27,7 +26,4 @@ export class Medicine {
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
-
-  @OneToMany(() => PrescriptionItem, (item) => item.medicine)
-  prescriptionItems: PrescriptionItem[];
 }
