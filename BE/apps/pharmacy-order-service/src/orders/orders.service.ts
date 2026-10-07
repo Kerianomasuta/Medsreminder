@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
 import { FulfillmentType } from '../enums/fulfillment-type.enum.js';
 import { OrderStatus } from '../enums/order-status.enum.js';
@@ -111,7 +111,7 @@ export class OrdersService {
   }
 
   async list(query: ListOrdersInput = {}) {
-    const where: Partial<Order> = {};
+    const where: FindOptionsWhere<Order> = {};
     if (query.patientId !== undefined) {
       where.patientId = this.requireUuid(query.patientId, 'patientId');
     }
