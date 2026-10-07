@@ -5,6 +5,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsMongoId,
   IsOptional,
   IsString,
   IsUUID,
@@ -26,12 +27,12 @@ export class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @IsMongoId()
   patientId: string;
 
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
+  @IsMongoId()
   caregiverId: string;
 
   @ApiProperty({ format: 'uuid' })
@@ -78,15 +79,22 @@ export class CreateOrderDto {
   items: CreateOrderItemDto[];
 }
 
-export class ListOrdersQueryDto {
-  @ApiPropertyOptional({ format: 'uuid' })
+export class ListMyOrdersQueryDto {
+  @ApiPropertyOptional({ enum: ['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'] })
   @IsOptional()
-  @IsUUID()
+  @IsIn(['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'])
+  status?: string;
+}
+
+export class ListOrdersQueryDto {
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @IsOptional()
+  @IsMongoId()
   patientId?: string;
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
   @IsOptional()
-  @IsUUID()
+  @IsMongoId()
   caregiverId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
@@ -101,18 +109,17 @@ export class ListOrdersQueryDto {
 }
 
 export class ShipOrderDto {
-  @ApiPropertyOptional({ example: 'GrabExpress' })
-  @IsOptional()
+  @ApiProperty({ example: 'Nguyen Van Giao' })
   @IsString()
   @MinLength(1)
-  @MaxLength(50)
-  shippingCarrier?: string;
+  @MaxLength(100)
+  shipperName: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: '0901234567' })
   @IsString()
-  @MaxLength(255)
-  trackingCodeOrLink?: string;
+  @MinLength(1)
+  @MaxLength(15)
+  shipperPhone: string;
 }
 
 export class RejectOrderDto {
@@ -124,13 +131,9 @@ export class RejectOrderDto {
 }
 
 export class CancelOrderDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'Không tới lấy' })
   @IsString()
   @MinLength(1)
   @MaxLength(2000)
   rejectionReason: string;
-
-  @ApiProperty({ enum: ['CAREGIVER', 'PHARMACIST'] })
-  @IsIn(['CAREGIVER', 'PHARMACIST'])
-  actor: 'CAREGIVER' | 'PHARMACIST';
 }

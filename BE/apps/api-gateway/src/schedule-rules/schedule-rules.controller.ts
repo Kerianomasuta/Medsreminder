@@ -29,7 +29,7 @@ export class ScheduleRulesController {
     description: 'The patient app uses this list to set local alarms. Each row includes the medicine name, unit, and image stored on the prescription line. Filter isActive with true or false. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
   @ApiOkResponse({ type: ScheduleRuleResponseDto, isArray: true, description: 'Dose times for the patient, ordered by reminder time.' })
-  @ApiBadRequestResponse({ description: 'patientId is missing or is not a UUID, or isActive is not true or false.' })
+  @ApiBadRequestResponse({ description: 'patientId is missing or is not an ObjectId, or isActive is not true or false.' })
   list(@Query() query: ListScheduleRulesQueryDto) {
     return this.scheduleRulesService.list(query);
   }

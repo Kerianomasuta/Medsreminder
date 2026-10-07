@@ -7,10 +7,10 @@ export class Prescription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', name: 'patient_id' })
+  @Column({ type: 'varchar', length: 24, name: 'patient_id' })
   patientId: string;
 
-  @Column({ type: 'uuid', name: 'created_by_cg_id' })
+  @Column({ type: 'varchar', length: 24, name: 'created_by_cg_id' })
   createdByCgId: string;
 
   @Column({ type: 'text' })

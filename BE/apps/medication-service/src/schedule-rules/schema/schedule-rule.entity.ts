@@ -11,7 +11,7 @@ export class ScheduleRule {
   @Column({ type: 'uuid', name: 'prescription_item_id' })
   prescriptionItemId: string;
 
-  @Column({ type: 'uuid', name: 'patient_id' })
+  @Column({ type: 'varchar', length: 24, name: 'patient_id' })
   patientId: string;
 
   @Column({ type: 'time', name: 'reminder_time' })

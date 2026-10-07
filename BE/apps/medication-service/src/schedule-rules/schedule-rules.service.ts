@@ -10,6 +10,7 @@ import { PrescriptionItem } from '../prescriptions/schema/prescription-item.enti
 import { ScheduleRule } from './schema/schedule-rule.entity.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 const ALL_WEEK = [1, 2, 3, 4, 5, 6, 7];
 
@@ -41,7 +42,7 @@ export class ScheduleRulesService {
   ) {}
 
   async list(patientId?: string, isActive?: boolean) {
-    const id = this.requireUuid(patientId, 'patientId');
+    const id = this.requireObjectId(patientId, 'patientId');
     if (isActive !== undefined && typeof isActive !== 'boolean') {
       throw ErrorHandling.BadRequest('isActive must be true or false');
     }
@@ -159,6 +160,13 @@ export class ScheduleRulesService {
   private requireUuid(value: string | undefined, label: string) {
     if (!value || !UUID_PATTERN.test(value)) {
       throw ErrorHandling.BadRequest(`${label} must be a UUID`);
+    }
+    return value;
+  }
+
+  private requireObjectId(value: string | undefined, label: string) {
+    if (!value || !OBJECT_ID_PATTERN.test(value)) {
+      throw ErrorHandling.BadRequest(`${label} must be an ObjectId`);
     }
     return value;
   }
