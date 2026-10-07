@@ -20,6 +20,11 @@ const RULE_RELATIONS = {
   },
 } as const;
 
+export type ScheduleActor = {
+  userId?: string;
+  role?: string;
+};
+
 export type CreateScheduleInput = {
   reminderTime?: string;
   daysOfWeek?: number[];
@@ -41,8 +46,8 @@ export class ScheduleRulesService {
     private readonly items: Repository<PrescriptionItem>,
   ) {}
 
-  async list(patientId?: string, isActive?: boolean) {
-    const id = this.requireObjectId(patientId, 'patientId');
+  async list(patientId?: string, isActive?: boolean, actor?: ScheduleActor) {
+    const id = this.patientOwnerId(actor) ?? this.requireObjectId(patientId, 'patientId');
     if (isActive !== undefined && typeof isActive !== 'boolean') {
       throw ErrorHandling.BadRequest('isActive must be true or false');
     }
@@ -59,12 +64,15 @@ export class ScheduleRulesService {
     return rows.map((rule) => this.toResponse(rule));
   }
 
-  async getById(id: string) {
-    return this.toResponse(await this.findRule(id));
+  async getById(id: string, actor?: ScheduleActor) {
+    const rule = await this.findRule(id);
+    this.assertPatientOwns(rule.prescriptionItem.prescription.patientId, actor);
+    return this.toResponse(rule);
   }
 
-  async create(prescriptionItemId: string | undefined, payload: CreateScheduleInput) {
+  async create(prescriptionItemId: string | undefined, payload: CreateScheduleInput, actor?: ScheduleActor) {
     const item = await this.findItem(prescriptionItemId);
+    this.assertPatientOwns(item.prescription.patientId, actor);
     const saved = await this.dataSource.transaction(async (manager) => {
       const rule = await manager.save(
         ScheduleRule,
@@ -83,7 +91,7 @@ export class ScheduleRulesService {
     return this.toResponse(saved);
   }
 
-  async update(id: string, payload: UpdateScheduleInput) {
+  async update(id: string, payload: UpdateScheduleInput, actor?: ScheduleActor) {
     const hasChange = ['reminderTime', 'daysOfWeek', 'isActive'].some(
       (field) => payload[field as keyof UpdateScheduleInput] !== undefined,
     );
@@ -92,6 +100,7 @@ export class ScheduleRulesService {
     }
 
     const rule = await this.findRule(id);
+    this.assertPatientOwns(rule.prescriptionItem.prescription.patientId, actor);
     if (payload.reminderTime !== undefined) {
       rule.reminderTime = this.requireTime(payload.reminderTime);
     }
@@ -155,6 +164,20 @@ export class ScheduleRulesService {
       throw ErrorHandling.NotFound('Schedule not found');
     }
     return rule;
+  }
+
+  private patientOwnerId(actor?: ScheduleActor) {
+    if (actor?.role !== 'PATIENT') {
+      return undefined;
+    }
+    return this.requireObjectId(actor.userId, 'userId');
+  }
+
+  private assertPatientOwns(patientId: string | undefined, actor?: ScheduleActor) {
+    const userId = this.patientOwnerId(actor);
+    if (userId !== undefined && patientId !== userId) {
+      throw ErrorHandling.Forbidden('A patient can only access their own prescription');
+    }
   }
 
   private requireUuid(value: string | undefined, label: string) {
