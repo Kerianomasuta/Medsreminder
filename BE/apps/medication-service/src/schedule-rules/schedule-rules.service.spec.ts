@@ -10,6 +10,10 @@ const itemId = '44444444-4444-4444-8444-444444444444';
 function createItem() {
   return {
     id: itemId,
+    name: 'Paracetamol',
+    genericName: 'Acetaminophen',
+    unit: 'VIEN',
+    imageUrl: 'https://example.com/paracetamol.png',
     dosagePerTime: '2.00',
     instructions: 'Sau ăn',
     prescription: {
@@ -19,12 +23,6 @@ function createItem() {
       startDate: '2026-10-01',
       endDate: '2026-10-31',
       isActive: true,
-    },
-    medicine: {
-      id: '33333333-3333-4333-8333-333333333333',
-      name: 'Paracetamol',
-      unit: 'VIEN',
-      imageUrl: 'https://example.com/paracetamol.png',
     },
   };
 }

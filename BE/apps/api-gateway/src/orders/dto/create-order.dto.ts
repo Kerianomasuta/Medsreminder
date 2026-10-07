@@ -5,7 +5,6 @@ import {
   IsArray,
   IsIn,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -16,23 +15,14 @@ import {
 } from 'class-validator';
 
 export class CreateOrderItemDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ format: 'uuid', description: 'Prescription line to buy. The pharmacy reviews the name stored on that line.' })
   @IsUUID()
   prescriptionItemId: string;
-
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
-  medicineId: string;
 
   @ApiProperty({ example: 30 })
   @IsInt()
   @Min(1)
   quantity: number;
-
-  @ApiProperty({ example: 12000 })
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  unitPrice: number;
 }
 
 export class CreateOrderDto {
@@ -88,6 +78,13 @@ export class CreateOrderDto {
   items: CreateOrderItemDto[];
 }
 
+export class ListMyOrdersQueryDto {
+  @ApiPropertyOptional({ enum: ['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'] })
+  @IsOptional()
+  @IsIn(['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'])
+  status?: string;
+}
+
 export class ListOrdersQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
@@ -111,28 +108,31 @@ export class ListOrdersQueryDto {
 }
 
 export class ShipOrderDto {
-  @ApiPropertyOptional({ example: 'GrabExpress' })
-  @IsOptional()
+  @ApiProperty({ example: 'Nguyen Van Giao' })
   @IsString()
   @MinLength(1)
-  @MaxLength(50)
-  shippingCarrier?: string;
+  @MaxLength(100)
+  shipperName: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: '0901234567' })
   @IsString()
-  @MaxLength(255)
-  trackingCodeOrLink?: string;
+  @MinLength(1)
+  @MaxLength(15)
+  shipperPhone: string;
 }
 
-export class CancelOrderDto {
-  @ApiProperty()
+export class RejectOrderDto {
+  @ApiProperty({ example: 'Hết hàng' })
   @IsString()
   @MinLength(1)
   @MaxLength(2000)
   rejectionReason: string;
+}
 
-  @ApiProperty({ enum: ['CAREGIVER', 'PHARMACIST'] })
-  @IsIn(['CAREGIVER', 'PHARMACIST'])
-  actor: 'CAREGIVER' | 'PHARMACIST';
+export class CancelOrderDto {
+  @ApiProperty({ example: 'Không tới lấy' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  rejectionReason: string;
 }

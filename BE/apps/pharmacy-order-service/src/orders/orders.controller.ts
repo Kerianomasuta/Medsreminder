@@ -22,8 +22,14 @@ export class OrdersController {
   }
 
   @MessagePattern({ cmd: 'accept_order' })
-  accept(@Payload() payload: { id: string }) {
-    return this.ordersService.accept(payload.id);
+  accept(@Payload() payload: { id: string; pharmacistId?: string }) {
+    return this.ordersService.accept(payload.id, payload.pharmacistId);
+  }
+
+  @MessagePattern({ cmd: 'reject_order' })
+  reject(@Payload() payload: Parameters<OrdersService['reject']>[1] & { id: string }) {
+    const { id, ...details } = payload;
+    return this.ordersService.reject(id, details);
   }
 
   @MessagePattern({ cmd: 'ready_order' })

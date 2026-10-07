@@ -3,9 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
 import { DoseStatus } from '../enums/dose-status.enum.js';
+import { MedicineUnit } from '../enums/medicine-unit.enum.js';
 import { MedicationLog } from '../medication-logs/schema/medication-log.entity.js';
 import { scheduledDoseInstants } from '../medication-logs/scheduled-doses.js';
-import { Medicine } from '../medicines/schema/medicine.entity.js';
 import { ScheduleRule } from '../schedule-rules/schema/schedule-rule.entity.js';
 import { PrescriptionItem } from './schema/prescription-item.entity.js';
 import { Prescription } from './schema/prescription.entity.js';
@@ -21,7 +21,10 @@ export type ScheduleInput = {
 };
 
 export type PrescriptionItemInput = {
-  medicineId?: string;
+  name?: string;
+  genericName?: string | null;
+  unit?: string;
+  imageUrl?: string | null;
   dosagePerTime?: number;
   currentStock?: number;
   reorderThreshold?: number;
@@ -52,6 +55,10 @@ export type UpdatePrescriptionInput = {
 };
 
 export type UpdatePrescriptionItemInput = {
+  name?: string;
+  genericName?: string | null;
+  unit?: string;
+  imageUrl?: string | null;
   dosagePerTime?: number;
   currentStock?: number;
   reorderThreshold?: number;
@@ -59,7 +66,10 @@ export type UpdatePrescriptionItemInput = {
 };
 
 type PreparedItem = {
-  medicineId: string;
+  name: string;
+  genericName: string | null;
+  unit: MedicineUnit;
+  imageUrl: string | null;
   dosagePerTime: string;
   currentStock: number;
   reorderThreshold: number;
@@ -87,8 +97,6 @@ export class PrescriptionsService {
     const items = this.prepareItems(payload.items);
 
     return this.dataSource.transaction(async (manager) => {
-      await this.assertMedicinesExist(manager, items);
-
       const saved = await manager.save(
         Prescription,
         manager.create(Prescription, {
@@ -185,20 +193,38 @@ export class PrescriptionsService {
         throw ErrorHandling.NotFound('Prescription not found');
       }
 
-      await this.assertMedicinesExist(manager, [item]);
       return this.saveItem(manager, prescription, item);
     });
   }
 
   async updateItem(id: string, payload: UpdatePrescriptionItemInput) {
-    const hasChange = ['dosagePerTime', 'currentStock', 'reorderThreshold', 'instructions'].some(
-      (field) => payload[field as keyof UpdatePrescriptionItemInput] !== undefined,
-    );
+    const hasChange = [
+      'name',
+      'genericName',
+      'unit',
+      'imageUrl',
+      'dosagePerTime',
+      'currentStock',
+      'reorderThreshold',
+      'instructions',
+    ].some((field) => payload[field as keyof UpdatePrescriptionItemInput] !== undefined);
     if (!hasChange) {
       throw ErrorHandling.BadRequest('Provide at least one field to update');
     }
 
     const item = await this.findItem(id);
+    if (payload.name !== undefined) {
+      item.name = this.requireName(payload.name);
+    }
+    if (payload.genericName !== undefined) {
+      item.genericName = this.optionalText(payload.genericName);
+    }
+    if (payload.unit !== undefined) {
+      item.unit = this.requireUnit(payload.unit);
+    }
+    if (payload.imageUrl !== undefined) {
+      item.imageUrl = this.optionalText(payload.imageUrl);
+    }
     if (payload.dosagePerTime !== undefined) {
       item.dosagePerTime = this.requireDosage(payload.dosagePerTime);
     }
@@ -255,7 +281,10 @@ export class PrescriptionsService {
       PrescriptionItem,
       manager.create(PrescriptionItem, {
         prescriptionId: prescription.id,
-        medicineId: item.medicineId,
+        name: item.name,
+        genericName: item.genericName,
+        unit: item.unit,
+        imageUrl: item.imageUrl,
         dosagePerTime: item.dosagePerTime,
         currentStock: item.currentStock.toFixed(2),
         reorderThreshold: item.reorderThreshold,
@@ -308,15 +337,6 @@ export class PrescriptionsService {
     }
   }
 
-  private async assertMedicinesExist(manager: EntityManager, items: PreparedItem[]) {
-    for (const item of items) {
-      const medicine = await manager.findOne(Medicine, { where: { id: item.medicineId } });
-      if (!medicine) {
-        throw ErrorHandling.NotFound('Medicine not found');
-      }
-    }
-  }
-
   private prepareItems(items: PrescriptionItemInput[] | undefined): PreparedItem[] {
     if (!items?.length) {
       throw ErrorHandling.BadRequest('A prescription needs at least one medicine');
@@ -329,7 +349,10 @@ export class PrescriptionsService {
       }
 
       return {
-        medicineId: this.requireUuid(item.medicineId, 'medicineId'),
+        name: this.requireName(item.name),
+        genericName: this.optionalText(item.genericName),
+        unit: this.requireUnit(item.unit),
+        imageUrl: this.optionalText(item.imageUrl),
         dosagePerTime: this.requireDosage(item.dosagePerTime),
         currentStock: item.currentStock === undefined ? 0 : this.requireWholeNumber(item.currentStock, 'currentStock'),
         reorderThreshold: item.reorderThreshold === undefined
@@ -373,6 +396,24 @@ export class PrescriptionsService {
       throw ErrorHandling.BadRequest(`${label} must be a UUID`);
     }
     return value;
+  }
+
+  private requireName(value: string | null | undefined) {
+    const trimmed = value?.trim();
+    if (!trimmed) {
+      throw ErrorHandling.BadRequest('Medicine name is required');
+    }
+    if (trimmed.length > 200) {
+      throw ErrorHandling.BadRequest('Medicine name must be at most 200 characters');
+    }
+    return trimmed;
+  }
+
+  private requireUnit(unit: string | null | undefined): MedicineUnit {
+    if (unit !== MedicineUnit.VIEN && unit !== MedicineUnit.GOI && unit !== MedicineUnit.CHAI) {
+      throw ErrorHandling.BadRequest('Unit must be VIEN, GOI, or CHAI');
+    }
+    return unit;
   }
 
   private requireText(value: string | null | undefined, label: string) {
@@ -494,7 +535,10 @@ export class PrescriptionsService {
     return {
       id: item.id,
       prescriptionId: item.prescriptionId,
-      medicineId: item.medicineId,
+      name: item.name,
+      genericName: item.genericName,
+      unit: item.unit,
+      imageUrl: item.imageUrl,
       dosagePerTime: Number(item.dosagePerTime),
       currentStock: Number(item.currentStock),
       reorderThreshold: item.reorderThreshold,
