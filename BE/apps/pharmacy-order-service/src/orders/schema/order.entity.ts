@@ -46,11 +46,11 @@ export class Order {
   @Column({ type: 'text', name: 'patient_note', nullable: true })
   patientNote: string | null;
 
-  @Column({ type: 'varchar', length: 50, name: 'shipping_carrier', nullable: true })
-  shippingCarrier: string | null;
+  @Column({ type: 'varchar', length: 100, name: 'shipper_name', nullable: true })
+  shipperName: string | null;
 
-  @Column({ type: 'varchar', length: 255, name: 'tracking_code_or_link', nullable: true })
-  trackingCodeOrLink: string | null;
+  @Column({ type: 'varchar', length: 15, name: 'shipper_phone', nullable: true })
+  shipperPhone: string | null;
 
   @Column({ type: 'text', name: 'rejection_reason', nullable: true })
   rejectionReason: string | null;

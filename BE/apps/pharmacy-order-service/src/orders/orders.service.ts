@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, In, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
 import { FulfillmentType } from '../enums/fulfillment-type.enum.js';
 import { OrderStatus } from '../enums/order-status.enum.js';
@@ -34,17 +34,19 @@ export type ListOrdersInput = {
   patientId?: string;
   caregiverId?: string;
   pharmacyId?: string;
+  pharmacistId?: string;
   status?: string;
 };
 
 export type ShipOrderInput = {
-  shippingCarrier?: string | null;
-  trackingCodeOrLink?: string | null;
+  shipperName?: string | null;
+  shipperPhone?: string | null;
 };
 
 export type CancelOrderInput = {
   rejectionReason?: string;
-  actor?: string;
+  userId?: string;
+  role?: string;
 };
 
 type PreparedItem = {
@@ -111,12 +113,23 @@ export class OrdersService {
   }
 
   async list(query: ListOrdersInput = {}) {
-    const where: Partial<Order> = {};
+    const where: FindOptionsWhere<Order> = {};
     if (query.patientId !== undefined) {
       where.patientId = this.requireUuid(query.patientId, 'patientId');
     }
     if (query.caregiverId !== undefined) {
       where.caregiverId = this.requireUuid(query.caregiverId, 'caregiverId');
+    }
+    if (query.pharmacistId !== undefined) {
+      const pharmacistId = this.requireUuid(query.pharmacistId, 'pharmacistId');
+      const pharmacies = await this.dataSource.getRepository(Pharmacy).find({
+        where: { pharmacistId },
+        select: { id: true },
+      });
+      if (pharmacies.length === 0) {
+        return [];
+      }
+      where.pharmacyId = In(pharmacies.map((pharmacy) => pharmacy.id));
     }
     if (query.pharmacyId !== undefined) {
       where.pharmacyId = this.requireUuid(query.pharmacyId, 'pharmacyId');
@@ -140,9 +153,14 @@ export class OrdersService {
     return this.toOrder(await this.findOrder(id));
   }
 
-  async accept(id: string) {
+  async accept(id: string, pharmacistId: string | undefined) {
+    const ownerId = this.requireUuid(pharmacistId, 'pharmacistId');
     return this.dataSource.transaction(async (manager) => {
       const order = await this.lockOrder(manager, id);
+      const pharmacy = await manager.findOne(Pharmacy, { where: { id: order.pharmacyId } });
+      if (!pharmacy || pharmacy.pharmacistId !== ownerId) {
+        throw ErrorHandling.Forbidden('Only the pharmacist of this pharmacy can accept the order');
+      }
       this.assertStatus(order, OrderStatus.PENDING_REVIEW, 'Only a submitted order can be accepted');
       order.status = OrderStatus.PREPARING;
       return this.toOrder(await manager.save(Order, order));
@@ -163,10 +181,10 @@ export class OrdersService {
   async markReady(id: string) {
     return this.dataSource.transaction(async (manager) => {
       const order = await this.lockOrder(manager, id);
+      this.assertStatus(order, OrderStatus.PREPARING, 'Pack the order before marking it ready');
       if (order.fulfillmentType !== FulfillmentType.PICKUP) {
         throw ErrorHandling.BadRequest('Only a pickup order can be marked ready for pickup');
       }
-      this.assertStatus(order, OrderStatus.PREPARING, 'Pack the order before marking it ready');
       order.status = OrderStatus.READY_FOR_PICKUP;
       return this.toOrder(await manager.save(Order, order));
     });
@@ -175,13 +193,13 @@ export class OrdersService {
   async ship(id: string, payload: ShipOrderInput = {}) {
     return this.dataSource.transaction(async (manager) => {
       const order = await this.lockOrder(manager, id);
+      this.assertStatus(order, OrderStatus.PREPARING, 'Pack the order before handing it to a shipper');
       if (order.fulfillmentType !== FulfillmentType.DELIVERY) {
         throw ErrorHandling.BadRequest('Only a delivery order can be shipped');
       }
-      this.assertStatus(order, OrderStatus.PREPARING, 'Pack the order before shipping it');
+      order.shipperName = this.requireText(payload.shipperName ?? undefined, 'shipperName', 100);
+      order.shipperPhone = this.requireText(payload.shipperPhone ?? undefined, 'shipperPhone', 15);
       order.status = OrderStatus.SHIPPED;
-      order.shippingCarrier = this.optionalText(payload.shippingCarrier);
-      order.trackingCodeOrLink = this.optionalText(payload.trackingCodeOrLink);
       return this.toOrder(await manager.save(Order, order));
     });
   }
@@ -197,34 +215,54 @@ export class OrdersService {
       return this.toOrder(await manager.save(Order, order));
     });
 
+    const rollbackStatus = completed.fulfillmentType === FulfillmentType.PICKUP
+      ? OrderStatus.READY_FOR_PICKUP
+      : OrderStatus.SHIPPED;
+    return this.replenishOrRollback(completed, rollbackStatus);
+  }
+
+  private async replenishOrRollback(
+    completed: ReturnType<OrdersService['toOrder']>,
+    rollbackStatus: OrderStatus,
+  ) {
     try {
       await this.medicationStock.replenish(completed.items.map((item) => ({
         prescriptionItemId: item.prescriptionItemId,
         quantity: item.quantity,
       })));
     } catch (error) {
-      await this.orders.update(completed.id, {
-        status: completed.fulfillmentType === FulfillmentType.PICKUP
-          ? OrderStatus.READY_FOR_PICKUP
-          : OrderStatus.SHIPPED,
-      });
+      await this.orders.update(completed.id, { status: rollbackStatus });
       throw error;
     }
-
     return completed;
   }
 
   async cancel(id: string, payload: CancelOrderInput) {
     const reason = this.requireText(payload.rejectionReason, 'rejectionReason', 2000);
-    const actor = this.requireActor(payload.actor);
+    const userId = this.requireUuid(payload.userId, 'userId');
 
     return this.dataSource.transaction(async (manager) => {
       const order = await this.lockOrder(manager, id);
       if (order.status === OrderStatus.COMPLETED || order.status === OrderStatus.CANCELLED) {
         throw ErrorHandling.BadRequest('This order can no longer be cancelled');
       }
-      if (actor === 'CAREGIVER' && order.status !== OrderStatus.PENDING_REVIEW) {
-        throw ErrorHandling.Forbidden('Contact the pharmacy to cancel an order that is already being prepared');
+      if (payload.role === 'CARE_GIVER') {
+        if (order.caregiverId !== userId) {
+          throw ErrorHandling.Forbidden('Only the caregiver who submitted this order can cancel it');
+        }
+        if (order.status !== OrderStatus.PENDING_REVIEW) {
+          throw ErrorHandling.Forbidden('Contact the pharmacy to cancel an order that is already being prepared');
+        }
+      } else if (payload.role === 'PHARMACIST') {
+        const pharmacy = await manager.findOne(Pharmacy, { where: { id: order.pharmacyId } });
+        if (!pharmacy || pharmacy.pharmacistId !== userId) {
+          throw ErrorHandling.Forbidden('Only the pharmacist of this pharmacy can cancel the order');
+        }
+        if (order.status === OrderStatus.PENDING_REVIEW) {
+          throw ErrorHandling.BadRequest('Reject a submitted order instead of cancelling it');
+        }
+      } else {
+        throw ErrorHandling.Forbidden('You do not have permission to cancel this order');
       }
       order.status = OrderStatus.CANCELLED;
       order.rejectionReason = reason;
@@ -348,8 +386,8 @@ export class OrdersService {
       recipientPhone: order.recipientPhone,
       deliveryAddress: order.deliveryAddress,
       patientNote: order.patientNote,
-      shippingCarrier: order.shippingCarrier,
-      trackingCodeOrLink: order.trackingCodeOrLink,
+      shipperName: order.shipperName,
+      shipperPhone: order.shipperPhone,
       rejectionReason: order.rejectionReason,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -376,13 +414,6 @@ export class OrdersService {
       throw ErrorHandling.BadRequest('status is not a valid order status');
     }
     return value as OrderStatus;
-  }
-
-  private requireActor(value: string | undefined) {
-    if (value !== 'CAREGIVER' && value !== 'PHARMACIST') {
-      throw ErrorHandling.BadRequest('actor must be CAREGIVER or PHARMACIST');
-    }
-    return value;
   }
 
   private requireUuid(value: string | undefined, label: string) {

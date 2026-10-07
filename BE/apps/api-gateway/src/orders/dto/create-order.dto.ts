@@ -78,6 +78,13 @@ export class CreateOrderDto {
   items: CreateOrderItemDto[];
 }
 
+export class ListMyOrdersQueryDto {
+  @ApiPropertyOptional({ enum: ['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'] })
+  @IsOptional()
+  @IsIn(['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'])
+  status?: string;
+}
+
 export class ListOrdersQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
@@ -101,18 +108,17 @@ export class ListOrdersQueryDto {
 }
 
 export class ShipOrderDto {
-  @ApiPropertyOptional({ example: 'GrabExpress' })
-  @IsOptional()
+  @ApiProperty({ example: 'Nguyen Van Giao' })
   @IsString()
   @MinLength(1)
-  @MaxLength(50)
-  shippingCarrier?: string;
+  @MaxLength(100)
+  shipperName: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: '0901234567' })
   @IsString()
-  @MaxLength(255)
-  trackingCodeOrLink?: string;
+  @MinLength(1)
+  @MaxLength(15)
+  shipperPhone: string;
 }
 
 export class RejectOrderDto {
@@ -124,13 +130,9 @@ export class RejectOrderDto {
 }
 
 export class CancelOrderDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'Không tới lấy' })
   @IsString()
   @MinLength(1)
   @MaxLength(2000)
   rejectionReason: string;
-
-  @ApiProperty({ enum: ['CAREGIVER', 'PHARMACIST'] })
-  @IsIn(['CAREGIVER', 'PHARMACIST'])
-  actor: 'CAREGIVER' | 'PHARMACIST';
 }
