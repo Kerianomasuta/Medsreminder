@@ -27,9 +27,6 @@ class UserLinkApi {
       Uri.parse('$apiBaseUrl/api/v1/users/create-link-invitation'),
     );
     final data = payload['data'] as Map<String, dynamic>?;
-    final uuid = data?['invitationUUID']?.toString().trim();
-    if (uuid != null && uuid.isNotEmpty) return uuid;
-
     final link = data?['invitationLink']?.toString().trim();
     final invitationUuid = link == null || link.isEmpty
         ? null
