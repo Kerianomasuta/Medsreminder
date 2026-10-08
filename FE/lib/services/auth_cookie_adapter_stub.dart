@@ -5,8 +5,8 @@ final AuthCookieAdapter _sharedCookieAdapter = _NativeAuthCookieAdapter();
 AuthCookieAdapter createAuthCookieAdapter() => _sharedCookieAdapter;
 
 class _NativeAuthCookieAdapter implements AuthCookieAdapter {
-  String? _accessToken;
-  String? _refreshToken;
+  static String? _accessToken;
+  static String? _refreshToken;
 
   @override
   String? get accessToken => _accessToken;
