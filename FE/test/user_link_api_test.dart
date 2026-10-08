@@ -16,10 +16,7 @@ void main() {
           return http.Response(
             jsonEncode({
               'status': 'success',
-              'data': {
-                'invitationLink':
-                    'http://localhost:3000/invitation?invitationUUID=invite-1',
-              },
+              'data': {'invitationUUID': 'invite-1'},
             }),
             201,
             headers: const {'content-type': 'application/json; charset=utf-8'},
@@ -69,7 +66,7 @@ void main() {
       });
 
       final api = UserLinkApi(client: client);
-      expect(await api.createInvitation(), contains('invite-1'));
+      expect(await api.createInvitation(), 'invite-1');
       await api.verifyInvitation('invite-1');
       final links = await api.getLinkedAccounts();
       final patient = await api.getPatientDetail(links.single.patient!.id);

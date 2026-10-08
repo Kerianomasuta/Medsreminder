@@ -47,7 +47,7 @@ class CaregiverHome extends StatelessWidget {
         return const _CenteredMessage(
           icon: Icons.people_outline_rounded,
           title: 'Chưa có bệnh nhân',
-          message: 'Mở link mời của bệnh nhân hoặc vào Hồ sơ để dán invitation UUID.',
+          message: 'Nhập mã mời của bệnh nhân tại Hồ sơ để bắt đầu kết nối.',
         );
       }
 
@@ -122,7 +122,7 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
       children: [
         const PageIntro(
           'Kết nối bệnh nhân đầu tiên',
-          'Dán link được bệnh nhân chia sẻ để bắt đầu chăm sóc',
+          'Nhập mã mời được bệnh nhân chia sẻ để bắt đầu chăm sóc',
         ),
         Glass(
           padding: const EdgeInsets.all(18),
@@ -144,8 +144,8 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
               TextField(
                 controller: _controller,
                 decoration: const InputDecoration(
-                  labelText: 'Link mời hoặc invitation UUID',
-                  prefixIcon: Icon(Icons.link_rounded),
+                  labelText: 'Mã mời (UUID)',
+                  prefixIcon: Icon(Icons.key_rounded),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -167,9 +167,7 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
   );
 
   Future<void> _submit() async {
-    final value = _controller.text.trim();
-    final uuid =
-        Uri.tryParse(value)?.queryParameters['invitationUUID'] ?? value;
+    final uuid = _controller.text.trim();
     if (uuid.isEmpty) return;
     setState(() {
       _submitting = true;
@@ -494,8 +492,8 @@ class _ProfilePageState extends State<_ProfilePage> {
                 TextField(
                   controller: _invitationController,
                   decoration: const InputDecoration(
-                    labelText: 'Dán link mời hoặc invitation UUID',
-                    prefixIcon: Icon(Icons.link_rounded),
+                    labelText: 'Mã mời (UUID)',
+                    prefixIcon: Icon(Icons.key_rounded),
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -545,9 +543,7 @@ class _ProfilePageState extends State<_ProfilePage> {
   );
 
   Future<void> _submitInvitation() async {
-    final value = _invitationController.text.trim();
-    final uri = Uri.tryParse(value);
-    final uuid = uri?.queryParameters['invitationUUID'] ?? value;
+    final uuid = _invitationController.text.trim();
     if (uuid.isEmpty) return;
     setState(() {
       _submitting = true;

@@ -65,27 +65,27 @@ export class UserController {
     @Role(
         UserRole.PATIENT,
     )
-    @ApiOperation({ summary: 'Create a caregiver invitation link' })
+    @ApiOperation({ summary: 'Create a caregiver invitation code' })
     @ApiCookieAuth('accessToken')
     @ApiResponse({
         status: 201,
-        description: 'Invitation link created successfully.',
+        description: 'Invitation code created successfully.',
         schema: {
             example: {
                 status: 'success',
                 message: 'Invitation has been created successfully!',
                 data: {
-                    invitationLink: 'https://example.com/invitation?invitationUUID=550e8400-e29b-41d4-a716-446655440000',
+                    invitationUUID: '550e8400-e29b-41d4-a716-446655440000',
                 },
             },
         },
     })
     @ApiResponse({
         status: 200,
-        description: 'An existing active invitation link was returned.',
+        description: 'An existing active invitation code was returned.',
     })
     @ApiResponse({ status: 401, description: 'Access token is missing or invalid.' })
-    @ApiResponse({ status: 403, description: 'Only patients can create invitation links.' })
+    @ApiResponse({ status: 403, description: 'Only patients can create invitation codes.' })
     async createLinkInvitation(
         @Req() req: Request,
     ) {
@@ -99,7 +99,7 @@ export class UserController {
             status: 'success',
             message: 'Invitation has been created successfully!',
             data: {
-                invitationLink: tcpResponse.data?.invitationLink
+                invitationUUID: tcpResponse.data?.invitationUUID
             }
         }
     }
@@ -113,7 +113,7 @@ export class UserController {
     @ApiCookieAuth('accessToken')
     @ApiParam({
         name: 'invitationUUID',
-        description: 'UUID from the patient invitation link.',
+        description: 'UUID invitation code shared by the patient.',
         example: '550e8400-e29b-41d4-a716-446655440000',
     })
     @ApiResponse({

@@ -6,9 +6,8 @@ import { ErrorHandling } from "@lib/error-handling";
 import { PatientCaregiverLink, PatientCaregiverLinkDocument } from "./schema/patient-caregiver-link.schema.js";
 import { Redis } from "ioredis";
 import * as crypto from 'crypto'
-import { ConfigService } from "@nestjs/config";
 
-const INVITATION_TTL = 15 * 60 * 1000
+const INVITATION_TTL = 15 * 60
 
 @Injectable()
 export class UserService {
@@ -20,9 +19,7 @@ export class UserService {
         private linkModel: Model<PatientCaregiverLinkDocument>,
 
         @Inject('REDIS_CLIENT')
-        private readonly redisClient: Redis,
-
-        private readonly configService: ConfigService
+        private readonly redisClient: Redis
     ) {}
 
     async findByEmail(email: string): Promise<UserDocument | null> {
@@ -77,13 +74,10 @@ export class UserService {
             const patientActiveKey = `patient_active_qr:${input.patientId}`;
             const existingActiveQr = await this.redisClient.get(patientActiveKey)
             if (existingActiveQr) {
-                const existingLink = 
-                `${this.configService.get<string>(`FRONTEND_INVITATION_URL`)}/invitation?invitationUUID=${existingActiveQr}`;
-
                 return {
                     status: 200,
                     data: {
-                        invitationLink: existingLink
+                        invitationUUID: existingActiveQr
                     }
                 }
             }
@@ -91,8 +85,6 @@ export class UserService {
             const invitationUUID = crypto.randomUUID()
 
             const invitationKey = `invitation_session:${invitationUUID}`;
-
-            const invitationLink = `${this.configService.get<string>(`FRONTEND_INVITATION_URL`)}/invitation?invitationUUID=${invitationUUID}`
 
             await this.redisClient.set(
                 invitationKey,
@@ -111,7 +103,7 @@ export class UserService {
             return {
                 status: 201,
                 data: {
-                    invitationLink,
+                    invitationUUID,
                 }
             }
         } catch (error: any) {
