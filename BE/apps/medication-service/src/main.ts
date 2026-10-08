@@ -2,9 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { MedicationServiceModule } from './medication-service.module.js';
+import { RpcErrorFilter } from './rpc-error.filter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(MedicationServiceModule);
+  app.useGlobalFilters(new RpcErrorFilter());
   const configService = app.get(ConfigService);
 
   const host = configService.get<string>('MEDICATION_SERVICE_HOST');

@@ -33,9 +33,16 @@ export type PrescriptionItemInput = {
   schedules?: ScheduleInput[];
 };
 
+export type PrescriptionActor = {
+  userId?: string;
+  role?: string;
+};
+
 export type CreatePrescriptionInput = {
   patientId?: string;
   createdByCgId?: string;
+  actorUserId?: string;
+  actorRole?: string;
   title?: string;
   doctorName?: string | null;
   prescriptionCode?: string | null;
@@ -89,8 +96,10 @@ export class PrescriptionsService {
   ) {}
 
   async create(payload: CreatePrescriptionInput) {
-    const patientId = this.requireObjectId(payload.patientId, 'patientId');
-    const createdByCgId = this.requireObjectId(payload.createdByCgId, 'createdByCgId');
+    const actor = this.actorFrom(payload.actorUserId, payload.actorRole);
+    const patientOwnerId = this.patientOwnerId(actor);
+    const patientId = patientOwnerId ?? this.requireObjectId(payload.patientId, 'patientId');
+    const createdByCgId = patientOwnerId ?? this.requireObjectId(payload.createdByCgId, 'createdByCgId');
     const title = this.requireText(payload.title, 'title');
     const startDate = this.requireDate(payload.startDate, 'startDate');
     const endDate = this.optionalDate(payload.endDate, 'endDate');
@@ -122,8 +131,8 @@ export class PrescriptionsService {
     });
   }
 
-  async list(patientId?: string) {
-    const id = this.requireObjectId(patientId, 'patientId');
+  async list(patientId?: string, actor?: PrescriptionActor) {
+    const id = this.patientOwnerId(actor) ?? this.requireObjectId(patientId, 'patientId');
     const rows = await this.prescriptions.find({
       where: { patientId: id },
       relations: { items: { scheduleRules: true } },
@@ -133,11 +142,13 @@ export class PrescriptionsService {
     return rows.map((row) => this.toPrescriptionFromEntity(row));
   }
 
-  async getById(id: string) {
-    return this.toPrescriptionFromEntity(await this.findPrescription(id));
+  async getById(id: string, actor?: PrescriptionActor) {
+    const prescription = await this.findPrescription(id);
+    this.assertPatientOwns(prescription.patientId, actor);
+    return this.toPrescriptionFromEntity(prescription);
   }
 
-  async update(id: string, payload: UpdatePrescriptionInput) {
+  async update(id: string, payload: UpdatePrescriptionInput, actor?: PrescriptionActor) {
     const hasChange = [
       'title',
       'doctorName',
@@ -153,6 +164,7 @@ export class PrescriptionsService {
     }
 
     const prescription = await this.findPrescription(id);
+    this.assertPatientOwns(prescription.patientId, actor);
     const startDate = payload.startDate !== undefined
       ? this.requireDate(payload.startDate, 'startDate')
       : prescription.startDate;
@@ -184,7 +196,7 @@ export class PrescriptionsService {
     return this.toPrescriptionFromEntity(saved);
   }
 
-  async addItem(prescriptionId: string | undefined, payload: PrescriptionItemInput) {
+  async addItem(prescriptionId: string | undefined, payload: PrescriptionItemInput, actor?: PrescriptionActor) {
     const id = this.requireUuid(prescriptionId, 'prescriptionId');
     const [item] = this.prepareItems([payload]);
 
@@ -193,12 +205,13 @@ export class PrescriptionsService {
       if (!prescription) {
         throw ErrorHandling.NotFound('Prescription not found');
       }
+      this.assertPatientOwns(prescription.patientId, actor);
 
       return this.saveItem(manager, prescription, item);
     });
   }
 
-  async updateItem(id: string, payload: UpdatePrescriptionItemInput) {
+  async updateItem(id: string, payload: UpdatePrescriptionItemInput, actor?: PrescriptionActor) {
     const hasChange = [
       'name',
       'genericName',
@@ -214,6 +227,7 @@ export class PrescriptionsService {
     }
 
     const item = await this.findItem(id);
+    this.assertPatientOwns(item.prescription?.patientId, actor);
     if (payload.name !== undefined) {
       item.name = this.requireName(payload.name);
     }
@@ -384,12 +398,33 @@ export class PrescriptionsService {
     this.requireUuid(id, 'prescription item id');
     const item = await this.prescriptionItems.findOne({
       where: { id },
-      relations: { scheduleRules: true },
+      relations: { scheduleRules: true, prescription: true },
     });
     if (!item) {
       throw ErrorHandling.NotFound('Prescription item not found');
     }
     return item;
+  }
+
+  private actorFrom(userId?: string, role?: string): PrescriptionActor | undefined {
+    if (!role) {
+      return undefined;
+    }
+    return { userId, role };
+  }
+
+  private patientOwnerId(actor?: PrescriptionActor) {
+    if (actor?.role !== 'PATIENT') {
+      return undefined;
+    }
+    return this.requireObjectId(actor.userId, 'userId');
+  }
+
+  private assertPatientOwns(patientId: string | undefined, actor?: PrescriptionActor) {
+    const userId = this.patientOwnerId(actor);
+    if (userId !== undefined && patientId !== userId) {
+      throw ErrorHandling.Forbidden('A patient can only access their own prescription');
+    }
   }
 
   private requireUuid(value: string | undefined, label: string) {

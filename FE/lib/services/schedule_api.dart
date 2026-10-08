@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../models/schedule_rule.dart';
 import 'api_base_url.dart';
 import 'auth_cookie_adapter.dart';
@@ -33,9 +35,8 @@ class ScheduleApi {
       queryParams['isActive'] = isActive.toString();
     }
 
-    final uri = Uri.parse('$apiBaseUrl/api/v1/schedule-rules').replace(
-      queryParameters: queryParams,
-    );
+    final uri = Uri.parse('$apiBaseUrl/api/v1/schedule-rules')
+        .replace(queryParameters: queryParams);
 
     final response = await _client.get(
       uri,
@@ -50,7 +51,9 @@ class ScheduleApi {
           .map((e) => ScheduleRule.fromJson(e as Map<String, dynamic>))
           .toList();
     } else {
-      throw ScheduleApiException('Lỗi lấy danh sách lịch nhắc: ${response.statusCode}');
+      throw ScheduleApiException(
+        'Lỗi lấy danh sách lịch nhắc: ${response.statusCode}',
+      );
     }
   }
 
@@ -69,7 +72,9 @@ class ScheduleApi {
         jsonDecode(response.body) as Map<String, dynamic>,
       );
     } else {
-      throw ScheduleApiException('Lỗi lấy chi tiết cữ uống: ${response.statusCode}');
+      throw ScheduleApiException(
+        'Lỗi lấy chi tiết cữ uống: ${response.statusCode}',
+      );
     }
   }
 
@@ -109,7 +114,9 @@ class ScheduleApi {
         jsonDecode(response.body) as Map<String, dynamic>,
       );
     } else {
-      throw ScheduleApiException('Cập nhật lịch uống thất bại: ${response.statusCode}');
+      throw ScheduleApiException(
+        'Cập nhật lịch uống thất bại: ${response.statusCode}',
+      );
     }
   }
 
@@ -146,7 +153,11 @@ class ScheduleApi {
         jsonDecode(response.body) as Map<String, dynamic>,
       );
     } else {
-      throw ScheduleApiException('Thêm lịch uống thất bại: ${response.statusCode}');
+      throw ScheduleApiException(
+        'Thêm lịch uống thất bại: ${response.statusCode}',
+      );
     }
   }
+
+  void close() => _client.close();
 }

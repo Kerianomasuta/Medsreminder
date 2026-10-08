@@ -72,6 +72,18 @@ describe('ScheduleRulesService', () => {
     expect(manager.save).not.toHaveBeenCalled();
   });
 
+  it('refuses a patient who does not own the prescription line', async () => {
+    items.findOne.mockResolvedValue(createItem());
+
+    await expect(service.create(itemId, { reminderTime: '08:00' }, {
+      userId: '507f1f77bcf86cd799439099',
+      role: 'PATIENT',
+    })).rejects.toMatchObject({
+      message: 'A patient can only access their own prescription',
+    });
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
   it('copies the patient from the prescription when adding a dose time', async () => {
     items.findOne.mockResolvedValue(createItem());
 

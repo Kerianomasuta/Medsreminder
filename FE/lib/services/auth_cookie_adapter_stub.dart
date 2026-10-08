@@ -1,6 +1,8 @@
 import 'auth_cookie_adapter.dart';
 
-AuthCookieAdapter createAuthCookieAdapter() => _NativeAuthCookieAdapter();
+final AuthCookieAdapter _sharedCookieAdapter = _NativeAuthCookieAdapter();
+
+AuthCookieAdapter createAuthCookieAdapter() => _sharedCookieAdapter;
 
 class _NativeAuthCookieAdapter implements AuthCookieAdapter {
   static String? _accessToken;

@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../widgets/widgets.dart';
+import '../controllers/care_network_controller.dart';
+import '../controllers/pharmacist_dashboard_controller.dart';
 
 import 'patient/patient_home.dart';
 import 'caregiver/caregiver_home.dart';
 import 'caregiver/caregiver_pharmacy_screen.dart';
-import 'caregiver/caregiver_tracking_screen.dart';
 import 'pharmacist/pharmacist_home.dart';
-import 'pharmacist/pharmacist_verification_screen.dart';
 import 'shipper/shipper_home.dart';
 import 'shipper/shipper_task_screen.dart';
 import 'admin/admin_home.dart';
@@ -19,40 +19,31 @@ class AppShell extends StatefulWidget {
     required this.role,
     required this.userName,
     required this.userEmail,
-    this.userId = '',
     required this.onLogout,
     required this.doseTaken,
     required this.doseMissed,
     required this.prescriptionAdded,
     required this.orderStage,
-    required this.linkedPatients,
-    required this.activePatientIndex,
+    required this.networkController,
+    required this.pharmacistController,
     required this.onRoleChanged,
     required this.onTaken,
     required this.onMissed,
     required this.onPrescriptionAdded,
     required this.onOrderStageChanged,
-    required this.onAddPatient,
-    required this.onRemovePatient,
-    required this.onSelectPatient,
   });
 
   final AppRole role;
   final String userName;
   final String userEmail;
-  final String userId;
   final Future<void> Function() onLogout;
   final bool doseTaken, doseMissed, prescriptionAdded;
-  final List<PatientProfileItem> linkedPatients;
-  final int activePatientIndex;
+  final CareNetworkController networkController;
+  final PharmacistDashboardController? pharmacistController;
   final OrderStage orderStage;
   final ValueChanged<AppRole> onRoleChanged;
   final VoidCallback onTaken, onMissed, onPrescriptionAdded;
   final ValueChanged<OrderStage> onOrderStageChanged;
-  final void Function(String code, {String? name, String? relation})
-  onAddPatient;
-  final ValueChanged<int> onRemovePatient;
-  final ValueChanged<int> onSelectPatient;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -87,15 +78,16 @@ class _AppShellState extends State<AppShell>
     ],
     AppRole.caregiver => const [
       NavItem(Icons.grid_view_rounded, 'Tổng quan'),
+      NavItem(Icons.calendar_month_rounded, 'Lịch uống'),
       NavItem(Icons.receipt_long_rounded, 'Đơn thuốc'),
       NavItem(Icons.storefront_rounded, 'Nhà thuốc'),
-      NavItem(Icons.near_me_rounded, 'Theo dõi'),
       NavItem(Icons.person_rounded, 'Hồ sơ'),
     ],
     AppRole.pharmacist => const [
       NavItem(Icons.dashboard_rounded, 'Xử lý đơn'),
       NavItem(Icons.inventory_2_rounded, 'Kho thuốc'),
       NavItem(Icons.history_rounded, 'Lịch sử'),
+      NavItem(Icons.local_pharmacy_rounded, 'Nhà thuốc'),
     ],
     AppRole.shipper => const [
       NavItem(Icons.route_rounded, 'Chuyến giao'),
@@ -161,54 +153,32 @@ class _AppShellState extends State<AppShell>
       doseMissed: widget.doseMissed,
       prescriptionAdded: widget.prescriptionAdded,
       onPrescriptionAdded: widget.onPrescriptionAdded,
-      isLinked: widget.linkedPatients.isNotEmpty,
-      linkedPatientCode: widget.linkedPatients.isNotEmpty
-          ? widget.linkedPatients[widget.activePatientIndex].code
-          : 'PA-8899',
-      patientId: widget.userId,
+      patientId: widget.networkController.user.id,
+      networkController: widget.networkController,
       onTaken: widget.onTaken,
     ),
 
     AppRole.caregiver =>
-      tab == 2
+      tab == 3
           ? CaregiverPharmacyScreen(
               key: ValueKey('${widget.role}$tab'),
               onSendRefill: () => widget.onRoleChanged(AppRole.pharmacist),
             )
-          : tab == 3
-          ? CaregiverTrackingScreen(
-              key: ValueKey('${widget.role}$tab'),
-              onReceiptConfirmed: () => setState(() => tab = 0),
-            )
           : CaregiverHome(
-              key: ValueKey('${widget.role}$tab${widget.activePatientIndex}'),
+              key: ValueKey(
+                '${widget.role}$tab${widget.networkController.selectedPatientId}',
+              ),
               tab: tab,
               userName: widget.userName,
               userEmail: widget.userEmail,
-              doseTaken: widget.doseTaken,
-              doseMissed: widget.doseMissed,
-              prescriptionAdded: widget.prescriptionAdded,
-              linkedPatients: widget.linkedPatients,
-              activePatientIndex: widget.activePatientIndex,
-              onMissed: widget.onMissed,
-              onPrescriptionAdded: widget.onPrescriptionAdded,
-              onAddPatient: widget.onAddPatient,
-              onRemovePatient: widget.onRemovePatient,
-              onSelectPatient: widget.onSelectPatient,
+              controller: widget.networkController,
             ),
 
-    AppRole.pharmacist =>
-      tab == 0
-          ? PharmacistVerificationScreen(
-              key: ValueKey('${widget.role}$tab'),
-              onApproveAndDispatch: () => widget.onRoleChanged(AppRole.shipper),
-            )
-          : PharmacistHome(
-              key: ValueKey('${widget.role}$tab'),
-              tab: tab,
-              orderStage: widget.orderStage,
-              onOrderStageChanged: widget.onOrderStageChanged,
-            ),
+    AppRole.pharmacist => PharmacistHome(
+      key: ValueKey('${widget.role}$tab'),
+      tab: tab,
+      controller: widget.pharmacistController!,
+    ),
 
     AppRole.shipper =>
       tab == 0
