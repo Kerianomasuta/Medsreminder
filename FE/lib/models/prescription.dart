@@ -15,13 +15,12 @@ class Schedule {
   });
 
   factory Schedule.fromJson(Map<String, dynamic> json) => Schedule(
-        id: json['id'] as String?,
-        reminderTime: json['reminderTime'] as String,
-        daysOfWeek: (json['daysOfWeek'] as List<dynamic>?)
-                ?.map((e) => e as int)
-                .toList() ??
-            [],
-      );
+    id: json['id'] as String?,
+    reminderTime: json['reminderTime'] as String,
+    daysOfWeek:
+        (json['daysOfWeek'] as List<dynamic>?)?.map((e) => e as int).toList() ??
+        [],
+  );
 
   /// Serialises for CREATE payload — omit daysOfWeek if full week.
   Map<String, dynamic> toCreateJson() {
@@ -40,6 +39,9 @@ class PrescriptionItem {
   final String? id;
   final String medicineId; // UUID
   final String medicineName; // display only
+  final String? genericName;
+  final String unit;
+  final String? imageUrl;
   final double dosagePerTime; // > 0
   final int currentStock; // >= 0
   final int reorderThreshold; // >= 0
@@ -50,6 +52,9 @@ class PrescriptionItem {
     this.id,
     required this.medicineId,
     required this.medicineName,
+    this.genericName,
+    this.unit = 'VIEN',
+    this.imageUrl,
     required this.dosagePerTime,
     required this.currentStock,
     required this.reorderThreshold,
@@ -62,15 +67,31 @@ class PrescriptionItem {
   factory PrescriptionItem.fromJson(Map<String, dynamic> json) =>
       PrescriptionItem(
         id: json['id'] as String?,
-        medicineId: json['medicineId'] as String,
-        medicineName: (json['medicine'] as Map<String, dynamic>?)?['name']
-                as String? ??
-            json['medicineId'] as String,
+        medicineId: (json['medicineId'] ?? json['id'] ?? '').toString(),
+        medicineName:
+            (json['name'] ??
+                    (json['medicine'] as Map<String, dynamic>?)?['name'] ??
+                    'Thuốc')
+                .toString(),
+        genericName:
+            (json['genericName'] ??
+                    (json['medicine'] as Map<String, dynamic>?)?['genericName'])
+                ?.toString(),
+        unit:
+            (json['unit'] ??
+                    (json['medicine'] as Map<String, dynamic>?)?['unit'] ??
+                    'VIEN')
+                .toString(),
+        imageUrl:
+            (json['imageUrl'] ??
+                    (json['medicine'] as Map<String, dynamic>?)?['imageUrl'])
+                ?.toString(),
         dosagePerTime: (json['dosagePerTime'] as num).toDouble(),
         currentStock: json['currentStock'] as int,
         reorderThreshold: json['reorderThreshold'] as int,
         instructions: json['instructions'] as String?,
-        schedules: (json['schedules'] as List<dynamic>?)
+        schedules:
+            (json['schedules'] as List<dynamic>?)
                 ?.map((s) => Schedule.fromJson(s as Map<String, dynamic>))
                 .toList() ??
             [],
@@ -78,7 +99,8 @@ class PrescriptionItem {
 
   Map<String, dynamic> toCreateJson() {
     final map = <String, dynamic>{
-      'medicineId': medicineId,
+      'name': medicineName,
+      'unit': unit,
       'dosagePerTime': dosagePerTime,
       'currentStock': currentStock,
       'reorderThreshold': reorderThreshold,
@@ -87,6 +109,10 @@ class PrescriptionItem {
     if (instructions != null && instructions!.isNotEmpty) {
       map['instructions'] = instructions;
     }
+    if (genericName != null && genericName!.isNotEmpty) {
+      map['genericName'] = genericName;
+    }
+    if (imageUrl != null && imageUrl!.isNotEmpty) map['imageUrl'] = imageUrl;
     return map;
   }
 
@@ -131,20 +157,20 @@ class Prescription {
   });
 
   factory Prescription.fromJson(Map<String, dynamic> json) => Prescription(
-        id: json['id'] as String?,
-        patientId: json['patientId'] as String,
-        title: json['title'] as String,
-        doctorName: json['doctorName'] as String?,
-        prescriptionCode: json['prescriptionCode'] as String?,
-        startDate: json['startDate'] as String,
-        endDate: json['endDate'] as String?,
-        isActive: json['isActive'] as bool? ?? true,
-        items: (json['items'] as List<dynamic>?)
-                ?.map((i) =>
-                    PrescriptionItem.fromJson(i as Map<String, dynamic>))
-                .toList() ??
-            [],
-      );
+    id: json['id'] as String?,
+    patientId: json['patientId'] as String,
+    title: json['title'] as String,
+    doctorName: json['doctorName'] as String?,
+    prescriptionCode: json['prescriptionCode'] as String?,
+    startDate: json['startDate'] as String,
+    endDate: json['endDate'] as String?,
+    isActive: json['isActive'] as bool? ?? true,
+    items:
+        (json['items'] as List<dynamic>?)
+            ?.map((i) => PrescriptionItem.fromJson(i as Map<String, dynamic>))
+            .toList() ??
+        [],
+  );
 
   Map<String, dynamic> toCreateJson() {
     final map = <String, dynamic>{
@@ -169,8 +195,13 @@ class Prescription {
       'title': title,
       'isActive': isActive,
       'startDate': startDate,
-      'doctorName': (doctorName != null && doctorName!.isNotEmpty) ? doctorName : null,
-      'prescriptionCode': (prescriptionCode != null && prescriptionCode!.isNotEmpty) ? prescriptionCode : null,
+      'doctorName': (doctorName != null && doctorName!.isNotEmpty)
+          ? doctorName
+          : null,
+      'prescriptionCode':
+          (prescriptionCode != null && prescriptionCode!.isNotEmpty)
+          ? prescriptionCode
+          : null,
       'endDate': endDate,
     };
   }
@@ -184,10 +215,8 @@ class ScheduleDraft {
   String reminderTime;
   List<int> daysOfWeek;
 
-  ScheduleDraft({
-    this.reminderTime = '08:00',
-    List<int>? daysOfWeek,
-  }) : daysOfWeek = daysOfWeek ?? [];
+  ScheduleDraft({this.reminderTime = '08:00', List<int>? daysOfWeek})
+    : daysOfWeek = daysOfWeek ?? [];
 
   Schedule toSchedule() =>
       Schedule(reminderTime: reminderTime, daysOfWeek: daysOfWeek);
@@ -196,6 +225,9 @@ class ScheduleDraft {
 class PrescriptionItemDraft {
   String medicineId;
   String medicineName;
+  String? genericName;
+  String unit;
+  String? imageUrl;
   double dosagePerTime;
   int currentStock;
   int reorderThreshold;
@@ -205,6 +237,9 @@ class PrescriptionItemDraft {
   PrescriptionItemDraft({
     this.medicineId = '',
     this.medicineName = '',
+    this.genericName,
+    this.unit = 'VIEN',
+    this.imageUrl,
     this.dosagePerTime = 1,
     this.currentStock = 0,
     this.reorderThreshold = 0,
@@ -213,12 +248,15 @@ class PrescriptionItemDraft {
   }) : schedules = schedules ?? [ScheduleDraft()];
 
   PrescriptionItem toPrescriptionItem() => PrescriptionItem(
-        medicineId: medicineId,
-        medicineName: medicineName,
-        dosagePerTime: dosagePerTime,
-        currentStock: currentStock,
-        reorderThreshold: reorderThreshold,
-        instructions: instructions,
-        schedules: schedules.map((s) => s.toSchedule()).toList(),
-      );
+    medicineId: medicineId,
+    medicineName: medicineName,
+    genericName: genericName,
+    unit: unit,
+    imageUrl: imageUrl,
+    dosagePerTime: dosagePerTime,
+    currentStock: currentStock,
+    reorderThreshold: reorderThreshold,
+    instructions: instructions,
+    schedules: schedules.map((s) => s.toSchedule()).toList(),
+  );
 }

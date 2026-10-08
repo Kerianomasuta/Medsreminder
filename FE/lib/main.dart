@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'controllers/care_network_controller.dart';
+import 'controllers/pharmacist_dashboard_controller.dart';
 import 'models/models.dart';
 import 'routing/url_strategy.dart';
 import 'screens/app_shell.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/splash_screen.dart';
+import 'screens/invitation/invitation_screen.dart';
 import 'services/auth_api.dart';
 import 'services/notification_service.dart';
 
@@ -37,6 +40,9 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final AuthApi _authApi;
   AuthUser? _currentUser;
+  CareNetworkController? _networkController;
+  PharmacistDashboardController? _pharmacistController;
+  String? _pendingInvitationUuid;
   bool _checkingSession = true;
   bool _showingRegistration = false;
   AppRole role = AppRole.patient;
@@ -45,32 +51,11 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   bool prescriptionAdded = false;
   OrderStage orderStage = OrderStage.review;
 
-  List<PatientProfileItem> linkedPatients = [
-    const PatientProfileItem(
-      code: 'PA-8899',
-      name: 'Nguyễn Thị Lan',
-      age: 72,
-      relation: 'Mẹ ruột',
-      condition: 'Huyết áp & Tiểu đường',
-      avatarBg: Color(0xFFFFD9C6),
-      avatarIcon: Icons.face_3_rounded,
-    ),
-    const PatientProfileItem(
-      code: 'PA-5521',
-      name: 'Trần Văn Nam',
-      age: 76,
-      relation: 'Bố ruột',
-      condition: 'Tim mạch',
-      avatarBg: Color(0xFFD6E4FF),
-      avatarIcon: Icons.face_rounded,
-    ),
-  ];
-  int activePatientIndex = 0;
-
   @override
   void initState() {
     super.initState();
     _authApi = widget.authApi ?? AuthApi();
+    _pendingInvitationUuid = Uri.base.queryParameters['invitationUUID'];
     _restoreSession();
   }
 
@@ -84,23 +69,25 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
       restoredUser = results.first as AuthUser;
     } catch (_) {}
     if (!mounted) return;
+    _replaceNetworkController(restoredUser);
     setState(() {
       _currentUser = restoredUser;
       if (restoredUser != null) role = restoredUser.role;
       _checkingSession = false;
     });
-    _replaceRoute(restoredUser?.role.route ?? '/login');
+    _replaceRoute(_routeFor(restoredUser));
   }
 
   Future<void> _login(String email, String password) async {
     final user = await _authApi.login(email: email, password: password);
     if (!mounted) return;
+    _replaceNetworkController(user);
     setState(() {
       _currentUser = user;
       role = user.role;
       _showingRegistration = false;
     });
-    _replaceRoute(user.role.route);
+    _replaceRoute(_routeFor(user));
   }
 
   Future<void> _register(
@@ -130,7 +117,9 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
         setState(() {
           _currentUser = null;
           _showingRegistration = false;
+          _pendingInvitationUuid = null;
         });
+        _replaceNetworkController(null);
       }
       _replaceRoute('/login');
     }
@@ -142,9 +131,40 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
     });
   }
 
+  String _routeFor(AuthUser? user) {
+    if (user == null) return '/login';
+    if (_pendingInvitationUuid != null) {
+      return '/invitation?invitationUUID=$_pendingInvitationUuid';
+    }
+    return user.role.route;
+  }
+
+  void _replaceNetworkController(AuthUser? user) {
+    _networkController?.dispose();
+    _pharmacistController?.dispose();
+    _pharmacistController = null;
+    _networkController = user == null
+        ? null
+        : CareNetworkController(user: user);
+    if (user?.role == AppRole.patient || user?.role == AppRole.caregiver) {
+      _networkController!.initialize();
+    }
+    if (user?.role == AppRole.pharmacist) {
+      _pharmacistController = PharmacistDashboardController(user: user!)
+        ..initialize();
+    }
+  }
+
+  void _closeInvitation() {
+    setState(() => _pendingInvitationUuid = null);
+    _replaceRoute(_currentUser!.role.route);
+  }
+
   @override
   void dispose() {
     _authApi.close();
+    _networkController?.dispose();
+    _pharmacistController?.dispose();
     super.dispose();
   }
 
@@ -156,39 +176,6 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   void markMissed() => setState(() {
     doseTaken = false;
     doseMissed = true;
-  });
-
-  void addPatient(String code, {String? name, String? relation}) =>
-      setState(() {
-        linkedPatients.add(
-          PatientProfileItem(
-            code: code,
-            name: (name != null && name.trim().isNotEmpty)
-                ? name.trim()
-                : 'Bệnh nhân $code',
-            age: 70,
-            relation: (relation != null && relation.trim().isNotEmpty)
-                ? relation.trim()
-                : 'Người thân',
-            condition: 'Đang theo dõi',
-            avatarBg: const Color(0xFFFFE5D0),
-            avatarIcon: Icons.person_rounded,
-          ),
-        );
-        activePatientIndex = linkedPatients.length - 1;
-      });
-
-  void removePatient(int index) => setState(() {
-    if (linkedPatients.length > 1) {
-      linkedPatients.removeAt(index);
-      if (activePatientIndex >= linkedPatients.length) {
-        activePatientIndex = linkedPatients.length - 1;
-      }
-    }
-  });
-
-  void selectPatient(int index) => setState(() {
-    activePatientIndex = index;
   });
 
   @override
@@ -249,25 +236,40 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
                     _replaceRoute('/register');
                   },
                 )
-        : AppShell(
-            key: const ValueKey('app-shell'),
-            role: role,
-            userName: _currentUser!.fullName,
-            onLogout: _logout,
-            doseTaken: doseTaken,
-            doseMissed: doseMissed,
-            prescriptionAdded: prescriptionAdded,
-            orderStage: orderStage,
-            linkedPatients: linkedPatients,
-            activePatientIndex: activePatientIndex,
-            onRoleChanged: (_) {},
-            onTaken: markTaken,
-            onMissed: markMissed,
-            onPrescriptionAdded: () => setState(() => prescriptionAdded = true),
-            onOrderStageChanged: (value) => setState(() => orderStage = value),
-            onAddPatient: addPatient,
-            onRemovePatient: removePatient,
-            onSelectPatient: selectPatient,
-          ),
+        : _signedInContent(),
   );
+
+  Widget _signedInContent() {
+    final user = _currentUser!;
+    final controller = _networkController!;
+    final invitationUuid = _pendingInvitationUuid;
+    if (invitationUuid != null) {
+      return InvitationScreen(
+        key: const ValueKey('invitation'),
+        invitationUuid: invitationUuid,
+        user: user,
+        controller: controller,
+        onCompleted: _closeInvitation,
+        onCancel: _closeInvitation,
+      );
+    }
+    return AppShell(
+      key: const ValueKey('app-shell'),
+      role: role,
+      userName: user.fullName,
+      userEmail: user.email,
+      networkController: controller,
+      pharmacistController: _pharmacistController,
+      onLogout: _logout,
+      doseTaken: doseTaken,
+      doseMissed: doseMissed,
+      prescriptionAdded: prescriptionAdded,
+      orderStage: orderStage,
+      onRoleChanged: (_) {},
+      onTaken: markTaken,
+      onMissed: markMissed,
+      onPrescriptionAdded: () => setState(() => prescriptionAdded = true),
+      onOrderStageChanged: (value) => setState(() => orderStage = value),
+    );
+  }
 }
