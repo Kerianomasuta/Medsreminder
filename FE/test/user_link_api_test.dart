@@ -16,7 +16,10 @@ void main() {
           return http.Response(
             jsonEncode({
               'status': 'success',
-              'data': {'invitationUUID': 'invite-1'},
+              'data': {
+                'invitationLink':
+                    'http://localhost:3000/invitation?invitationUUID=invite-1',
+              },
             }),
             201,
             headers: const {'content-type': 'application/json; charset=utf-8'},
