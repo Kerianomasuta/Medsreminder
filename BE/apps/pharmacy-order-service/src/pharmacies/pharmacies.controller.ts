@@ -20,20 +20,4 @@ export class PharmaciesController {
   getById(@Payload() payload: { id: string }) {
     return this.pharmaciesService.getById(payload.id);
   }
-
-  @MessagePattern({ cmd: 'update_pharmacy' })
-  update(@Payload() payload: Parameters<PharmaciesService['update']>[1] & { id: string }) {
-    const { id, ...changes } = payload;
-    return this.pharmaciesService.update(id, changes);
-  }
-
-  @MessagePattern({ cmd: 'list_pharmacy_inventory' })
-  listInventory(@Payload() payload: { pharmacyId: string }) {
-    return this.pharmaciesService.listInventory(payload.pharmacyId);
-  }
-
-  @MessagePattern({ cmd: 'upsert_pharmacy_inventory' })
-  upsertInventory(@Payload() payload: { pharmacyId: string; items: Parameters<PharmaciesService['upsertInventory']>[1] }) {
-    return this.pharmaciesService.upsertInventory(payload.pharmacyId, payload.items);
-  }
 }

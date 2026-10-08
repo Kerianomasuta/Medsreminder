@@ -21,9 +21,6 @@ export class OrderItem {
   @Column({ type: 'text', name: 'image_url', nullable: true })
   imageUrl: string | null;
 
-  @Column({ type: 'uuid', name: 'medicine_id', nullable: true })
-  medicineId: string | null;
-
   @Column({ type: 'int' })
   quantity: number;
 

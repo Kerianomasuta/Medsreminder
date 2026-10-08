@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
-import { PharmacyInventory } from './schema/pharmacy-inventory.entity.js';
 import { Pharmacy } from './schema/pharmacy.entity.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -18,12 +17,6 @@ export type PharmacyInput = {
   isActive?: boolean;
 };
 
-export type InventoryInput = {
-  medicineId?: string;
-  stockQuantity?: number;
-  pricePerUnit?: number;
-};
-
 export type ListPharmaciesInput = {
   latitude?: number;
   longitude?: number;
@@ -35,12 +28,15 @@ export class PharmaciesService {
   constructor(
     @InjectRepository(Pharmacy)
     private readonly pharmacies: Repository<Pharmacy>,
-    @InjectRepository(PharmacyInventory)
-    private readonly inventory: Repository<PharmacyInventory>,
   ) {}
 
   async create(payload: PharmacyInput) {
-    const pharmacy = this.pharmacies.create(this.preparePharmacy(payload, true));
+    const pharmacistId = this.requireObjectId(payload.pharmacistId, 'pharmacistId');
+    const existing = await this.pharmacies.findOne({ where: { pharmacistId } });
+    if (existing) {
+      throw ErrorHandling.Conflict('This pharmacist already has a pharmacy');
+    }
+    const pharmacy = this.pharmacies.create(this.preparePharmacy({ ...payload, pharmacistId }, true));
     return this.toPharmacy(await this.pharmacies.save(pharmacy));
   }
 
@@ -72,60 +68,6 @@ export class PharmaciesService {
 
   async getById(id: string) {
     return this.toPharmacy(await this.findPharmacy(id));
-  }
-
-  async update(id: string, payload: PharmacyInput) {
-    const pharmacy = await this.findPharmacy(id);
-    const changes = this.preparePharmacy(payload, false);
-    if (Object.keys(changes).length === 0) {
-      throw ErrorHandling.BadRequest('Provide at least one field to update');
-    }
-    Object.assign(pharmacy, changes);
-    return this.toPharmacy(await this.pharmacies.save(pharmacy));
-  }
-
-  async listInventory(pharmacyId: string) {
-    await this.findPharmacy(pharmacyId);
-    const rows = await this.inventory.find({
-      where: { pharmacyId },
-      order: { medicineId: 'ASC' },
-    });
-    return rows.map((row) => this.toInventory(row));
-  }
-
-  async upsertInventory(pharmacyId: string, items: InventoryInput[] | undefined) {
-    await this.findPharmacy(pharmacyId);
-    if (!Array.isArray(items) || items.length === 0) {
-      throw ErrorHandling.BadRequest('items must contain at least one medicine');
-    }
-
-    const prepared = items.map((item, index) => ({
-      medicineId: this.requireUuid(item?.medicineId, `items[${index}].medicineId`),
-      stockQuantity: this.requireWholeNumber(item?.stockQuantity, `items[${index}].stockQuantity`),
-      pricePerUnit: this.requireMoney(item?.pricePerUnit, `items[${index}].pricePerUnit`),
-    }));
-    const seen = new Set<string>();
-    for (const item of prepared) {
-      if (seen.has(item.medicineId)) {
-        throw ErrorHandling.BadRequest('Each medicineId can appear only once');
-      }
-      seen.add(item.medicineId);
-    }
-
-    const saved = await this.inventory.manager.transaction(async (manager) => {
-      const inventory = manager.getRepository(PharmacyInventory);
-      const rows: PharmacyInventory[] = [];
-      for (const item of prepared) {
-        const existing = await inventory.findOne({ where: { pharmacyId, medicineId: item.medicineId } });
-        rows.push(await inventory.save(
-          existing
-            ? Object.assign(existing, { stockQuantity: item.stockQuantity, pricePerUnit: item.pricePerUnit })
-            : inventory.create({ pharmacyId, ...item }),
-        ));
-      }
-      return rows;
-    });
-    return saved.map((row) => this.toInventory(row));
   }
 
   private async findPharmacy(id: string) {
@@ -179,17 +121,6 @@ export class PharmaciesService {
     };
   }
 
-  private toInventory(row: PharmacyInventory) {
-    return {
-      id: row.id,
-      pharmacyId: row.pharmacyId,
-      medicineId: row.medicineId,
-      stockQuantity: row.stockQuantity,
-      pricePerUnit: Number(row.pricePerUnit),
-      updatedAt: row.updatedAt,
-    };
-  }
-
   private hasCoordinates(latitude: number | undefined, longitude: number | undefined) {
     if (latitude === undefined && longitude === undefined) {
       return false;
@@ -235,20 +166,6 @@ export class PharmaciesService {
       throw ErrorHandling.BadRequest(`${label} must be at most ${maxLength} characters`);
     }
     return trimmed;
-  }
-
-  private requireWholeNumber(value: number | undefined, label: string) {
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-      throw ErrorHandling.BadRequest(`${label} must be a whole number of 0 or more`);
-    }
-    return value;
-  }
-
-  private requireMoney(value: number | undefined, label: string) {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-      throw ErrorHandling.BadRequest(`${label} must be 0 or more`);
-    }
-    return value.toFixed(2);
   }
 
   private requireCoordinate(value: number | undefined, label: string, min: number, max: number) {

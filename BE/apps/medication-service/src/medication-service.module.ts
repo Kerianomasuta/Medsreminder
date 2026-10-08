@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MedicationLogsModule } from './medication-logs/medication-logs.module.js';
-import { MedicinesModule } from './medicines/medicines.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
 import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
 
@@ -23,7 +22,6 @@ import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
         ssl: { rejectUnauthorized: false },
       }),
     }),
-    MedicinesModule,
     PrescriptionsModule,
     ScheduleRulesModule,
     MedicationLogsModule,

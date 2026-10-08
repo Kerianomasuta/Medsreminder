@@ -22,6 +22,6 @@ import { PharmaciesService } from './pharmacies.service.js';
   ],
   controllers: [PharmaciesController],
   providers: [PharmaciesService],
-  exports: [ClientsModule],
+  exports: [PharmaciesService, ClientsModule],
 })
 export class PharmaciesModule {}
