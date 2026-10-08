@@ -14,7 +14,7 @@ alwaysApply: true
 
 ## Leo thang
 
-Mặc định 15 phút sau giờ nhắc mà không Taken, hoặc PA chọn Skipped: log thành `MISSED`, tăng `escalation_level`. Máy PA kêu mức 2 (âm lượng tối đa, rung liên tục). CG nhận alert ưu tiên cao kèm nút Gọi điện ngay.
+Chuông đầu 10 phút. Không bấm gì thì chuông thứ hai thêm 10 phút, mức 2. Hết chuông thứ hai, tức 20 phút sau giờ nhắc hiện tại, mới gọi missed: log thành `MISSED`, `escalation_level` = 1. Trong cả hai lần kêu vẫn bấm được Taken, Snooze hoặc Skip. PA chọn Skipped thì log thành `SKIPPED` và `escalation_level` = 1. CG nhận alert ưu tiên cao kèm nút Gọi điện ngay.
 
 Ngưỡng hết thuốc: `current_stock` gần `reorder_threshold`, hoặc còn đủ khoảng 3–5 ngày. Báo CG đặt thêm.
 
