@@ -24,8 +24,8 @@ export class MedicationLogsService {
     });
   }
 
-  take(id: string, dto: RecordDoseDto, user: AccessUser) {
-    return this.send({ cmd: 'take_medication_log' }, { id, actedAt: dto.actedAt, userId: user.userId });
+  take(id: string, user: AccessUser) {
+    return this.send({ cmd: 'take_medication_log' }, { id, userId: user.userId });
   }
 
   snooze(id: string, dto: SnoozeDoseDto, user: AccessUser) {

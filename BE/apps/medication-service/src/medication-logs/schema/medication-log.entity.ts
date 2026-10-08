@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { DoseStatus } from '../../enums/dose-status.enum.js';
 import { ScheduleRule } from '../../schedule-rules/schema/schedule-rule.entity.js';
 
@@ -41,5 +41,5 @@ export class MedicationLog {
 
   @ManyToOne(() => ScheduleRule, (rule) => rule.logs, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'schedule_rule_id' })
-  scheduleRule: ScheduleRule;
+  scheduleRule: Relation<ScheduleRule>;
 }

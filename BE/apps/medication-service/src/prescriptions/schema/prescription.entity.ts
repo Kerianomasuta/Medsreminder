@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { PrescriptionItem } from './prescription-item.entity.js';
 
 @Entity({ schema: 'medication', name: 'prescriptions' })
@@ -41,5 +41,5 @@ export class Prescription {
   updatedAt: Date;
 
   @OneToMany(() => PrescriptionItem, (item) => item.prescription)
-  items: PrescriptionItem[];
+  items: Relation<PrescriptionItem>[];
 }
