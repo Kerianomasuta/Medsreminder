@@ -27,11 +27,19 @@ class UserLinkApi {
       Uri.parse('$apiBaseUrl/api/v1/users/create-link-invitation'),
     );
     final data = payload['data'] as Map<String, dynamic>?;
-    final link = data?['invitationLink']?.toString();
-    if (link == null || link.isEmpty) {
-      throw const UserLinkApiException('Máy chủ không trả về link mời.');
+    final uuid = data?['invitationUUID']?.toString().trim();
+    if (uuid != null && uuid.isNotEmpty) return uuid;
+
+    final link = data?['invitationLink']?.toString().trim();
+    final invitationUuid = link == null || link.isEmpty
+        ? null
+        : Uri.tryParse(link)?.queryParameters['invitationUUID']?.trim();
+    if (invitationUuid == null || invitationUuid.isEmpty) {
+      throw const UserLinkApiException(
+        'Máy chủ không trả về mã lời mời hợp lệ.',
+      );
     }
-    return link;
+    return invitationUuid;
   }
 
   Future<void> verifyInvitation(String invitationUuid) async {

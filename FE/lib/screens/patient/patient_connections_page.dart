@@ -52,7 +52,7 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
                             ),
                           ),
                           Text(
-                            'Link mời có hiệu lực tối đa 15 phút',
+                            'Mã mời có hiệu lực tối đa 15 phút',
                             style: TextStyle(
                               color: Color(0xFF6E7590),
                               fontSize: 12,
@@ -63,7 +63,7 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
                     ),
                   ],
                 ),
-                if (widget.controller.invitationLink != null) ...[
+                if (widget.controller.invitationUuid != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     width: double.infinity,
@@ -73,7 +73,7 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: SelectableText(
-                      widget.controller.invitationLink!,
+                      widget.controller.invitationUuid!,
                       style: const TextStyle(
                         color: Color(0xFF3D4FC2),
                         fontWeight: FontWeight.w700,
@@ -82,9 +82,9 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
                   ),
                   const SizedBox(height: 10),
                   FilledButton.icon(
-                    onPressed: _copyLink,
+                    onPressed: _copyUuid,
                     icon: const Icon(Icons.copy_rounded),
-                    label: const Text('Sao chép link mời'),
+                    label: const Text('Sao chép mã mời'),
                   ),
                 ] else ...[
                   const SizedBox(height: 16),
@@ -99,7 +99,7 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
                             ),
                           )
                         : const Icon(Icons.person_add_alt_1_rounded),
-                    label: const Text('Tạo link mời'),
+                    label: const Text('Tạo mã mời'),
                   ),
                 ],
                 if (_error != null) ...[
@@ -144,7 +144,7 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Chưa có người chăm sóc nào. Hãy tạo và gửi link mời.',
+                      'Chưa có người chăm sóc nào. Hãy tạo và gửi mã mời.',
                       style: TextStyle(color: Color(0xFF687195)),
                     ),
                   ),
@@ -198,13 +198,13 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
     }
   }
 
-  Future<void> _copyLink() async {
+  Future<void> _copyUuid() async {
     await Clipboard.setData(
-      ClipboardData(text: widget.controller.invitationLink!),
+      ClipboardData(text: widget.controller.invitationUuid!),
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Đã sao chép link mời.')));
+        .showSnackBar(const SnackBar(content: Text('Đã sao chép mã mời.')));
   }
 }
 

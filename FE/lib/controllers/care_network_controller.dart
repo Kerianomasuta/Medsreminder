@@ -29,7 +29,7 @@ class CareNetworkController extends ChangeNotifier {
   String? selectedPatientId;
   bool linksLoading = false;
   String? linksError;
-  String? invitationLink;
+  String? invitationUuid;
 
   bool _linksLoaded = false;
   Future<void>? _linksInFlight;
@@ -142,9 +142,9 @@ class CareNetworkController extends ChangeNotifier {
   }
 
   Future<String> createInvitation() async {
-    invitationLink ??= await _userLinkApi.createInvitation();
+    invitationUuid ??= await _userLinkApi.createInvitation();
     notifyListeners();
-    return invitationLink!;
+    return invitationUuid!;
   }
 
   Future<void> verifyInvitation(String invitationUuid) async {
