@@ -254,6 +254,7 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
             role: role,
             userName: _currentUser!.fullName,
             userEmail: _currentUser!.email,
+            userId: _currentUser!.id,
             onLogout: _logout,
             doseTaken: doseTaken,
             doseMissed: doseMissed,

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/schedule_rule.dart';
 import 'api_base_url.dart';
+import 'auth_cookie_adapter.dart';
 import 'http_client_factory.dart';
 
 class ScheduleApiException implements Exception {
@@ -13,9 +14,14 @@ class ScheduleApiException implements Exception {
 }
 
 class ScheduleApi {
-  ScheduleApi({http.Client? client}) : _client = client ?? createHttpClient();
+  ScheduleApi({
+    http.Client? client,
+    AuthCookieAdapter? cookies,
+  })  : _client = client ?? createHttpClient(),
+        _cookies = cookies ?? AuthCookieAdapter();
 
   final http.Client _client;
+  final AuthCookieAdapter _cookies;
 
   /// Gọi GET /api/v1/schedule-rules?patientId=...&isActive=...
   Future<List<ScheduleRule>> list({
@@ -31,7 +37,13 @@ class ScheduleApi {
       queryParameters: queryParams,
     );
 
-    final response = await _client.get(uri);
+    final response = await _client.get(
+      uri,
+      headers: {
+        ..._cookies.requestHeaders,
+        'Accept': 'application/json',
+      },
+    );
     if (response.statusCode == 200) {
       final list = jsonDecode(response.body) as List<dynamic>;
       return list
@@ -45,7 +57,13 @@ class ScheduleApi {
   /// Gọi GET /api/v1/schedule-rules/:id
   Future<ScheduleRule> getById(String id) async {
     final uri = Uri.parse('$apiBaseUrl/api/v1/schedule-rules/$id');
-    final response = await _client.get(uri);
+    final response = await _client.get(
+      uri,
+      headers: {
+        ..._cookies.requestHeaders,
+        'Accept': 'application/json',
+      },
+    );
     if (response.statusCode == 200) {
       return ScheduleRule.fromJson(
         jsonDecode(response.body) as Map<String, dynamic>,
@@ -79,7 +97,11 @@ class ScheduleApi {
 
     final response = await _client.patch(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        ..._cookies.requestHeaders,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
       body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
@@ -112,7 +134,11 @@ class ScheduleApi {
 
     final response = await _client.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        ..._cookies.requestHeaders,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
       body: jsonEncode(body),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {

@@ -19,6 +19,7 @@ class AppShell extends StatefulWidget {
     required this.role,
     required this.userName,
     required this.userEmail,
+    this.userId = '',
     required this.onLogout,
     required this.doseTaken,
     required this.doseMissed,
@@ -39,6 +40,7 @@ class AppShell extends StatefulWidget {
   final AppRole role;
   final String userName;
   final String userEmail;
+  final String userId;
   final Future<void> Function() onLogout;
   final bool doseTaken, doseMissed, prescriptionAdded;
   final List<PatientProfileItem> linkedPatients;
@@ -163,6 +165,7 @@ class _AppShellState extends State<AppShell>
       linkedPatientCode: widget.linkedPatients.isNotEmpty
           ? widget.linkedPatients[widget.activePatientIndex].code
           : 'PA-8899',
+      patientId: widget.userId,
       onTaken: widget.onTaken,
     ),
 

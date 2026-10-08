@@ -15,11 +15,13 @@ class PatientHome extends StatelessWidget {
     this.onPrescriptionAdded,
     this.isLinked = true,
     this.linkedPatientCode = 'PA-8899',
+    this.patientId,
   });
 
   final int tab;
   final bool doseTaken, doseMissed, prescriptionAdded, isLinked;
   final String linkedPatientCode;
+  final String? patientId;
   final VoidCallback onTaken;
   final VoidCallback? onPrescriptionAdded;
 
@@ -135,7 +137,11 @@ class PatientHome extends StatelessWidget {
       );
     }
     if (tab == 2) {
-      return const ScheduleTimelinePage();
+      return ScheduleTimelinePage(
+        patientId: (patientId != null && patientId!.isNotEmpty)
+            ? patientId!
+            : '6abbd74f1a65898500954ec6',
+      );
     }
     if (tab == 3) {
       return AppScroll(
@@ -301,6 +307,9 @@ class PatientHome extends StatelessWidget {
       );
     }
     return PatientTodayView(
+      patientId: (patientId != null && patientId!.isNotEmpty)
+          ? patientId!
+          : '6abbd74f1a65898500954ec6',
       doseTaken: doseTaken,
       doseMissed: doseMissed,
       onTaken: onTaken,

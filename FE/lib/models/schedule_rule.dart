@@ -1,12 +1,14 @@
 class ScheduleMedicine {
   final String id;
   final String name;
+  final String? genericName;
   final String unit;
   final String? imageUrl;
 
   const ScheduleMedicine({
     required this.id,
     required this.name,
+    this.genericName,
     required this.unit,
     this.imageUrl,
   });
@@ -14,6 +16,7 @@ class ScheduleMedicine {
   factory ScheduleMedicine.fromJson(Map<String, dynamic> json) => ScheduleMedicine(
     id: json['id'] as String? ?? '',
     name: json['name'] as String? ?? '',
+    genericName: json['genericName'] as String?,
     unit: json['unit'] as String? ?? 'VIEN',
     imageUrl: json['imageUrl'] as String?,
   );
