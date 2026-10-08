@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { FulfillmentType } from '../../enums/fulfillment-type.enum.js';
 import { OrderStatus } from '../../enums/order-status.enum.js';
 import { OrderItem } from './order-item.entity.js';
@@ -62,5 +62,5 @@ export class Order {
   updatedAt: Date;
 
   @OneToMany(() => OrderItem, (item) => item.order)
-  items: OrderItem[];
+  items: Relation<OrderItem>[];
 }

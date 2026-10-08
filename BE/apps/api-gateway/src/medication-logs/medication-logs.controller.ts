@@ -46,8 +46,8 @@ export class MedicationLogsController {
   @ApiOkResponse({ type: MedicationLogResponseDto })
   @ApiBadRequestResponse({ description: 'The dose is already final.' })
   @ApiNotFoundResponse({ description: 'Dose log not found.' })
-  take(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RecordDoseDto, @Req() request: Request) {
-    return this.medicationLogsService.take(id, dto ?? {}, this.user(request));
+  take(@Param('id', ParseUUIDPipe) id: string, @Req() request: Request) {
+    return this.medicationLogsService.take(id, this.user(request));
   }
 
   @Post(':id/snooze')

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { PharmacyInventory } from './pharmacy-inventory.entity.js';
 
 @Entity({ schema: 'pharmacy', name: 'pharmacies' })
@@ -34,5 +34,5 @@ export class Pharmacy {
   updatedAt: Date;
 
   @OneToMany(() => PharmacyInventory, (row) => row.pharmacy)
-  inventory: PharmacyInventory[];
+  inventory: Relation<PharmacyInventory>[];
 }

@@ -1,4 +1,4 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { Pharmacy } from './pharmacy.entity.js';
 
 @Entity({ schema: 'pharmacy', name: 'pharmacy_inventory' })
@@ -24,5 +24,5 @@ export class PharmacyInventory {
 
   @ManyToOne(() => Pharmacy, (pharmacy) => pharmacy.inventory, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'pharmacy_id' })
-  pharmacy: Pharmacy;
+  pharmacy: Relation<Pharmacy>;
 }
