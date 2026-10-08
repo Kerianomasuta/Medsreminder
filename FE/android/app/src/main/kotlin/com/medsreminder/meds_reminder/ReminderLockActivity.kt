@@ -1,15 +1,15 @@
 package com.medsreminder.meds_reminder
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.os.PowerManager
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import java.text.SimpleDateFormat
@@ -18,7 +18,6 @@ import java.util.Locale
 
 class ReminderLockActivity : Activity() {
 
-    private val autoDismissHandler = Handler(Looper.getMainLooper())
     private var wakeLock: PowerManager.WakeLock? = null
 
     private var medicineName: String = "Đến giờ uống thuốc!"
@@ -26,14 +25,8 @@ class ReminderLockActivity : Activity() {
     private var time: String = ""
     private var notifId: Int = ReminderAlarmService.NOTIF_ID
     private var snoozeCount: Int = 0
-
-    // Nếu người dùng không chạm vào màn hình trong 3 phút -> Tự động hoãn nhắc lại sau 5 phút
-    private val autoDismissRunnable = Runnable {
-        if (!isFinishing) {
-            sendSnoozeService()
-            finish()
-        }
-    }
+    private var medicationLogId: String = ""
+    private var alarmRound: Int = 1
 
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +56,7 @@ class ReminderLockActivity : Activity() {
                 PowerManager.ON_AFTER_RELEASE,
                 "medsreminder:reminder_activity_wake"
             )
-            wakeLock?.acquire(180_000L)
+            wakeLock?.acquire(10 * 60 * 1000L)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -71,31 +64,12 @@ class ReminderLockActivity : Activity() {
         setContentView(R.layout.activity_reminder_lock)
 
         // 3. Nhận dữ liệu cữ thuốc từ Intent
-        medicineName = intent.getStringExtra("medicine_name") ?: "Đến giờ uống thuốc!"
-        dosage = intent.getStringExtra("dosage") ?: "Hãy uống thuốc đúng cữ"
-        val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-        time = intent.getStringExtra("time") ?: currentTime
-        notifId = intent.getIntExtra("notification_id", ReminderAlarmService.NOTIF_ID)
-        snoozeCount = intent.getIntExtra("snooze_count", 0)
+        displayReminder(intent)
 
-        val tvReminderTime = findViewById<TextView>(R.id.tvReminderTime)
-        val tvMedicineName = findViewById<TextView>(R.id.tvMedicineName)
-        val tvDosageInstructions = findViewById<TextView>(R.id.tvDosageInstructions)
-        val tvSnoozeInfo = findViewById<TextView>(R.id.tvSnoozeInfo)
         val btnTaken = findViewById<Button>(R.id.btnTaken)
         val btnSnooze = findViewById<Button>(R.id.btnSnooze)
+        val btnSnooze10 = findViewById<Button>(R.id.btnSnooze10)
         val btnDismiss = findViewById<TextView>(R.id.btnDismiss)
-
-        tvReminderTime.text = time
-        tvMedicineName.text = medicineName
-        tvDosageInstructions.text = dosage
-
-        if (snoozeCount > 0) {
-            tvSnoozeInfo.visibility = View.VISIBLE
-            tvSnoozeInfo.text = "⏰ Nhắc lại lần $snoozeCount/${ReminderAlarmService.MAX_SNOOZE_COUNT}"
-        } else {
-            tvSnoozeInfo.visibility = View.GONE
-        }
 
         // 4. Nút "✓ ĐÃ UỐNG" — Tắt hẳn chuông và dừng mọi nhắc lại
         btnTaken.setOnClickListener {
@@ -106,23 +80,53 @@ class ReminderLockActivity : Activity() {
 
         // 5. Nút "⏰ Nhắc lại (5p)" — Tắt chuông hiện tại, hẹn 5 phút sau reo lại
         btnSnooze.setOnClickListener {
-            sendSnoozeService()
+            sendSnoozeService(5)
             Toast.makeText(this, "⏰ Sẽ nhắc lại sau 5 phút!", Toast.LENGTH_SHORT).show()
+            finish()
+        }
+
+        btnSnooze10.setOnClickListener {
+            sendSnoozeService(10)
+            Toast.makeText(this, "⏰ Sẽ nhắc lại sau 10 phút!", Toast.LENGTH_SHORT).show()
             finish()
         }
 
         // 6. Nút "Bỏ qua cữ này (Tắt hẳn)"
         btnDismiss.setOnClickListener {
-            sendStopAction(ReminderAlarmService.ACTION_STOP_ALARM)
-            Toast.makeText(this, "Đã bỏ qua cữ thuốc", Toast.LENGTH_SHORT).show()
-            finish()
+            showSkipReasonDialog()
         }
-
-        // 7. Tự động chuyển sang Snooze sau 3 phút nếu không thao tác
-        autoDismissHandler.postDelayed(autoDismissRunnable, 180_000L)
     }
 
-    private fun sendSnoozeService() {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        displayReminder(intent)
+    }
+
+    private fun displayReminder(source: Intent) {
+        medicineName = source.getStringExtra("medicine_name") ?: "Đến giờ uống thuốc!"
+        dosage = source.getStringExtra("dosage") ?: "Hãy uống thuốc đúng cữ"
+        val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        time = source.getStringExtra("time") ?: currentTime
+        notifId = source.getIntExtra("notification_id", ReminderAlarmService.NOTIF_ID)
+        snoozeCount = source.getIntExtra("snooze_count", 0)
+        medicationLogId = source.getStringExtra("medication_log_id") ?: ""
+        alarmRound = source.getIntExtra("alarm_round", 1)
+
+        findViewById<TextView>(R.id.tvReminderTime).text = time
+        findViewById<TextView>(R.id.tvMedicineName).text = medicineName
+        findViewById<TextView>(R.id.tvDosageInstructions).text = dosage
+        findViewById<TextView>(R.id.tvSnoozeInfo).apply {
+            if (alarmRound > 1) {
+                visibility = View.VISIBLE
+                text = "⏰ Lần nhắc $alarmRound/${ReminderAlarmService.ALARM_ROUNDS}"
+            } else {
+                visibility = View.GONE
+            }
+        }
+    }
+
+    private fun sendSnoozeService(minutes: Int) {
         try {
             val snoozeIntent = Intent(this, ReminderAlarmService::class.java).apply {
                 action = ReminderAlarmService.ACTION_SNOOZE
@@ -131,6 +135,8 @@ class ReminderLockActivity : Activity() {
                 putExtra("time", time)
                 putExtra("notification_id", notifId)
                 putExtra("snooze_count", snoozeCount)
+                putExtra("snooze_minutes", minutes)
+                putExtra("medication_log_id", medicationLogId)
             }
             startService(snoozeIntent)
         } catch (e: Exception) {
@@ -138,11 +144,30 @@ class ReminderLockActivity : Activity() {
         }
     }
 
-    private fun sendStopAction(actionType: String) {
+    private fun showSkipReasonDialog() {
+        val input = EditText(this).apply {
+            hint = "Ví dụ: Buồn nôn (không bắt buộc)"
+            maxLines = 3
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Bỏ qua cữ thuốc")
+            .setView(input)
+            .setNegativeButton("Hủy", null)
+            .setPositiveButton("Xác nhận") { _, _ ->
+                sendStopAction(ReminderAlarmService.ACTION_SKIP, input.text.toString())
+                Toast.makeText(this, "Đã bỏ qua cữ thuốc", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+            .show()
+    }
+
+    private fun sendStopAction(actionType: String, reason: String? = null) {
         try {
             val stopIntent = Intent(this, ReminderAlarmService::class.java).apply {
                 action = actionType
                 putExtra("notification_id", notifId)
+                putExtra("medication_log_id", medicationLogId)
+                if (!reason.isNullOrBlank()) putExtra("skip_reason", reason.take(500))
             }
             startService(stopIntent)
         } catch (e: Exception) {
@@ -151,7 +176,6 @@ class ReminderLockActivity : Activity() {
     }
 
     override fun onDestroy() {
-        autoDismissHandler.removeCallbacks(autoDismissRunnable)
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()

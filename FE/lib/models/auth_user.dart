@@ -27,7 +27,6 @@ class AuthUser {
     'PATIENT' => AppRole.patient,
     'CARE_GIVER' || 'CAREGIVER' => AppRole.caregiver,
     'PHARMACIST' => AppRole.pharmacist,
-    'DRUGSHIPPER' || 'SHIPPER' => AppRole.shipper,
     'ADMIN' => AppRole.admin,
     _ => throw FormatException('Unsupported user role: $role'),
   };

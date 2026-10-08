@@ -9,8 +9,6 @@ import 'patient/patient_home.dart';
 import 'caregiver/caregiver_home.dart';
 import 'caregiver/caregiver_pharmacy_screen.dart';
 import 'pharmacist/pharmacist_home.dart';
-import 'shipper/shipper_home.dart';
-import 'shipper/shipper_task_screen.dart';
 import 'admin/admin_home.dart';
 
 class AppShell extends StatefulWidget {
@@ -20,30 +18,18 @@ class AppShell extends StatefulWidget {
     required this.userName,
     required this.userEmail,
     required this.onLogout,
-    required this.doseTaken,
-    required this.doseMissed,
-    required this.prescriptionAdded,
-    required this.orderStage,
     required this.networkController,
     required this.pharmacistController,
     required this.onRoleChanged,
-    required this.onTaken,
-    required this.onMissed,
-    required this.onPrescriptionAdded,
-    required this.onOrderStageChanged,
   });
 
   final AppRole role;
   final String userName;
   final String userEmail;
   final Future<void> Function() onLogout;
-  final bool doseTaken, doseMissed, prescriptionAdded;
   final CareNetworkController networkController;
   final PharmacistDashboardController? pharmacistController;
-  final OrderStage orderStage;
   final ValueChanged<AppRole> onRoleChanged;
-  final VoidCallback onTaken, onMissed, onPrescriptionAdded;
-  final ValueChanged<OrderStage> onOrderStageChanged;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -72,7 +58,6 @@ class _AppShellState extends State<AppShell>
   List<NavItem> get nav => switch (widget.role) {
     AppRole.patient => const [
       NavItem(Icons.home_rounded, 'Hôm nay'),
-      NavItem(Icons.medication_rounded, 'Uống thuốc'),
       NavItem(Icons.calendar_month_rounded, 'Lịch uống'),
       NavItem(Icons.person_rounded, 'Hồ sơ'),
     ],
@@ -86,13 +71,9 @@ class _AppShellState extends State<AppShell>
     AppRole.pharmacist => const [
       NavItem(Icons.dashboard_rounded, 'Xử lý đơn'),
       NavItem(Icons.inventory_2_rounded, 'Kho thuốc'),
+      NavItem(Icons.medication_rounded, 'Danh mục thuốc'),
       NavItem(Icons.history_rounded, 'Lịch sử'),
       NavItem(Icons.local_pharmacy_rounded, 'Nhà thuốc'),
-    ],
-    AppRole.shipper => const [
-      NavItem(Icons.route_rounded, 'Chuyến giao'),
-      NavItem(Icons.assignment_turned_in_rounded, 'Đã giao'),
-      NavItem(Icons.person_rounded, 'Tài khoản'),
     ],
     AppRole.admin => const [
       NavItem(Icons.insights_rounded, 'Hệ thống'),
@@ -149,13 +130,7 @@ class _AppShellState extends State<AppShell>
     AppRole.patient => PatientHome(
       key: ValueKey('${widget.role}$tab'),
       tab: tab,
-      doseTaken: widget.doseTaken,
-      doseMissed: widget.doseMissed,
-      prescriptionAdded: widget.prescriptionAdded,
-      onPrescriptionAdded: widget.onPrescriptionAdded,
-      patientId: widget.networkController.user.id,
       networkController: widget.networkController,
-      onTaken: widget.onTaken,
     ),
 
     AppRole.caregiver =>
@@ -180,28 +155,7 @@ class _AppShellState extends State<AppShell>
       controller: widget.pharmacistController!,
     ),
 
-    AppRole.shipper =>
-      tab == 0
-          ? ShipperTaskScreen(
-              key: ValueKey('${widget.role}$tab'),
-              onConfirmPickup: () {
-                widget.onRoleChanged(AppRole.caregiver);
-                Future.delayed(const Duration(milliseconds: 150), () {
-                  if (mounted) setState(() => tab = 3);
-                });
-              },
-            )
-          : ShipperHome(
-              key: ValueKey('${widget.role}$tab'),
-              tab: tab,
-              orderStage: widget.orderStage,
-              onOrderStageChanged: widget.onOrderStageChanged,
-            ),
-
-    AppRole.admin => AdminHome(
-      key: ValueKey('${widget.role}$tab'),
-      doseMissed: widget.doseMissed,
-    ),
+    AppRole.admin => AdminHome(key: ValueKey('${widget.role}$tab')),
   };
 }
 

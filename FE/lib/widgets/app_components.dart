@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/models.dart';
 import 'glass.dart';
 import 'pressable.dart';
 
@@ -714,19 +713,3 @@ class InventoryItem extends StatelessWidget {
     ),
   );
 }
-
-String stageText(OrderStage stage) => switch (stage) {
-  OrderStage.review => 'Chờ duyệt',
-  OrderStage.verified => 'Chờ lấy hàng',
-  OrderStage.pickedUp => 'Đã lấy đơn',
-  OrderStage.delivering => 'Đang giao',
-  OrderStage.delivered => 'Đã giao',
-};
-
-Color stageColor(OrderStage stage) => switch (stage) {
-  OrderStage.review => const Color(0xFFF0A042),
-  OrderStage.verified => const Color(0xFF586CF4),
-  OrderStage.pickedUp => const Color(0xFF9B72D9),
-  OrderStage.delivering => const Color(0xFF297DCE),
-  OrderStage.delivered => const Color(0xFF249D76),
-};

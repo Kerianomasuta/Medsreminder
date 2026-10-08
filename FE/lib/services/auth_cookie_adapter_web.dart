@@ -10,6 +10,9 @@ class _WebAuthCookieAdapter implements AuthCookieAdapter {
   Map<String, String> get requestHeaders => const {};
 
   @override
+  Future<void> restore() async {}
+
+  @override
   void capture(Map<String, String> responseHeaders) {
     // Browsers intentionally hide Set-Cookie and HttpOnly cookies from Dart/JS.
   }

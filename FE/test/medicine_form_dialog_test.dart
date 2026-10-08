@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meds_reminder/models/medicine.dart';
-import 'package:meds_reminder/screens/patient/medicine_catalog_page.dart';
+import 'package:meds_reminder/widgets/medicine_management_dialogs.dart';
 
 void main() {
   testWidgets('adds multiple medicine inputs without an image field', (

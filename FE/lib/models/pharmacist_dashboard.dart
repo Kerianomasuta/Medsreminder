@@ -1,5 +1,17 @@
 import 'medicine.dart';
 
+class PharmacyLocationSelection {
+  const PharmacyLocationSelection({
+    required this.addressText,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String addressText;
+  final double latitude;
+  final double longitude;
+}
+
 class Pharmacy {
   const Pharmacy({
     required this.id,

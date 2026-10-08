@@ -100,7 +100,20 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="10dp"
                 android:background="@drawable/btn_dismiss"
-                android:text="⏰ Nhắc lại (5p)"
+                android:text="⏰ 5 phút"
+                android:textAllCaps="false"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#D97706" />
+
+            <Button
+                android:id="@+id/btnSnooze10"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/btn_dismiss"
+                android:text="⏰ 10 phút"
                 android:textAllCaps="false"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -127,7 +140,7 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="16dp"
             android:padding="8dp"
-            android:text="Bỏ qua cữ này (Tắt hẳn)"
+            android:text="Bỏ qua cữ này"
             android:textSize="13sp"
             android:textColor="#94A3B8" />
 

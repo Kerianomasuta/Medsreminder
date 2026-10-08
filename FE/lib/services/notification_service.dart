@@ -1,24 +1,52 @@
 import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import '../models/schedule_rule.dart';
+
+import '../models/medication_log.dart';
+import 'medication_logs_api.dart';
+
+class SkipReasonRequest {
+  const SkipReasonRequest({
+    required this.medicationLogId,
+    required this.notificationId,
+  });
+
+  final String medicationLogId;
+  final int notificationId;
+}
+
+@visibleForTesting
+bool shouldScheduleMedicationLog(MedicationLog log, DateTime now) =>
+    log.isOpen && log.effectiveReminderAt.isAfter(now);
 
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
-  static const MethodChannel _wakeChannel = MethodChannel('com.medsreminder/wake_lock');
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
+  final MedicationLogsApi _medicationLogsApi = MedicationLogsApi();
+  static const MethodChannel _wakeChannel = MethodChannel(
+    'com.medsreminder/wake_lock',
+  );
   bool _isInitialized = false;
+  bool _processingDoseActions = false;
+  Future<void>? _refreshInFlight;
+  final ValueNotifier<SkipReasonRequest?> skipReasonRequest = ValueNotifier(
+    null,
+  );
 
   static const String channelId = 'meds_reminder_channel';
   static const String channelName = 'Nhắc uống thuốc';
-  static const String channelDesc = 'Thông báo nhắc uống thuốc đúng cữ trên màn hình khóa';
+  static const String channelDesc =
+      'Thông báo nhắc uống thuốc đúng cữ trên màn hình khóa';
 
-  bool get _isSupported => !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST');
+  bool get _isSupported =>
+      !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST');
 
   /// Bật sáng màn hình điện thoại (Đánh thức màn hình khóa)
   Future<void> turnScreenOn() async {
@@ -56,6 +84,17 @@ class NotificationService {
       return;
     }
 
+    _wakeChannel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'doseActionQueued':
+          await refreshUpcomingMedicationLogs();
+          return;
+        case 'openSkipReason':
+          _publishSkipReasonRequest(call.arguments);
+          return;
+      }
+    });
+
     if (Platform.isAndroid) {
       try {
         AndroidFlutterLocalNotificationsPlugin.registerWith();
@@ -66,18 +105,23 @@ class NotificationService {
 
     tz.initializeTimeZones();
     try {
-      final String? timeZoneName = await _wakeChannel.invokeMethod<String>('getTimeZoneName');
-      if (timeZoneName != null && tz.timeZoneDatabase.locations.containsKey(timeZoneName)) {
+      final String? timeZoneName = await _wakeChannel.invokeMethod<String>(
+        'getTimeZoneName',
+      );
+      if (timeZoneName != null &&
+          tz.timeZoneDatabase.locations.containsKey(timeZoneName)) {
         tz.setLocalLocation(tz.getLocation(timeZoneName));
         debugPrint('NotificationService: Thiết lập TimeZone = $timeZoneName');
       } else {
         final offset = DateTime.now().timeZoneOffset;
         final matchedLoc = tz.timeZoneDatabase.locations.values.firstWhere(
-          (l) => l.currentTimeZone.offset == offset.inMilliseconds,
+          (l) => l.currentTimeZone.offset == offset,
           orElse: () => tz.getLocation('Asia/Ho_Chi_Minh'),
         );
         tz.setLocalLocation(matchedLoc);
-        debugPrint('NotificationService: Fallback TimeZone = ${matchedLoc.name}');
+        debugPrint(
+          'NotificationService: Fallback TimeZone = ${matchedLoc.name}',
+        );
       }
     } catch (e) {
       try {
@@ -86,7 +130,9 @@ class NotificationService {
       debugPrint('NotificationService: Timezone init fallback error: $e');
     }
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -111,8 +157,10 @@ class NotificationService {
     }
 
     if (Platform.isAndroid) {
-      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidPlugin != null) {
         // Tạo notification channel với độ ưu tiên cao nhất cho màn hình khóa
         const channel = AndroidNotificationChannel(
@@ -133,7 +181,210 @@ class NotificationService {
     }
 
     _isInitialized = true;
+    await _consumePendingSkipReasonRequest();
   }
+
+  /// Gửi các thao tác được bấm từ màn hình khóa lên backend. Native giữ queue
+  /// cho tới khi Dart xác nhận từng action, nên mất mạng không làm mất dữ liệu.
+  Future<void> processPendingDoseActions() async {
+    if (!_isSupported || !Platform.isAndroid || _processingDoseActions) return;
+    _processingDoseActions = true;
+    try {
+      final raw = await _wakeChannel.invokeMethod<List<dynamic>>(
+        'peekPendingDoseActions',
+      );
+      for (final value in raw ?? const <dynamic>[]) {
+        final action = Map<String, dynamic>.from(value as Map);
+        final actionId = action['actionId']?.toString();
+        final logId = action['logId']?.toString();
+        final type = action['action']?.toString();
+        if (actionId == null || logId == null || type == null) continue;
+        try {
+          final MedicationLog? updated = switch (type) {
+            'taken' => await _medicationLogsApi.markTaken(logId),
+            'snooze' => await _medicationLogsApi.snooze(
+              logId,
+              minutes: (action['minutes'] as num?)?.toInt() ?? 5,
+            ),
+            'skip' => await _medicationLogsApi.skip(
+              logId,
+              reason: action['reason']?.toString(),
+            ),
+            'missed' => await _medicationLogsApi.markMissed(logId),
+            _ => null,
+          };
+          if (updated == null) continue;
+          if (updated.isOpen) {
+            await scheduleMedicationLog(updated);
+          } else {
+            await cancelMedicationLog(logId);
+          }
+          await _wakeChannel.invokeMethod<void>('ackPendingDoseAction', {
+            'actionId': actionId,
+          });
+        } on MedicationLogsApiException catch (error) {
+          // A final dose returns 400 for duplicate notification taps. Reconcile
+          // by dropping that stale action; early MISSED stays queued to retry.
+          final tooEarlyMiss =
+              type == 'missed' &&
+              error.statusCode == 400 &&
+              error.message.contains('20 minutes');
+          if (error.statusCode == 400 && !tooEarlyMiss) {
+            await _wakeChannel.invokeMethod<void>('ackPendingDoseAction', {
+              'actionId': actionId,
+            });
+          }
+          if (tooEarlyMiss) {
+            Future<void>.delayed(
+              const Duration(minutes: 1),
+              processPendingDoseActions,
+            );
+            break;
+          }
+        } catch (error) {
+          debugPrint('Pending medication action failed: $error');
+          break;
+        }
+      }
+    } catch (error) {
+      debugPrint('Could not process pending medication actions: $error');
+    } finally {
+      _processingDoseActions = false;
+    }
+  }
+
+  Future<void> syncMedicationLogs(List<MedicationLog> logs) async {
+    if (!_isSupported) return;
+    await init();
+    await cancelAll();
+    final now = DateTime.now();
+    for (final log in logs.where(
+      (item) => shouldScheduleMedicationLog(item, now),
+    )) {
+      await scheduleMedicationLog(log);
+    }
+  }
+
+  Future<void> refreshUpcomingMedicationLogs() {
+    if (!_isSupported) return Future.value();
+    if (_refreshInFlight != null) return _refreshInFlight!;
+    final refresh = _refreshUpcomingMedicationLogs();
+    _refreshInFlight = refresh;
+    refresh.whenComplete(() => _refreshInFlight = null);
+    return refresh;
+  }
+
+  Future<void> _refreshUpcomingMedicationLogs() async {
+    try {
+      await processPendingDoseActions();
+      final logs = await _medicationLogsApi.list(from: DateTime.now());
+      await syncMedicationLogs(logs);
+    } catch (error) {
+      debugPrint('Could not refresh upcoming medication alarms: $error');
+    }
+  }
+
+  Future<void> scheduleMedicationLog(MedicationLog log) async {
+    if (!_isSupported || !log.isOpen) return;
+    await init();
+    final reminderAt = log.effectiveReminderAt;
+    if (!reminderAt.isAfter(DateTime.now())) return;
+    final triggerAt = reminderAt;
+    final medicine = log.medicine?.name ?? 'Đến giờ uống thuốc';
+    final amount = log.dosagePerTime;
+    final unit = log.medicine?.unit ?? '';
+    final dose = amount == null
+        ? (log.instructions ?? '')
+        : '${amount == amount.roundToDouble() ? amount.toInt() : amount} $unit'
+              '${log.instructions == null ? '' : ' · ${log.instructions}'}';
+    final id = _notificationId(log.id);
+    if (Platform.isAndroid) {
+      await _wakeChannel.invokeMethod<void>('scheduleExactAlarm', {
+        'id': id,
+        'triggerAtMillis': triggerAt.millisecondsSinceEpoch,
+        'medicineName': medicine,
+        'dosage': dose,
+        'time': _clock(reminderAt),
+        'medicationLogId': log.id,
+        'alarmRound': 1,
+      });
+    } else {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'Đến giờ uống thuốc',
+        body: '$medicine · $dose',
+        scheduledDate: tz.TZDateTime.from(triggerAt, tz.local),
+        notificationDetails: _notificationDetails(),
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
+        payload: log.id,
+      );
+    }
+  }
+
+  Future<void> cancelMedicationLog(String logId) async {
+    if (!_isSupported) return;
+    final id = _notificationId(logId);
+    await _plugin.cancel(id: id);
+    if (Platform.isAndroid) {
+      await _wakeChannel.invokeMethod<void>('cancelAlarm', {'id': id});
+    }
+  }
+
+  Future<void> clearMedicationState() async {
+    if (!_isSupported) return;
+    skipReasonRequest.value = null;
+    await cancelAll();
+    if (Platform.isAndroid) {
+      await _wakeChannel.invokeMethod<void>('clearPendingDoseActions');
+    }
+  }
+
+  int _notificationId(String logId) => logId.hashCode.abs() % 1000000000;
+
+  Future<void> submitSkipReason(
+    SkipReasonRequest request,
+    String reason,
+  ) async {
+    if (!_isSupported || !Platform.isAndroid) return;
+    await _wakeChannel.invokeMethod<void>('submitSkipReason', {
+      'medicationLogId': request.medicationLogId,
+      'notificationId': request.notificationId,
+      'reason': reason.trim(),
+    });
+  }
+
+  void clearSkipReasonRequest(SkipReasonRequest request) {
+    if (skipReasonRequest.value?.medicationLogId == request.medicationLogId) {
+      skipReasonRequest.value = null;
+    }
+  }
+
+  Future<void> _consumePendingSkipReasonRequest() async {
+    if (!_isSupported || !Platform.isAndroid) return;
+    try {
+      final raw = await _wakeChannel.invokeMethod<Map<dynamic, dynamic>>(
+        'consumePendingSkipRequest',
+      );
+      _publishSkipReasonRequest(raw);
+    } catch (error) {
+      debugPrint('Could not consume pending skip request: $error');
+    }
+  }
+
+  void _publishSkipReasonRequest(Object? raw) {
+    if (raw is! Map) return;
+    final logId = raw['medicationLogId']?.toString() ?? '';
+    final notificationId = (raw['notificationId'] as num?)?.toInt();
+    if (logId.isEmpty || notificationId == null) return;
+    skipReasonRequest.value = SkipReasonRequest(
+      medicationLogId: logId,
+      notificationId: notificationId,
+    );
+  }
+
+  String _clock(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:'
+      '${value.minute.toString().padLeft(2, '0')}';
 
   /// Cấu hình chi tiết thông báo hiển thị trên màn hình khóa
   NotificationDetails _notificationDetails() {
@@ -178,7 +429,10 @@ class NotificationService {
     await init();
     await turnScreenOn();
     if (medicineName != null) {
-      await showLockScreenReminder(medicineName: medicineName, dosage: dosage ?? '');
+      await showLockScreenReminder(
+        medicineName: medicineName,
+        dosage: dosage ?? '',
+      );
     }
 
     await _plugin.show(
@@ -187,88 +441,6 @@ class NotificationService {
       body: body,
       notificationDetails: _notificationDetails(),
     );
-  }
-
-  /// Hẹn giờ báo thức cho một cữ thuốc cụ thể theo ScheduleRule
-  Future<void> scheduleMedicationRule(ScheduleRule rule) async {
-    if (!_isSupported || !rule.isActive) return;
-    await init();
-
-    final parts = rule.reminderTime.split(':');
-    if (parts.length < 2) return;
-    final hour = int.tryParse(parts[0]) ?? 8;
-    final minute = int.tryParse(parts[1]) ?? 0;
-
-    final now = tz.TZDateTime.now(tz.local);
-
-    // Lên lịch cho các thứ trong tuần
-    for (final day in rule.daysOfWeek) {
-      // 1 = Monday, ..., 7 = Sunday
-      var scheduledDate = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day,
-        hour,
-        minute,
-      );
-
-      // Điều chỉnh theo ngày trong tuần: nếu ngày đã qua trong tuần hoặc giờ đã qua hôm nay, nhảy sang tuần tới
-      while (scheduledDate.weekday != day || scheduledDate.isBefore(now)) {
-        scheduledDate = scheduledDate.add(const Duration(days: 1));
-      }
-
-      // ID duy nhất dựa trên rule ID hash và thứ
-      final notifId = (rule.id.hashCode ^ (day * 100)).abs() % 100000;
-
-      final title = '⏰ Đến giờ uống thuốc (${rule.period})';
-      final drug = rule.medicine.name;
-      final dose = '${rule.dosagePerTime.toInt()} ${rule.medicine.unit}'
-          '${rule.instructions != null ? " · ${rule.instructions}" : ""}';
-
-      if (Platform.isAndroid) {
-        // Trên Android: Sử dụng Exact Alarm native để đánh thức máy, phát chuông lặp và mở màn hình khóa
-        try {
-          await _wakeChannel.invokeMethod('scheduleExactAlarm', {
-            'id': notifId,
-            'triggerAtMillis': scheduledDate.millisecondsSinceEpoch,
-            'medicineName': drug,
-            'dosage': dose,
-            'time': rule.reminderTime,
-          });
-          debugPrint('Đã hẹn báo thức Android cho $drug lúc ${scheduledDate.toString()} (ID: $notifId)');
-        } catch (e) {
-          debugPrint('Lỗi hẹn báo thức exact alarm: $e');
-        }
-      } else {
-        // Trên iOS hoặc nền tảng khác: Fallback qua FlutterLocalNotifications
-        await _plugin.zonedSchedule(
-          id: notifId,
-          title: title,
-          body: '$drug - $dose',
-          scheduledDate: scheduledDate,
-          notificationDetails: _notificationDetails(),
-          androidScheduleMode: AndroidScheduleMode.alarmClock,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        );
-      }
-    }
-  }
-
-  /// Đồng bộ toàn bộ danh sách cữ thuốc từ backend với báo thức điện thoại
-  Future<void> syncAllSchedules(List<ScheduleRule> rules) async {
-    if (!_isSupported) return;
-    await init();
-
-    // Hủy các lịch hẹn cũ để đồng bộ mới chính xác
-    await cancelAll();
-
-    for (final rule in rules) {
-      if (rule.isActive) {
-        await scheduleMedicationRule(rule);
-      }
-    }
-    debugPrint('Đã đồng bộ ${rules.length} cữ thuốc vào hệ thống thông báo báo thức.');
   }
 
   /// Hủy tất cả thông báo và báo thức

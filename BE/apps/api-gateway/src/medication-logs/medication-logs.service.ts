@@ -18,7 +18,9 @@ export class MedicationLogsService {
 
   list(query: ListMedicationLogsQueryDto, user: AccessUser) {
     return this.send({ cmd: 'list_medication_logs' }, {
-      userId: user.userId,
+      patientId: query.patientId,
+      actorUserId: user.userId,
+      actorRole: user.role,
       from: query.from,
       to: query.to,
     });

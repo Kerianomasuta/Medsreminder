@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../../widgets/widgets.dart';
 
 class AdminHome extends StatelessWidget {
-  const AdminHome({super.key, required this.doseMissed});
-  final bool doseMissed;
+  const AdminHome({super.key});
 
   @override
   Widget build(BuildContext context) => AppScroll(
@@ -41,11 +41,11 @@ class AdminHome extends StatelessWidget {
               Color(0xFF9A70DB),
             ),
             const SizedBox(width: 10),
-            MetricCard(
-              doseMissed ? '1' : '0',
+            const MetricCard(
+              '0',
               'Cảnh báo mới',
               Icons.warning_rounded,
-              const Color(0xFFD65E4A),
+              Color(0xFFD65E4A),
             ),
           ],
         ),
@@ -80,11 +80,6 @@ class AdminHome extends StatelessWidget {
             ],
           ),
         ),
-        if (doseMissed)
-          const Padding(
-            padding: EdgeInsets.only(top: 14),
-            child: AlertCard(),
-          ),
       ],
     ),
   );

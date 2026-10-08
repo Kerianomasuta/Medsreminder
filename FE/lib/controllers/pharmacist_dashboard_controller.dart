@@ -27,6 +27,7 @@ class PharmacistDashboardController extends ChangeNotifier {
   List<Pharmacy> pharmacies = const [];
   List<PharmacyOrder> orders = const [];
   List<Medicine> medicines = const [];
+  List<Medicine> catalogMedicines = const [];
   String? selectedPharmacyId;
   bool loading = false;
   bool saving = false;
@@ -79,7 +80,6 @@ class PharmacistDashboardController extends ChangeNotifier {
         _pharmacyApi.list(isActive: true),
         _pharmacyApi.list(isActive: false),
         _orderApi.listMine(),
-        _medicineApi.list(),
       ]);
       final all = <Pharmacy>[
         ...(results[0] as List<Pharmacy>),
@@ -89,17 +89,21 @@ class PharmacistDashboardController extends ChangeNotifier {
           .where((pharmacy) => pharmacy.pharmacistId == user.id)
           .toList(growable: false);
       orders = results[2] as List<PharmacyOrder>;
-      medicines = results[3] as List<Medicine>;
       if (selectedPharmacyId == null ||
           !pharmacies.any((item) => item.id == selectedPharmacyId)) {
         selectedPharmacyId = pharmacies.firstOrNull?.id;
       }
       final pharmacyId = selectedPharmacyId;
       if (pharmacyId != null) {
+        medicines = await _medicineApi.list();
+        catalogMedicines = medicines;
         await Future.wait([
           loadPharmacyDetail(pharmacyId, force: force),
           loadInventory(pharmacyId, force: force),
         ]);
+      } else {
+        medicines = const [];
+        catalogMedicines = const [];
       }
       _initialized = true;
     } catch (exception) {
@@ -171,6 +175,13 @@ class PharmacistDashboardController extends ChangeNotifier {
       _replacePharmacy(saved);
       selectedPharmacyId = saved.id;
       _inventoryCache.putIfAbsent(saved.id, () => const []);
+      if (currentId == null) {
+        try {
+          await _reloadMedicines();
+        } catch (exception) {
+          error = exception.toString();
+        }
+      }
     } catch (exception) {
       error = exception.toString();
       rethrow;
@@ -210,6 +221,66 @@ class PharmacistDashboardController extends ChangeNotifier {
     } finally {
       saving = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> searchMedicines({String? search}) async {
+    error = null;
+    notifyListeners();
+    try {
+      catalogMedicines = await _medicineApi.list(search: search);
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<Medicine> loadMedicineDetail(String id) => _medicineApi.getById(id);
+
+  Future<void> createMedicines(List<MedicineInput> inputs) async {
+    saving = true;
+    error = null;
+    notifyListeners();
+    try {
+      for (final input in inputs) {
+        await _medicineApi.create(input);
+      }
+      await _reloadMedicines();
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      saving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateMedicine(String id, MedicineInput input) async {
+    saving = true;
+    error = null;
+    notifyListeners();
+    try {
+      await _medicineApi.update(id, input);
+      await _reloadMedicines();
+    } catch (exception) {
+      error = exception.toString();
+      rethrow;
+    } finally {
+      saving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _reloadMedicines() async {
+    medicines = await _medicineApi.list();
+    catalogMedicines = medicines;
+    final byId = {for (final medicine in medicines) medicine.id: medicine};
+    for (final pharmacyId in _inventoryCache.keys.toList()) {
+      _inventoryCache[pharmacyId] = _inventoryCache[pharmacyId]!
+          .map((row) => row.withMedicine(byId[row.medicineId]))
+          .toList(growable: false);
     }
   }
 

@@ -11,11 +11,13 @@ import 'screens/auth/register_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/invitation/invitation_screen.dart';
 import 'services/auth_api.dart';
+import 'services/auth_cookie_adapter.dart';
 import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configureUrlStrategy();
+  await AuthCookieAdapter().restore();
   await NotificationService.instance.init();
   // Đặt thanh trạng thái iOS / Android trong suốt như yêu cầu
   SystemChrome.setSystemUIOverlayStyle(
@@ -36,7 +38,8 @@ class MedsReminderApp extends StatefulWidget {
   State<MedsReminderApp> createState() => _MedsReminderAppState();
 }
 
-class _MedsReminderAppState extends State<MedsReminderApp> {
+class _MedsReminderAppState extends State<MedsReminderApp>
+    with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final AuthApi _authApi;
   AuthUser? _currentUser;
@@ -45,15 +48,16 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
   String? _pendingInvitationUuid;
   bool _checkingSession = true;
   bool _showingRegistration = false;
+  bool _showingSkipReason = false;
   AppRole role = AppRole.patient;
-  bool doseTaken = false;
-  bool doseMissed = false;
-  bool prescriptionAdded = false;
-  OrderStage orderStage = OrderStage.review;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    NotificationService.instance.skipReasonRequest.addListener(
+      _onSkipReasonRequested,
+    );
     _authApi = widget.authApi ?? AuthApi();
     _pendingInvitationUuid = Uri.base.queryParameters['invitationUUID'];
     _restoreSession();
@@ -75,7 +79,11 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
       if (restoredUser != null) role = restoredUser.role;
       _checkingSession = false;
     });
+    if (restoredUser?.role == AppRole.patient) {
+      NotificationService.instance.refreshUpcomingMedicationLogs();
+    }
     _replaceRoute(_routeFor(restoredUser));
+    _scheduleSkipReasonDialog();
   }
 
   Future<void> _login(String email, String password) async {
@@ -87,7 +95,11 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
       role = user.role;
       _showingRegistration = false;
     });
+    if (user.role == AppRole.patient) {
+      NotificationService.instance.refreshUpcomingMedicationLogs();
+    }
     _replaceRoute(_routeFor(user));
+    _scheduleSkipReasonDialog();
   }
 
   Future<void> _register(
@@ -113,6 +125,8 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
     } catch (_) {
       // The server session may already be expired; still clear local UI state.
     } finally {
+      AuthCookieAdapter().clear();
+      await NotificationService.instance.clearMedicationState();
       if (mounted) {
         setState(() {
           _currentUser = null;
@@ -162,21 +176,60 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    NotificationService.instance.skipReasonRequest.removeListener(
+      _onSkipReasonRequested,
+    );
     _authApi.close();
     _networkController?.dispose();
     _pharmacistController?.dispose();
     super.dispose();
   }
 
-  void markTaken() => setState(() {
-    doseTaken = true;
-    doseMissed = false;
-  });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _currentUser?.role == AppRole.patient) {
+      NotificationService.instance.refreshUpcomingMedicationLogs();
+      _scheduleSkipReasonDialog();
+    }
+  }
 
-  void markMissed() => setState(() {
-    doseTaken = false;
-    doseMissed = true;
-  });
+  void _onSkipReasonRequested() => _scheduleSkipReasonDialog();
+
+  void _scheduleSkipReasonDialog() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showSkipReasonDialogIfNeeded();
+    });
+  }
+
+  Future<void> _showSkipReasonDialogIfNeeded() async {
+    final request = NotificationService.instance.skipReasonRequest.value;
+    if (!mounted ||
+        request == null ||
+        _showingSkipReason ||
+        _checkingSession ||
+        _currentUser?.role != AppRole.patient) {
+      return;
+    }
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+
+    _showingSkipReason = true;
+    final reason = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _SkipMedicationDialog(),
+    );
+    try {
+      if (reason != null) {
+        await NotificationService.instance.submitSkipReason(request, reason);
+      }
+    } finally {
+      NotificationService.instance.clearSkipReasonRequest(request);
+      _showingSkipReason = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -261,15 +314,62 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
       networkController: controller,
       pharmacistController: _pharmacistController,
       onLogout: _logout,
-      doseTaken: doseTaken,
-      doseMissed: doseMissed,
-      prescriptionAdded: prescriptionAdded,
-      orderStage: orderStage,
       onRoleChanged: (_) {},
-      onTaken: markTaken,
-      onMissed: markMissed,
-      onPrescriptionAdded: () => setState(() => prescriptionAdded = true),
-      onOrderStageChanged: (value) => setState(() => orderStage = value),
     );
   }
+}
+
+class _SkipMedicationDialog extends StatefulWidget {
+  const _SkipMedicationDialog();
+
+  @override
+  State<_SkipMedicationDialog> createState() => _SkipMedicationDialogState();
+}
+
+class _SkipMedicationDialogState extends State<_SkipMedicationDialog> {
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Bỏ qua cữ thuốc'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Nhập lý do nếu có. Cữ thuốc chỉ được đánh dấu bỏ qua sau khi bạn xác nhận.',
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('skip-reason-field'),
+          controller: _reasonController,
+          autofocus: true,
+          maxLength: 500,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Lý do bỏ qua (không bắt buộc)',
+            hintText: 'Ví dụ: Buồn nôn',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Quay lại'),
+      ),
+      FilledButton(
+        key: const Key('confirm-skip-dose'),
+        onPressed: () => Navigator.pop(context, _reasonController.text.trim()),
+        child: const Text('Xác nhận bỏ qua'),
+      ),
+    ],
+  );
 }
