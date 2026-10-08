@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config'
 import { AuthModule } from './auth/auth.module.js';
+import { MedicationLogsModule } from './medication-logs/medication-logs.module.js';
 import { MedicinesModule } from './medicines/medicines.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PharmaciesModule } from './pharmacies/pharmacies.module.js';
@@ -17,6 +18,7 @@ import { UserModule } from './users/user.module.js';
 
     AuthModule,
     MedicinesModule,
+    MedicationLogsModule,
     PrescriptionsModule,
     ScheduleRulesModule,
     UserModule,
