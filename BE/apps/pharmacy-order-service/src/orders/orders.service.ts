@@ -345,10 +345,14 @@ export class OrdersService {
 
   private prepareRecipient(fulfillmentType: FulfillmentType, payload: CreateOrderInput) {
     if (fulfillmentType === FulfillmentType.PICKUP) {
-      if (payload.recipientName || payload.recipientPhone || payload.deliveryAddress) {
+      if (payload.deliveryAddress?.trim()) {
         throw ErrorHandling.BadRequest('A pickup order does not take a delivery address');
       }
-      return { recipientName: null, recipientPhone: null, deliveryAddress: null };
+      return {
+        recipientName: this.optionalBounded(payload.recipientName, 'recipientName', 100),
+        recipientPhone: this.optionalBounded(payload.recipientPhone, 'recipientPhone', 15),
+        deliveryAddress: null,
+      };
     }
 
     return {
@@ -440,6 +444,14 @@ export class OrdersService {
       throw ErrorHandling.BadRequest(`${label} must be at most ${maxLength} characters`);
     }
     return trimmed;
+  }
+
+  private optionalBounded(value: string | null | undefined, label: string, maxLength: number) {
+    const text = this.optionalText(value);
+    if (text && text.length > maxLength) {
+      throw ErrorHandling.BadRequest(`${label} must be at most ${maxLength} characters`);
+    }
+    return text;
   }
 
   private optionalText(value: string | null | undefined) {

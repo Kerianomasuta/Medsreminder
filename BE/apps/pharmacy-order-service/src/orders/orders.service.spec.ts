@@ -73,6 +73,29 @@ describe('OrdersService', () => {
     service = new OrdersService(dataSource as never, orders as never, { replenish } as never);
   });
 
+  it('accepts a pickup order that names who will collect it', async () => {
+    const created = await service.create({
+      ...baseOrder(),
+      recipientName: 'DGB',
+      recipientPhone: '0856232227',
+    });
+
+    expect(created).toMatchObject({
+      recipientName: 'DGB',
+      recipientPhone: '0856232227',
+      deliveryAddress: null,
+    });
+  });
+
+  it('rejects a pickup order that includes a delivery address', async () => {
+    await expect(service.create({
+      ...baseOrder(),
+      deliveryAddress: '123 Lê Lợi',
+    })).rejects.toMatchObject({
+      message: 'A pickup order does not take a delivery address',
+    });
+  });
+
   it('rejects a delivery order without an address', async () => {
     await expect(service.create({
       ...baseOrder(),

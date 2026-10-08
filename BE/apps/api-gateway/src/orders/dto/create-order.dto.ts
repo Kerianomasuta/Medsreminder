@@ -47,19 +47,19 @@ export class CreateOrderDto {
   @IsIn(['PICKUP', 'DELIVERY'])
   fulfillmentType: 'PICKUP' | 'DELIVERY';
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Who receives the medicine. Optional for PICKUP, required for DELIVERY.' })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   recipientName?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Phone of the person who receives the medicine. Optional for PICKUP, required for DELIVERY.' })
   @IsOptional()
   @IsString()
   @MaxLength(15)
   recipientPhone?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Required for DELIVERY. Omit this field for PICKUP.' })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
