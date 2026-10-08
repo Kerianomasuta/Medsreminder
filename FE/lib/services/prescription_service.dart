@@ -21,7 +21,7 @@ class PrescriptionServiceException implements Exception {
 
 class PrescriptionService {
   PrescriptionService({http.Client? client})
-      : _client = client ?? createHttpClient();
+    : _client = client ?? createHttpClient();
 
   static final instance = PrescriptionService();
 
@@ -39,25 +39,34 @@ class PrescriptionService {
 
     try {
       response = switch (method) {
-        'GET' => await _client.get(uri,
-            headers: const {'Accept': 'application/json'}),
-        'POST' => await _client.post(uri,
-            headers: const {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode(body)),
-        'PATCH' => await _client.patch(uri,
-            headers: const {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode(body)),
+        'GET' => await _client.get(
+          uri,
+          headers: const {'Accept': 'application/json'},
+        ),
+        'POST' => await _client.post(
+          uri,
+          headers: const {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(body),
+        ),
+        'PATCH' => await _client.patch(
+          uri,
+          headers: const {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(body),
+        ),
         _ => throw UnsupportedError('Unsupported HTTP method: $method'),
       };
     } catch (e) {
       if (e is PrescriptionServiceException) rethrow;
-      throw PrescriptionServiceException(0, 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+      throw PrescriptionServiceException(
+        0,
+        'Không thể kết nối máy chủ. Vui lòng thử lại.',
+      );
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -68,7 +77,8 @@ class PrescriptionService {
     String errorMsg = response.body;
     try {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      errorMsg = (decoded['message'] ?? decoded['error'] ?? response.body).toString();
+      errorMsg = (decoded['message'] ?? decoded['error'] ?? response.body)
+          .toString();
     } catch (_) {}
     throw PrescriptionServiceException(response.statusCode, errorMsg);
   }
@@ -78,10 +88,15 @@ class PrescriptionService {
     late http.Response response;
 
     try {
-      response = await _client.get(uri,
-          headers: const {'Accept': 'application/json'});
+      response = await _client.get(
+        uri,
+        headers: const {'Accept': 'application/json'},
+      );
     } catch (_) {
-      throw PrescriptionServiceException(0, 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+      throw PrescriptionServiceException(
+        0,
+        'Không thể kết nối máy chủ. Vui lòng thử lại.',
+      );
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -99,8 +114,9 @@ class PrescriptionService {
     if (_isDevPatientId(patientId)) return _mockPrescriptions(patientId);
     // ─────────────────────────────────────────────────────────────────────────
 
-    final raw =
-        await _requestList('/api/v1/prescriptions?patientId=$patientId');
+    final raw = await _requestList(
+      '/api/v1/prescriptions?patientId=$patientId',
+    );
     return raw
         .map((e) => Prescription.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -110,10 +126,9 @@ class PrescriptionService {
   Future<Prescription> getById(String id) async {
     // ── DEV MOCK ─────────────────────────────────────────────────────────────
     if (_isDevId(id)) {
-      final found = _allMockPrescriptions()
-          .where((p) => p.id == id)
-          .toList();
-      if (found.isEmpty) throw PrescriptionServiceException(404, 'Prescription not found');
+      final found = _allMockPrescriptions().where((p) => p.id == id).toList();
+      if (found.isEmpty)
+        throw PrescriptionServiceException(404, 'Prescription not found');
       return found.first;
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -124,11 +139,15 @@ class PrescriptionService {
   /// POST /api/v1/prescriptions (nested creation)
   Future<Prescription> create(Prescription prescription) async {
     if (prescription.items.isEmpty) {
-      throw ArgumentError('A prescription must have at least one medicine item.');
+      throw ArgumentError(
+        'A prescription must have at least one medicine item.',
+      );
     }
     for (final item in prescription.items) {
       if (item.schedules.isEmpty) {
-        throw ArgumentError('Each medicine item must have at least one schedule.');
+        throw ArgumentError(
+          'Each medicine item must have at least one schedule.',
+        );
       }
     }
     // ── DEV MOCK: trả về prescription mới tạo giả ────────────────────────────
@@ -161,41 +180,56 @@ class PrescriptionService {
       return created;
     }
     // ─────────────────────────────────────────────────────────────────────────
-    final raw = await _request('POST', '/api/v1/prescriptions',
-        body: prescription.toCreateJson());
+    final raw = await _request(
+      'POST',
+      '/api/v1/prescriptions',
+      body: prescription.toCreateJson(),
+    );
     return Prescription.fromJson(raw);
   }
 
   /// PATCH /api/v1/prescriptions/{id}
-  Future<Prescription> updateInfo(
-      String id, Map<String, dynamic> patch) async {
+  Future<Prescription> updateInfo(String id, Map<String, dynamic> patch) async {
     // ── DEV MOCK ─────────────────────────────────────────────────────────────
     if (_isDevId(id)) {
       await Future<void>.delayed(const Duration(milliseconds: 400));
       final all = _allMockPrescriptions();
       final idx = all.indexWhere((p) => p.id == id);
-      if (idx == -1) throw PrescriptionServiceException(404, 'Prescription not found');
+      if (idx == -1)
+        throw PrescriptionServiceException(404, 'Prescription not found');
       final old = all[idx];
       return Prescription(
         id: old.id,
         patientId: old.patientId,
         title: patch['title'] as String? ?? old.title,
-        doctorName: patch.containsKey('doctorName') ? patch['doctorName'] as String? : old.doctorName,
-        prescriptionCode: patch.containsKey('prescriptionCode') ? patch['prescriptionCode'] as String? : old.prescriptionCode,
+        doctorName: patch.containsKey('doctorName')
+            ? patch['doctorName'] as String?
+            : old.doctorName,
+        prescriptionCode: patch.containsKey('prescriptionCode')
+            ? patch['prescriptionCode'] as String?
+            : old.prescriptionCode,
         startDate: patch['startDate'] as String? ?? old.startDate,
-        endDate: patch.containsKey('endDate') ? patch['endDate'] as String? : old.endDate,
+        endDate: patch.containsKey('endDate')
+            ? patch['endDate'] as String?
+            : old.endDate,
         isActive: patch['isActive'] as bool? ?? old.isActive,
         items: old.items,
       );
     }
     // ─────────────────────────────────────────────────────────────────────────
-    final raw = await _request('PATCH', '/api/v1/prescriptions/$id', body: patch);
+    final raw = await _request(
+      'PATCH',
+      '/api/v1/prescriptions/$id',
+      body: patch,
+    );
     return Prescription.fromJson(raw);
   }
 
   /// POST /api/v1/prescriptions/{id}/items
   Future<PrescriptionItem> addItem(
-      String prescriptionId, PrescriptionItem item) async {
+    String prescriptionId,
+    PrescriptionItem item,
+  ) async {
     if (item.schedules.isEmpty) {
       throw ArgumentError('A medicine item must have at least one schedule.');
     }
@@ -224,7 +258,9 @@ class PrescriptionService {
 
   /// PATCH /api/v1/prescription-items/{id}
   Future<PrescriptionItem> updateItem(
-      String itemId, PrescriptionItem item) async {
+    String itemId,
+    PrescriptionItem item,
+  ) async {
     // ── DEV MOCK ─────────────────────────────────────────────────────────────
     if (_isDevId(itemId)) {
       await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -255,11 +291,10 @@ class PrescriptionService {
   static bool _isDevId(String id) => id.startsWith('mock-');
   static bool _isDevPatientId(String id) {
     // BE chưa làm xong API, nên tạm coi ID này là Mock để test UI lưu vào RAM
-    if (id == '6ac0cbf1ea185d34aa6f322a') return true;
-    
     // Cho phép cả UUID chuẩn và MongoDB ObjectId (24 ký tự hex)
     final idRe = RegExp(
-        r'^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24})$');
+      r'^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24})$',
+    );
     return !idRe.hasMatch(id);
   }
 
@@ -285,7 +320,9 @@ class PrescriptionService {
     // Map code PA-xxxx sang mock UUID
     final mapped = _kPatientCodeToId[patientId] ?? patientId;
     final fromDb = _mockDb.where((p) => p.patientId == mapped).toList();
-    final fromCreated = _mockCreated.where((p) => p.patientId == mapped || p.patientId == patientId).toList();
+    final fromCreated = _mockCreated
+        .where((p) => p.patientId == mapped || p.patientId == patientId)
+        .toList();
     return [...fromDb, ...fromCreated];
   }
 
@@ -316,7 +353,11 @@ class PrescriptionService {
           reorderThreshold: 7,
           instructions: 'Uống sau bữa sáng',
           schedules: [
-            Schedule(id: 'sch-001', reminderTime: '07:30', daysOfWeek: List.generate(7, (i) => i + 1)),
+            Schedule(
+              id: 'sch-001',
+              reminderTime: '07:30',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
           ],
         ),
         PrescriptionItem(
@@ -328,7 +369,11 @@ class PrescriptionService {
           reorderThreshold: 7,
           instructions: 'Uống trước khi ngủ',
           schedules: [
-            Schedule(id: 'sch-002', reminderTime: '21:00', daysOfWeek: List.generate(7, (i) => i + 1)),
+            Schedule(
+              id: 'sch-002',
+              reminderTime: '21:00',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
           ],
         ),
       ],
@@ -352,8 +397,16 @@ class PrescriptionService {
           reorderThreshold: 14,
           instructions: 'Uống trong bữa ăn, không uống khi đói',
           schedules: [
-            Schedule(id: 'sch-003', reminderTime: '07:00', daysOfWeek: List.generate(7, (i) => i + 1)),
-            Schedule(id: 'sch-004', reminderTime: '12:00', daysOfWeek: List.generate(7, (i) => i + 1)),
+            Schedule(
+              id: 'sch-003',
+              reminderTime: '07:00',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
+            Schedule(
+              id: 'sch-004',
+              reminderTime: '12:00',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
           ],
         ),
         PrescriptionItem(
@@ -365,7 +418,11 @@ class PrescriptionService {
           reorderThreshold: 15,
           instructions: null,
           schedules: [
-            Schedule(id: 'sch-005', reminderTime: '08:00', daysOfWeek: List.generate(7, (i) => i + 1)),
+            Schedule(
+              id: 'sch-005',
+              reminderTime: '08:00',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
           ],
         ),
       ],
@@ -389,7 +446,11 @@ class PrescriptionService {
           reorderThreshold: 7,
           instructions: 'Uống 30 phút trước bữa sáng',
           schedules: [
-            Schedule(id: 'sch-006', reminderTime: '06:30', daysOfWeek: List.generate(7, (i) => i + 1)),
+            Schedule(
+              id: 'sch-006',
+              reminderTime: '06:30',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
           ],
         ),
       ],
@@ -415,7 +476,11 @@ class PrescriptionService {
           reorderThreshold: 10,
           instructions: 'Uống mỗi sáng, tránh dùng khi đang uống potassium',
           schedules: [
-            Schedule(id: 'sch-007', reminderTime: '08:00', daysOfWeek: List.generate(7, (i) => i + 1)),
+            Schedule(
+              id: 'sch-007',
+              reminderTime: '08:00',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
           ],
         ),
         PrescriptionItem(
@@ -427,7 +492,11 @@ class PrescriptionService {
           reorderThreshold: 7,
           instructions: 'Uống buổi tối',
           schedules: [
-            Schedule(id: 'sch-008', reminderTime: '20:00', daysOfWeek: List.generate(7, (i) => i + 1)),
+            Schedule(
+              id: 'sch-008',
+              reminderTime: '20:00',
+              daysOfWeek: List.generate(7, (i) => i + 1),
+            ),
           ],
         ),
       ],
@@ -451,7 +520,11 @@ class PrescriptionService {
           reorderThreshold: 10,
           instructions: null,
           schedules: [
-            Schedule(id: 'sch-009', reminderTime: '09:00', daysOfWeek: [1, 3, 5, 7]),
+            Schedule(
+              id: 'sch-009',
+              reminderTime: '09:00',
+              daysOfWeek: [1, 3, 5, 7],
+            ),
           ],
         ),
       ],
@@ -467,7 +540,8 @@ class PrescriptionService {
 class PrescriptionValidator {
   // Cho phép cả UUID chuẩn và MongoDB ObjectId (24 ký tự hex)
   static final _uuidRe = RegExp(
-      r'^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24})$');
+    r'^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24})$',
+  );
   static final _dateRe = RegExp(r'^\d{4}-\d{2}-\d{2}$');
   static final _timeRe = RegExp(r'^\d{2}:\d{2}$');
 

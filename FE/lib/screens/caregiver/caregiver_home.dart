@@ -1,140 +1,117 @@
 import 'package:flutter/material.dart';
-import '../../models/models.dart';
+
+import '../../controllers/care_network_controller.dart';
+import '../../models/care_network.dart';
+import '../../models/prescription.dart';
+import '../../models/schedule_rule.dart';
 import '../../widgets/widgets.dart';
-import 'prescriptions/prescription_list_screen.dart';
 
 class CaregiverHome extends StatelessWidget {
   const CaregiverHome({
     super.key,
     required this.tab,
-    required this.doseTaken,
-    required this.doseMissed,
-    required this.prescriptionAdded,
-    required this.linkedPatients,
-    required this.activePatientIndex,
-    required this.onMissed,
-    required this.onPrescriptionAdded,
-    required this.onAddPatient,
-    required this.onRemovePatient,
-    required this.onSelectPatient,
+    required this.controller,
     required this.userName,
     required this.userEmail,
   });
 
   final int tab;
+  final CareNetworkController controller;
   final String userName;
   final String userEmail;
-  final bool doseTaken, doseMissed, prescriptionAdded;
-  final List<PatientProfileItem> linkedPatients;
-  final int activePatientIndex;
-  final VoidCallback onMissed, onPrescriptionAdded;
-  final void Function(String code, {String? name, String? relation}) onAddPatient;
-  final ValueChanged<int> onRemovePatient;
-  final ValueChanged<int> onSelectPatient;
 
   @override
-  Widget build(BuildContext context) {
-    if (tab == 1) {
-      return CaregiverPrescriptionPage(
-        added: prescriptionAdded,
-        onAdded: onPrescriptionAdded,
-      );
-    }
-    if (tab == 4) {
-      return CaregiverProfilePage(
-        linkedPatients: linkedPatients,
-        activePatientIndex: activePatientIndex,
-        onAddPatient: onAddPatient,
-        onRemovePatient: onRemovePatient,
-        onSelectPatient: onSelectPatient,
-        userName: userName,
-        userEmail: userEmail,
-      );
-    }
-    
-    // Tab 0 (Tổng quan), or any other fallback
-    return const Center(
-      child: Text(
-        'Tính năng đang phát triển',
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.black54,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: controller,
+    builder: (context, _) {
+      if (controller.linksLoading && controller.linkedPatients.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (controller.linksError != null && controller.linkedPatients.isEmpty) {
+        return _CenteredMessage(
+          icon: Icons.wifi_off_rounded,
+          title: 'Không tải được kết nối',
+          message: controller.linksError!,
+          actionLabel: 'Thử lại',
+          onAction: () => controller.loadLinkedAccounts(force: true),
+        );
+      }
+      if (controller.linkedPatients.isEmpty) {
+        if (tab == 4) {
+          return _ConnectPatientPage(
+            controller: controller,
+            userName: userName,
+            userEmail: userEmail,
+          );
+        }
+        return const _CenteredMessage(
+          icon: Icons.people_outline_rounded,
+          title: 'Chưa có bệnh nhân',
+          message: 'Mở link mời của bệnh nhân hoặc vào Hồ sơ để dán invitation UUID.',
+        );
+      }
+
+      final patientId = controller.selectedPatientId!;
+      final bundle = controller.bundleFor(patientId);
+      final error = controller.bundleErrorFor(patientId);
+      if (bundle == null && controller.isPatientLoading(patientId)) {
+        return _PatientFrame(
+          controller: controller,
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      }
+      if (bundle == null && error != null) {
+        return _PatientFrame(
+          controller: controller,
+          child: _CenteredMessage(
+            icon: Icons.error_outline_rounded,
+            title: 'Không tải được hồ sơ',
+            message: error,
+            actionLabel: 'Thử lại',
+            onAction: () => controller.loadPatient(patientId, force: true),
+          ),
+        );
+      }
+      if (bundle == null) return const SizedBox.shrink();
+
+      return switch (tab) {
+        1 => _SchedulePage(controller: controller, bundle: bundle),
+        2 => _PrescriptionPage(controller: controller, bundle: bundle),
+        4 => _ProfilePage(
+          controller: controller,
+          bundle: bundle,
+          userName: userName,
+          userEmail: userEmail,
         ),
-      ),
-    );
-  }
+        _ => _OverviewPage(controller: controller, bundle: bundle),
+      };
+    },
+  );
 }
 
-class CaregiverPrescriptionPage extends StatelessWidget {
-  const CaregiverPrescriptionPage({
-    super.key,
-    required this.added,
-    required this.onAdded,
-    this.patientId,
-    this.patientName,
-  });
-
-  final bool added;
-  final VoidCallback onAdded;
-  // These come from the active patient selection in AppShell.
-  // Replace with real UUID from auth/patient state in production.
-  final String? patientId;
-  final String? patientName;
-
-  @override
-  Widget build(BuildContext context) {
-    final pid = patientId ?? 'demo-patient-id-not-set';
-    final pname = patientName ?? 'Bệnh nhân';
-    return PrescriptionListScreen(
-      patientId: pid,
-      patientName: pname,
-    );
-  }
-}
-
-class CaregiverProfilePage extends StatefulWidget {
-  const CaregiverProfilePage({
-    super.key,
-    required this.linkedPatients,
-    required this.activePatientIndex,
-    required this.onAddPatient,
-    required this.onRemovePatient,
-    required this.onSelectPatient,
+class _ConnectPatientPage extends StatefulWidget {
+  const _ConnectPatientPage({
+    required this.controller,
     required this.userName,
     required this.userEmail,
   });
 
-  final List<PatientProfileItem> linkedPatients;
-  final int activePatientIndex;
-  final void Function(String code, {String? name, String? relation}) onAddPatient;
-  final ValueChanged<int> onRemovePatient;
-  final ValueChanged<int> onSelectPatient;
+  final CareNetworkController controller;
   final String userName;
   final String userEmail;
 
   @override
-  State<CaregiverProfilePage> createState() => _CaregiverProfilePageState();
+  State<_ConnectPatientPage> createState() => _ConnectPatientPageState();
 }
 
-class _CaregiverProfilePageState extends State<CaregiverProfilePage> {
-  late final TextEditingController _codeController;
-  late final TextEditingController _nameController;
-  late final TextEditingController _relationController;
-
-  @override
-  void initState() {
-    super.initState();
-    _codeController = TextEditingController();
-    _nameController = TextEditingController();
-    _relationController = TextEditingController();
-  }
+class _ConnectPatientPageState extends State<_ConnectPatientPage> {
+  final _controller = TextEditingController();
+  bool _submitting = false;
+  String? _error;
 
   @override
   void dispose() {
-    _codeController.dispose();
-    _nameController.dispose();
-    _relationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -144,398 +121,687 @@ class _CaregiverProfilePageState extends State<CaregiverProfilePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const PageIntro(
-          'Hồ sơ người chăm sóc',
-          'Quản lý thông tin & liên kết bệnh nhân',
+          'Kết nối bệnh nhân đầu tiên',
+          'Dán link được bệnh nhân chia sẻ để bắt đầu chăm sóc',
         ),
-        Glass(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: Color(0xFFDCE2FE),
-                child: Icon(
-                  Icons.person_rounded,
-                  size: 36,
-                  color: Color(0xFF5066F3),
-                ),
-              ),
-              SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.userName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Vai trò: Đang cập nhật',
-                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 13),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'SĐT: Đang cập nhật · ${widget.userEmail}',
-                      style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              StatusChip('Hoạt động', Color(0xFF249D76)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          'Liên kết thêm bệnh nhân mới',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
         Glass(
           padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
-                children: [
-                  Icon(
-                    Icons.person_add_alt_1_rounded,
-                    color: Color(0xFF5267F4),
-                    size: 24,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Nhập mã liên kết người thân',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Nhập mã trên màn hình của bệnh nhân (VD: PA-8899, PA-5521...) để liên kết nhiều người thân vào tài khoản chăm sóc.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEDEFFC),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: TextField(
-                  controller: _codeController,
-                  decoration: const InputDecoration(
-                    hintText: 'Mã bệnh nhân (VD: PA-7788)',
-                    prefixIcon: Icon(
-                      Icons.qr_code_rounded,
-                      color: Color(0xFF5065F2),
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                  textCapitalization: TextCapitalization.characters,
+              Text(
+                widget.userName,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDEFFC),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: TextField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          hintText: 'Họ tên (VD: Bà ngoại Mai)',
-                          prefixIcon: Icon(
-                            Icons.badge_outlined,
-                            color: Color(0xFF5065F2),
-                            size: 20,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDEFFC),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: TextField(
-                        controller: _relationController,
-                        decoration: const InputDecoration(
-                          hintText: 'Mối quan hệ (VD: Bà ngoại)',
-                          prefixIcon: Icon(
-                            Icons.family_restroom_rounded,
-                            color: Color(0xFF5065F2),
-                            size: 20,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                widget.userEmail,
+                style: const TextStyle(color: Color(0xFF687195)),
               ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _controller,
+                decoration: const InputDecoration(
+                  labelText: 'Link mời hoặc invitation UUID',
+                  prefixIcon: Icon(Icons.link_rounded),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!, style: const TextStyle(color: Color(0xFFC64E57))),
+              ],
               const SizedBox(height: 14),
               FilledButton.icon(
-                onPressed: () {
-                  final code = _codeController.text.trim();
-                  if (code.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng nhập mã bệnh nhân!'),
-                      ),
-                    );
-                    return;
-                  }
-                  final exists = widget.linkedPatients.any(
-                        (p) => p.code.toUpperCase() == code.toUpperCase(),
-                  );
-                  if (exists) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Bệnh nhân có mã $code đã có trong danh sách!',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  final name = _nameController.text.trim();
-                  final rel = _relationController.text.trim();
-                  widget.onAddPatient(
-                    code,
-                    name: name.isNotEmpty ? name : null,
-                    relation: rel.isNotEmpty ? rel : null,
-                  );
-                  _codeController.clear();
-                  _nameController.clear();
-                  _relationController.clear();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Đã liên kết thêm bệnh nhân mới: ${name.isNotEmpty ? name : code}!',
-                      ),
-                    ),
-                  );
-                },
+                onPressed: _submitting ? null : _submit,
                 icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('Liên kết thêm bệnh nhân'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                ),
+                label: const Text('Xác nhận kết nối'),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 22),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Danh sách bệnh nhân (${widget.linkedPatients.length})',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            Text(
-              'Đang theo dõi: ${widget.linkedPatients.isNotEmpty ? widget.linkedPatients[widget.activePatientIndex].name : "Không"}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF5065F2),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        ...List.generate(widget.linkedPatients.length, (idx) {
-          final patient = widget.linkedPatients[idx];
-          final isActive = idx == widget.activePatientIndex;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Glass(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: patient.avatarBg,
-                        child: Icon(
-                          patient.avatarIcon,
-                          size: 32,
-                          color: const Color(0xFFAD6047),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  patient.name,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE9EDFF),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    patient.relation,
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF485EE8),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${patient.age} tuổi · Mã: ${patient.code}',
-                              style: const TextStyle(
-                                color: Color(0xFF5267F4),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                              ),
-                            ),
-                            Text(
-                              'Tình trạng: ${patient.condition}',
-                              style: const TextStyle(
-                                color: Color(0xFF6B7280),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isActive)
-                        const StatusChip('Đang theo dõi', Color(0xFF249D76))
-                      else
-                        OutlinedButton(
-                          onPressed: () => widget.onSelectPatient(idx),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text(
-                            'Theo dõi',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (widget.linkedPatients.length > 1) ...[
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () {
-                            final pName = patient.name;
-                            widget.onRemovePatient(idx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Đã hủy liên kết với $pName.'),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.link_off_rounded,
-                            size: 16,
-                            color: Color(0xFFD65E4A),
-                          ),
-                          label: const Text(
-                            'Hủy liên kết',
-                            style: TextStyle(
-                              color: Color(0xFFD65E4A),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          );
-        }),
-        const SizedBox(height: 18),
-        const Text(
-          'Cài đặt nhắc nhở & cảnh báo',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        const Glass(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(
-                Icons.notification_important_rounded,
-                color: Color(0xFFD65E4A),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Cảnh báo khẩn cấp (Unhappy case)',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Báo động đỏ khi bệnh nhân chưa uống thuốc sau 15 phút',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                    ),
-                  ],
-                ),
-              ),
-              StatusChip('15 phút', Color(0xFFD65E4A)),
             ],
           ),
         ),
       ],
+    ),
+  );
+
+  Future<void> _submit() async {
+    final value = _controller.text.trim();
+    final uuid =
+        Uri.tryParse(value)?.queryParameters['invitationUUID'] ?? value;
+    if (uuid.isEmpty) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.controller.verifyInvitation(uuid);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+}
+
+class _PatientFrame extends StatelessWidget {
+  const _PatientFrame({required this.controller, required this.child});
+  final CareNetworkController controller;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+        child: _PatientSelector(controller: controller),
+      ),
+      Expanded(child: child),
+    ],
+  );
+}
+
+class _PatientSelector extends StatelessWidget {
+  const _PatientSelector({required this.controller});
+  final CareNetworkController controller;
+
+  @override
+  Widget build(BuildContext context) => Glass(
+    radius: 18,
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+    child: Row(
+      children: [
+        const CircleAvatar(
+          radius: 18,
+          backgroundColor: Color(0xFFFFE5D0),
+          child: Icon(Icons.person_rounded, color: Color(0xFFAD6047)),
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          'Đang chăm sóc',
+          style: TextStyle(color: Color(0xFF687195), fontSize: 12),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: controller.selectedPatientId,
+              isExpanded: true,
+              borderRadius: BorderRadius.circular(16),
+              items: controller.linkedPatients
+                  .map(
+                    (patient) => DropdownMenuItem(
+                      value: patient.id,
+                      child: Text(
+                        patient.fullName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) controller.selectPatient(value);
+              },
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Làm mới dữ liệu bệnh nhân',
+          onPressed: controller.isPatientLoading(controller.selectedPatientId)
+              ? null
+              : controller.refreshSelectedPatient,
+          icon: const Icon(Icons.refresh_rounded),
+        ),
+      ],
+    ),
+  );
+}
+
+class _OverviewPage extends StatelessWidget {
+  const _OverviewPage({required this.controller, required this.bundle});
+  final CareNetworkController controller;
+  final PatientBundle bundle;
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now().weekday;
+    final todaySchedules = bundle.schedules
+        .where((item) => item.isActive && item.daysOfWeek.contains(today))
+        .toList();
+    return _PatientFrame(
+      controller: controller,
+      child: AppScroll(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PageIntro(
+              'Chào ${bundle.detail.fullName}',
+              'Tổng hợp dữ liệu chăm sóc mới nhất',
+            ),
+            Glass(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Color(0xFFFFD9C6),
+                    child: Icon(Icons.face_3_rounded, size: 34),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          bundle.detail.fullName,
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          [
+                            bundle.detail.phone,
+                            bundle.detail.email,
+                          ].where((value) => value.isNotEmpty).join(' · '),
+                          style: const TextStyle(color: Color(0xFF687195)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const StatusChip('Đã kết nối', Color(0xFF249D76)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _Metric(
+                  value: '${todaySchedules.length}',
+                  label: 'Cữ hôm nay',
+                  icon: Icons.alarm_rounded,
+                  color: const Color(0xFF5267F4),
+                ),
+                const SizedBox(width: 10),
+                _Metric(
+                  value: '${bundle.activePrescriptionCount}',
+                  label: 'Đơn đang dùng',
+                  icon: Icons.receipt_long_rounded,
+                  color: const Color(0xFF24A87D),
+                ),
+                const SizedBox(width: 10),
+                _Metric(
+                  value: '${bundle.lowStockCount}',
+                  label: 'Thuốc sắp hết',
+                  icon: Icons.inventory_2_outlined,
+                  color: const Color(0xFFE18A37),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Lịch uống hôm nay',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 10),
+            if (todaySchedules.isEmpty)
+              const _EmptyCard(message: 'Hôm nay không có cữ thuốc nào.')
+            else
+              ...todaySchedules.take(4).map(_ScheduleTile.new),
+            if (bundle.lowStockCount > 0) ...[
+              const SizedBox(height: 14),
+              const Glass(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Color(0xFFE18A37)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Có thuốc đã chạm ngưỡng đặt lại. Kiểm tra tab Đơn thuốc.',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SchedulePage extends StatelessWidget {
+  const _SchedulePage({required this.controller, required this.bundle});
+  final CareNetworkController controller;
+  final PatientBundle bundle;
+
+  @override
+  Widget build(BuildContext context) => _PatientFrame(
+    controller: controller,
+    child: AppScroll(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageIntro(
+            'Lịch uống thuốc',
+            'Toàn bộ cữ thuốc của ${bundle.detail.fullName}',
+          ),
+          if (bundle.schedules.isEmpty)
+            const _EmptyCard(message: 'Chưa có lịch uống thuốc.')
+          else
+            ...bundle.schedules.map(_ScheduleTile.new),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PrescriptionPage extends StatelessWidget {
+  const _PrescriptionPage({required this.controller, required this.bundle});
+  final CareNetworkController controller;
+  final PatientBundle bundle;
+
+  @override
+  Widget build(BuildContext context) => _PatientFrame(
+    controller: controller,
+    child: AppScroll(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageIntro('Đơn thuốc', 'Đơn và thuốc của ${bundle.detail.fullName}'),
+          if (bundle.prescriptions.isEmpty)
+            const _EmptyCard(message: 'Bệnh nhân chưa có đơn thuốc.')
+          else
+            ...bundle.prescriptions.map(
+              (prescription) => _PrescriptionCard(prescription: prescription),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ProfilePage extends StatefulWidget {
+  const _ProfilePage({
+    required this.controller,
+    required this.bundle,
+    required this.userName,
+    required this.userEmail,
+  });
+  final CareNetworkController controller;
+  final PatientBundle bundle;
+  final String userName;
+  final String userEmail;
+
+  @override
+  State<_ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<_ProfilePage> {
+  final _invitationController = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _invitationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _PatientFrame(
+    controller: widget.controller,
+    child: AppScroll(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const PageIntro(
+            'Hồ sơ người chăm sóc',
+            'Tài khoản và các kết nối bệnh nhân',
+          ),
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                radius: 28,
+                backgroundColor: Color(0xFFDCE2FE),
+                child: Icon(Icons.person_rounded, color: Color(0xFF5066F3)),
+              ),
+              title: Text(
+                widget.userName,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: Text(widget.userEmail),
+              trailing: const StatusChip('Hoạt động', Color(0xFF249D76)),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Kết nối thêm bệnh nhân',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _invitationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Dán link mời hoặc invitation UUID',
+                    prefixIcon: Icon(Icons.link_rounded),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Color(0xFFC64E57)),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _submitting ? null : _submitInvitation,
+                  icon: const Icon(Icons.person_add_alt_1_rounded),
+                  label: const Text('Xác nhận kết nối'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Đang chăm sóc ${widget.controller.linkedPatients.length} bệnh nhân',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          ...widget.controller.linkedPatients.map(
+            (patient) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Glass(
+                padding: const EdgeInsets.all(12),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.person_rounded),
+                  ),
+                  title: Text(patient.fullName),
+                  trailing: patient.id == widget.controller.selectedPatientId
+                      ? const Icon(Icons.check_circle, color: Color(0xFF249D76))
+                      : null,
+                  onTap: () => widget.controller.selectPatient(patient.id),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> _submitInvitation() async {
+    final value = _invitationController.text.trim();
+    final uri = Uri.tryParse(value);
+    final uuid = uri?.queryParameters['invitationUUID'] ?? value;
+    if (uuid.isEmpty) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.controller.verifyInvitation(uuid);
+      _invitationController.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã kết nối bệnh nhân thành công.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+}
+
+class _CenteredMessage extends StatelessWidget {
+  const _CenteredMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 54, color: const Color(0xFF5267F4)),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(message, textAlign: TextAlign.center),
+          if (onAction != null) ...[
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Glass(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF687195)),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ScheduleTile extends StatelessWidget {
+  const _ScheduleTile(this.rule);
+  final ScheduleRule rule;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Glass(
+      padding: const EdgeInsets.all(15),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7E9FF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              rule.displayTime,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF4659CF),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  rule.medicine.name,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                Text(
+                  '${rule.dosagePerTime.toStringAsFixed(rule.dosagePerTime % 1 == 0 ? 0 : 1)} ${rule.medicine.unit} · ${rule.prescription.title}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF687195),
+                  ),
+                ),
+                if (rule.instructions?.isNotEmpty == true)
+                  Text(
+                    rule.instructions!,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+          StatusChip(
+            rule.isActive ? 'Đang bật' : 'Đã tắt',
+            rule.isActive ? const Color(0xFF249D76) : const Color(0xFF9BA3BF),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PrescriptionCard extends StatelessWidget {
+  const _PrescriptionCard({required this.prescription});
+  final Prescription prescription;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Glass(
+      padding: const EdgeInsets.all(17),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        leading: const CircleAvatar(
+          backgroundColor: Color(0xFFE7E9FF),
+          child: Icon(Icons.receipt_long_rounded, color: Color(0xFF5267F4)),
+        ),
+        title: Text(
+          prescription.title,
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+        subtitle: Text(
+          '${prescription.startDate} → ${prescription.endDate ?? 'Không giới hạn'}',
+        ),
+        trailing: StatusChip(
+          prescription.isActive ? 'Đang dùng' : 'Đã ngừng',
+          prescription.isActive
+              ? const Color(0xFF249D76)
+              : const Color(0xFF9BA3BF),
+        ),
+        children: prescription.items.isEmpty
+            ? const [
+                Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Đơn chưa có thuốc.'),
+                ),
+              ]
+            : prescription.items.map(_MedicineLine.new).toList(),
+      ),
+    ),
+  );
+}
+
+class _MedicineLine extends StatelessWidget {
+  const _MedicineLine(this.item);
+  final PrescriptionItem item;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 10),
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: item.isLowStock
+          ? const Color(0xFFFFF3E6)
+          : const Color(0xFFF5F6FF),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          item.isLowStock
+              ? Icons.warning_amber_rounded
+              : Icons.medication_rounded,
+          color: item.isLowStock
+              ? const Color(0xFFE18A37)
+              : const Color(0xFF5267F4),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.medicineName,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              Text(
+                '${item.dosagePerTime} ${item.unit}/lần · Còn ${item.currentStock} · Ngưỡng ${item.reorderThreshold}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF687195)),
+              ),
+              if (item.instructions?.isNotEmpty == true)
+                Text(item.instructions!, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Glass(
+    padding: const EdgeInsets.all(22),
+    child: Center(
+      child: Text(message, style: const TextStyle(color: Color(0xFF687195))),
     ),
   );
 }
