@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/pharmacist_dashboard_controller.dart';
 import '../../models/models.dart';
+import '../../services/geocoding_api.dart';
 import '../../widgets/widgets.dart';
+import 'pharmacist_medicine_catalog_page.dart';
 
 class PharmacistHome extends StatelessWidget {
   const PharmacistHome({
     super.key,
     required this.tab,
     required this.controller,
+    this.geocodingApi,
   });
 
   final int tab;
   final PharmacistDashboardController controller;
+  final GeocodingApi? geocodingApi;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -24,8 +28,9 @@ class PharmacistHome extends StatelessWidget {
       return switch (tab) {
         0 => _OrdersPage(controller: controller, history: false),
         1 => _InventoryPage(controller: controller),
-        2 => _OrdersPage(controller: controller, history: true),
-        _ => _PharmacyPage(controller: controller),
+        2 => PharmacistMedicineCatalogPage(controller: controller),
+        3 => _OrdersPage(controller: controller, history: true),
+        _ => _PharmacyPage(controller: controller, geocodingApi: geocodingApi),
       };
     },
   );
@@ -375,8 +380,9 @@ class _InventoryPage extends StatelessWidget {
 }
 
 class _PharmacyPage extends StatelessWidget {
-  const _PharmacyPage({required this.controller});
+  const _PharmacyPage({required this.controller, this.geocodingApi});
   final PharmacistDashboardController controller;
+  final GeocodingApi? geocodingApi;
 
   @override
   Widget build(BuildContext context) {
@@ -466,6 +472,7 @@ class _PharmacyPage extends StatelessWidget {
       context,
       controller.user.id,
       controller.selectedPharmacy,
+      geocodingApi: geocodingApi,
     );
     if (input == null || !context.mounted) return;
     await _run(context, () => controller.savePharmacy(input));
@@ -581,34 +588,36 @@ Future<String?> _textDialog(
   final value = TextEditingController();
   final result = await showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: value,
-        autofocus: true,
-        maxLines: 3,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
+    builder: (context) => _ControllerOwner(
+      controllers: [value],
+      child: AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: value,
+          autofocus: true,
+          maxLines: 3,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (value.text.trim().isNotEmpty) {
+                Navigator.pop(context, value.text.trim());
+              }
+            },
+            child: const Text('Xác nhận'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Đóng'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (value.text.trim().isNotEmpty) {
-              Navigator.pop(context, value.text.trim());
-            }
-          },
-          child: const Text('Xác nhận'),
-        ),
-      ],
     ),
   );
-  value.dispose();
   return result;
 }
 
@@ -617,40 +626,41 @@ Future<(String, String)?> _shipperDialog(BuildContext context) async {
   final phone = TextEditingController();
   final result = await showDialog<(String, String)>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Bàn giao cho shipper'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: name,
-            decoration: const InputDecoration(labelText: 'Tên shipper'),
+    builder: (context) => _ControllerOwner(
+      controllers: [name, phone],
+      child: AlertDialog(
+        title: const Text('Bàn giao cho shipper'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Tên shipper'),
+            ),
+            TextField(
+              controller: phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Số điện thoại'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
           ),
-          TextField(
-            controller: phone,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Số điện thoại'),
+          FilledButton(
+            onPressed: () {
+              if (name.text.trim().isNotEmpty && phone.text.trim().isNotEmpty) {
+                Navigator.pop(context, (name.text.trim(), phone.text.trim()));
+              }
+            },
+            child: const Text('Bàn giao'),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Đóng'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (name.text.trim().isNotEmpty && phone.text.trim().isNotEmpty) {
-              Navigator.pop(context, (name.text.trim(), phone.text.trim()));
-            }
-          },
-          child: const Text('Bàn giao'),
-        ),
-      ],
     ),
   );
-  name.dispose();
-  phone.dispose();
   return result;
 }
 
@@ -668,197 +678,197 @@ Future<InventoryInput?> _inventoryDialog(
   );
   final result = await showDialog<InventoryInput>(
     context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: Text(
-          current == null ? 'Thêm thuốc vào kho' : 'Cập nhật tồn kho',
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: medicineId,
-              decoration: const InputDecoration(labelText: 'Thuốc'),
-              items: medicines
-                  .map(
-                    (item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text('${item.name} (${item.unit.label})'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: current == null
-                  ? (value) => setDialogState(() => medicineId = value)
-                  : null,
-            ),
-            TextField(
-              controller: stock,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Số lượng tồn'),
-            ),
-            TextField(
-              controller: price,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+    builder: (context) => _ControllerOwner(
+      controllers: [stock, price],
+      child: StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            current == null ? 'Thêm thuốc vào kho' : 'Cập nhật tồn kho',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: medicineId,
+                decoration: const InputDecoration(labelText: 'Thuốc'),
+                items: medicines
+                    .map(
+                      (item) => DropdownMenuItem(
+                        value: item.id,
+                        child: Text('${item.name} (${item.unit.label})'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: current == null
+                    ? (value) => setDialogState(() => medicineId = value)
+                    : null,
               ),
-              decoration: const InputDecoration(labelText: 'Giá mỗi đơn vị'),
+              TextField(
+                controller: stock,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Số lượng tồn'),
+              ),
+              TextField(
+                controller: price,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(labelText: 'Giá mỗi đơn vị'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final quantity = int.tryParse(stock.text.trim());
+                final unitPrice = double.tryParse(price.text.trim());
+                if (medicineId != null &&
+                    quantity != null &&
+                    quantity >= 0 &&
+                    unitPrice != null &&
+                    unitPrice >= 0) {
+                  Navigator.pop(
+                    context,
+                    InventoryInput(
+                      medicineId: medicineId!,
+                      stockQuantity: quantity,
+                      pricePerUnit: unitPrice,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Lưu'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final quantity = int.tryParse(stock.text.trim());
-              final unitPrice = double.tryParse(price.text.trim());
-              if (medicineId != null &&
-                  quantity != null &&
-                  quantity >= 0 &&
-                  unitPrice != null &&
-                  unitPrice >= 0) {
-                Navigator.pop(
-                  context,
-                  InventoryInput(
-                    medicineId: medicineId!,
-                    stockQuantity: quantity,
-                    pricePerUnit: unitPrice,
-                  ),
-                );
-              }
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
       ),
     ),
   );
-  stock.dispose();
-  price.dispose();
   return result;
 }
 
 Future<PharmacyInput?> _pharmacyDialog(
   BuildContext context,
   String pharmacistId,
-  Pharmacy? current,
-) async {
+  Pharmacy? current, {
+  GeocodingApi? geocodingApi,
+}) async {
   final name = TextEditingController(text: current?.name);
   final phone = TextEditingController(text: current?.phoneNumber);
-  final address = TextEditingController(text: current?.addressText);
-  final latitude = TextEditingController(
-    text: current?.latitude.toString() ?? '10.7769',
-  );
-  final longitude = TextEditingController(
-    text: current?.longitude.toString() ?? '106.7009',
-  );
+  PharmacyLocationSelection? location = current == null
+      ? null
+      : PharmacyLocationSelection(
+          addressText: current.addressText,
+          latitude: current.latitude,
+          longitude: current.longitude,
+        );
   var active = current?.isActive ?? true;
   final result = await showDialog<PharmacyInput>(
     context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: Text(
-          current == null ? 'Đăng ký nhà thuốc' : 'Cập nhật nhà thuốc',
-        ),
-        content: SizedBox(
-          width: 460,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: 'Tên nhà thuốc'),
-                ),
-                TextField(
-                  controller: phone,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Số điện thoại'),
-                ),
-                TextField(
-                  controller: address,
-                  maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'Địa chỉ'),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: latitude,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                        decoration: const InputDecoration(labelText: 'Vĩ độ'),
-                      ),
+    builder: (context) => _ControllerOwner(
+      controllers: [name, phone],
+      child: StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            current == null ? 'Đăng ký nhà thuốc' : 'Cập nhật nhà thuốc',
+          ),
+          content: SizedBox(
+            width: 620,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(
+                      labelText: 'Tên nhà thuốc',
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: longitude,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                        decoration: const InputDecoration(labelText: 'Kinh độ'),
-                      ),
+                  ),
+                  TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Số điện thoại',
                     ),
-                  ],
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Đang hoạt động'),
-                  value: active,
-                  onChanged: (value) => setDialogState(() => active = value),
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 14),
+                  PharmacyLocationPicker(
+                    initialLocation: location,
+                    geocodingApi: geocodingApi,
+                    onChanged: (value) =>
+                        setDialogState(() => location = value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Đang hoạt động'),
+                    value: active,
+                    onChanged: (value) => setDialogState(() => active = value),
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'),
+            ),
+            FilledButton(
+              onPressed: location == null
+                  ? null
+                  : () {
+                      final selectedLocation = location!;
+                      if (name.text.trim().isNotEmpty &&
+                          phone.text.trim().isNotEmpty) {
+                        Navigator.pop(
+                          context,
+                          PharmacyInput(
+                            pharmacistId: pharmacistId,
+                            name: name.text,
+                            phoneNumber: phone.text,
+                            addressText: selectedLocation.addressText,
+                            latitude: selectedLocation.latitude,
+                            longitude: selectedLocation.longitude,
+                            isActive: active,
+                          ),
+                        );
+                      }
+                    },
+              child: const Text('Lưu'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final lat = double.tryParse(latitude.text.trim());
-              final lng = double.tryParse(longitude.text.trim());
-              if (name.text.trim().isNotEmpty &&
-                  phone.text.trim().isNotEmpty &&
-                  address.text.trim().isNotEmpty &&
-                  lat != null &&
-                  lng != null &&
-                  lat >= -90 &&
-                  lat <= 90 &&
-                  lng >= -180 &&
-                  lng <= 180) {
-                Navigator.pop(
-                  context,
-                  PharmacyInput(
-                    pharmacistId: pharmacistId,
-                    name: name.text,
-                    phoneNumber: phone.text,
-                    addressText: address.text,
-                    latitude: lat,
-                    longitude: lng,
-                    isActive: active,
-                  ),
-                );
-              }
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
       ),
     ),
   );
-  for (final item in [name, phone, address, latitude, longitude]) {
-    item.dispose();
-  }
   return result;
+}
+
+class _ControllerOwner extends StatefulWidget {
+  const _ControllerOwner({required this.controllers, required this.child});
+
+  final List<TextEditingController> controllers;
+  final Widget child;
+
+  @override
+  State<_ControllerOwner> createState() => _ControllerOwnerState();
+}
+
+class _ControllerOwnerState extends State<_ControllerOwner> {
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 String _money(double value) => '${value.toStringAsFixed(0)} đ';

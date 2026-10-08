@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
-import '../../services/notification_service.dart';
 import '../../services/schedule_api.dart';
 import '../../widgets/widgets.dart';
 
@@ -73,8 +72,6 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
           _schedules = items;
           _isLoading = false;
         });
-        // Tự động đồng bộ báo thức cho toàn bộ cữ thuốc
-        NotificationService.instance.syncAllSchedules(items);
       }
     } catch (e) {
       if (mounted) {

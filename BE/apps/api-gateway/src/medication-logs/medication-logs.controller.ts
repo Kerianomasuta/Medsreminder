@@ -20,18 +20,19 @@ const openDose = 'The dose must still be SCHEDULED or SNOOZED. TAKEN, SKIPPED, a
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Role(UserRole.PATIENT)
 @ApiUnauthorizedResponse({ description: 'Access token cookie is missing or expired.' })
-@ApiForbiddenResponse({ description: 'The signed-in user is not the patient for this dose. Allowed role: PATIENT.' })
+@ApiForbiddenResponse({ description: 'The signed-in role cannot call this route.' })
 @ApiResponse({ status: 503, description: 'Medication service is unavailable.' })
 export class MedicationLogsController {
   constructor(private readonly medicationLogsService: MedicationLogsService) {}
 
   @Get()
+  @Role(UserRole.PATIENT, UserRole.CARE_GIVER)
   @ApiOperation({
     summary: 'List the signed-in patient\'s doses from today onward',
-    description: 'The patient id comes from the access token. from defaults to today in Asia/Ho_Chi_Minh. to is an inclusive last day; omit it to include every later dose. Each row is one reminder instant and its current status. Allowed role: PATIENT.',
+    description: 'PATIENT uses the patient id from the access token. CARE_GIVER sends patientId. from defaults to today in Asia/Ho_Chi_Minh. to is an inclusive last day; omit it to include every later dose. Each row is one reminder instant and its current status. Allowed roles: PATIENT, CARE_GIVER.',
   })
   @ApiOkResponse({ type: MedicationLogResponseDto, isArray: true, description: 'Doses ordered by scheduled time.' })
-  @ApiBadRequestResponse({ description: 'from or to is not a real YYYY-MM-DD date, or to is before from.' })
+  @ApiBadRequestResponse({ description: 'CARE_GIVER did not provide patientId; from or to is not a real YYYY-MM-DD date; or to is before from.' })
   list(@Query() query: ListMedicationLogsQueryDto, @Req() request: Request) {
     return this.medicationLogsService.list(query, this.user(request));
   }

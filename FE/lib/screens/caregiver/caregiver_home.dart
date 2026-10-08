@@ -4,6 +4,7 @@ import '../../controllers/care_network_controller.dart';
 import '../../models/care_network.dart';
 import '../../models/prescription.dart';
 import '../../models/schedule_rule.dart';
+import '../patient/medication_log_timeline_page.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverHome extends StatelessWidget {
@@ -75,7 +76,13 @@ class CaregiverHome extends StatelessWidget {
       if (bundle == null) return const SizedBox.shrink();
 
       return switch (tab) {
-        1 => _SchedulePage(controller: controller, bundle: bundle),
+        1 => _PatientFrame(
+          controller: controller,
+          child: MedicationLogTimelinePage(
+            key: ValueKey(patientId),
+            patientId: patientId,
+          ),
+        ),
         2 => _PrescriptionPage(controller: controller, bundle: bundle),
         4 => _ProfilePage(
           controller: controller,
@@ -371,32 +378,6 @@ class _OverviewPage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SchedulePage extends StatelessWidget {
-  const _SchedulePage({required this.controller, required this.bundle});
-  final CareNetworkController controller;
-  final PatientBundle bundle;
-
-  @override
-  Widget build(BuildContext context) => _PatientFrame(
-    controller: controller,
-    child: AppScroll(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PageIntro(
-            'Lịch uống thuốc',
-            'Toàn bộ cữ thuốc của ${bundle.detail.fullName}',
-          ),
-          if (bundle.schedules.isEmpty)
-            const _EmptyCard(message: 'Chưa có lịch uống thuốc.')
-          else
-            ...bundle.schedules.map(_ScheduleTile.new),
-        ],
-      ),
-    ),
-  );
 }
 
 class _PrescriptionPage extends StatelessWidget {

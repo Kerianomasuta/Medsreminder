@@ -40,7 +40,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     AppRole.patient,
     AppRole.caregiver,
     AppRole.pharmacist,
-    AppRole.shipper,
   ];
 
   @override
