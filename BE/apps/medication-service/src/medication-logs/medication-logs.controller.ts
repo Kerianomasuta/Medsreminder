@@ -1,6 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { DoseActionInput, ListLogsInput, MedicationLogsService } from './medication-logs.service.js';
+import type { DoseActionInput, ListLogsInput } from './medication-logs.service.js';
+import { MedicationLogsService } from './medication-logs.service.js';
 
 @Controller()
 export class MedicationLogsController {

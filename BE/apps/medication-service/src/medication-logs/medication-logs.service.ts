@@ -136,10 +136,13 @@ export class MedicationLogsService {
     if (!log) {
       throw ErrorHandling.NotFound('Dose log not found');
     }
-    log.scheduleRule = await manager.findOne(ScheduleRule, {
+    const scheduleRule = await manager.findOne(ScheduleRule, {
       where: { id: log.scheduleRuleId },
       relations: { prescriptionItem: true },
     });
+    if (scheduleRule) {
+      log.scheduleRule = scheduleRule;
+    }
     return log;
   }
 
