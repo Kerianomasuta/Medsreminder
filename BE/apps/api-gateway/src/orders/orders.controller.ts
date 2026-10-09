@@ -41,7 +41,7 @@ type AccessUser = {
 @Controller('api/v1/orders')
 @ApiTags('Orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -122,6 +122,9 @@ export class OrdersController {
   }
 
   @Post(':id/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(UserRole.PHARMACIST)
+  @ApiCookieAuth('accessToken')
   @ApiOperation({
     summary: 'Pharmacy rejects a submitted order and must give a reason',
   })
