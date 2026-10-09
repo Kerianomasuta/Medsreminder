@@ -1,6 +1,6 @@
 export 'app_role.dart';
 export 'auth_user.dart';
-export 'medicine.dart';
+export 'registration_input.dart';
 export 'medication_log.dart';
 export 'patient_profile.dart';
 export 'care_network.dart';

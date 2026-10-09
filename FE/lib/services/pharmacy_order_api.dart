@@ -21,6 +21,42 @@ class PharmacyOrderApi {
 
   final http.Client _client;
 
+  Future<PharmacyOrder> create({
+    required String patientId,
+    required String pharmacyId,
+    required String prescriptionId,
+    required FulfillmentType fulfillmentType,
+    required List<({String prescriptionItemId, int quantity})> items,
+    String? recipientName,
+    String? recipientPhone,
+    String? deliveryAddress,
+    String? patientNote,
+  }) => _order(
+    'POST',
+    '/api/v1/orders',
+    body: {
+      'patientId': patientId,
+      'pharmacyId': pharmacyId,
+      'prescriptionId': prescriptionId,
+      'fulfillmentType': fulfillmentType.apiValue,
+      if (recipientName?.trim().isNotEmpty == true)
+        'recipientName': recipientName!.trim(),
+      if (recipientPhone?.trim().isNotEmpty == true)
+        'recipientPhone': recipientPhone!.trim(),
+      if (deliveryAddress?.trim().isNotEmpty == true)
+        'deliveryAddress': deliveryAddress!.trim(),
+      if (patientNote?.trim().isNotEmpty == true)
+        'patientNote': patientNote!.trim(),
+      'items': [
+        for (final item in items)
+          {
+            'prescriptionItemId': item.prescriptionItemId,
+            'quantity': item.quantity,
+          },
+      ],
+    },
+  );
+
   Future<List<PharmacyOrder>> listMine({PharmacyOrderStatus? status}) async {
     final uri = Uri.parse('$apiBaseUrl/api/v1/orders/mine').replace(
       queryParameters: status == null ? null : {'status': status.apiValue},

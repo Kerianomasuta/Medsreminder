@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ schema: 'pharmacy', name: 'pharmacies' })
 export class Pharmacy {
@@ -23,8 +29,8 @@ export class Pharmacy {
   @Column({ type: 'double precision' })
   longitude: number;
 
-  @Column({ type: 'boolean', name: 'is_active', default: true })
-  isActive: boolean;
+  @Column({ type: 'varchar', length: 12 })
+  geohash: string;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;

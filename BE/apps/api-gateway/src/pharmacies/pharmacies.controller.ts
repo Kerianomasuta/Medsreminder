@@ -9,7 +9,9 @@ export class PharmaciesController {
   constructor(private readonly pharmaciesService: PharmaciesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List pharmacies, nearest first when coordinates are sent' })
+  @ApiOperation({
+    summary: 'Find pharmacies within 10 km using Geohash and exact distance',
+  })
   list(@Query() query: ListPharmaciesQueryDto) {
     return this.pharmaciesService.list(query);
   }

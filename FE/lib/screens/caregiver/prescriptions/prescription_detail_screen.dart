@@ -523,8 +523,10 @@ class _EditItemSheetState extends State<_EditItemSheet> {
     try {
       final updated = PrescriptionItem(
         id: widget.item.id,
-        medicineId: widget.item.medicineId,
         medicineName: widget.item.medicineName,
+        genericName: widget.item.genericName,
+        unit: widget.item.unit,
+        imageUrl: widget.item.imageUrl,
         dosagePerTime: dosage,
         currentStock: stock,
         reorderThreshold: threshold,

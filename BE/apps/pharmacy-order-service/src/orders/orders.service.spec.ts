@@ -18,43 +18,52 @@ function createManager() {
   const orders = new Map<string, Record<string, unknown>>();
   return {
     orders,
-    findOne: vi.fn(async (entity: { name: string }, options: { where: { id?: string } }) => {
-      if (entity === Pharmacy) {
-        return { id: pharmacyId, pharmacistId, isActive: true };
-      }
-      if (entity === Order) {
-        return orders.get(options.where.id ?? '') ?? null;
-      }
-      return null;
-    }),
+    findOne: vi.fn(
+      async (entity: { name: string }, options: { where: { id?: string } }) => {
+        if (entity === Pharmacy) {
+          return { id: pharmacyId, pharmacistId };
+        }
+        if (entity === Order) {
+          return orders.get(options.where.id ?? '') ?? null;
+        }
+        return null;
+      },
+    ),
     find: vi.fn(async () => {
-      const order = [...orders.values()][0] as { items?: unknown[] } | undefined;
+      const order = [...orders.values()][0] as
+        { items?: unknown[] } | undefined;
       return order?.items ?? [];
     }),
-    query: vi.fn(async () => [{
-      id: prescriptionItemId,
-      name: 'Paracetamol',
-      unit: 'VIEN',
-      image_url: null,
-    }]),
-    create: vi.fn((_entity: unknown, value: Record<string, unknown>) => ({ ...value })),
-    save: vi.fn(async (entity: { name: string }, value: Record<string, unknown>) => {
-      if (entity === Order) {
-        const saved = {
-          id: orderId,
-          createdAt: new Date('2026-10-03T00:00:00.000Z'),
-          updatedAt: new Date('2026-10-03T00:00:00.000Z'),
-          items: [],
-          ...value,
-        };
-        orders.set(orderId, saved);
-        return saved;
-      }
-      if (entity === OrderItem) {
-        return { id: 'item-1', ...value };
-      }
-      return value;
-    }),
+    query: vi.fn(async () => [
+      {
+        id: prescriptionItemId,
+        name: 'Paracetamol',
+        unit: 'VIEN',
+        image_url: null,
+      },
+    ]),
+    create: vi.fn((_entity: unknown, value: Record<string, unknown>) => ({
+      ...value,
+    })),
+    save: vi.fn(
+      async (entity: { name: string }, value: Record<string, unknown>) => {
+        if (entity === Order) {
+          const saved = {
+            id: orderId,
+            createdAt: new Date('2026-10-03T00:00:00.000Z'),
+            updatedAt: new Date('2026-10-03T00:00:00.000Z'),
+            items: [],
+            ...value,
+          };
+          orders.set(orderId, saved);
+          return saved;
+        }
+        if (entity === OrderItem) {
+          return { id: 'item-1', ...value };
+        }
+        return value;
+      },
+    ),
   };
 }
 
@@ -67,10 +76,21 @@ describe('OrdersService', () => {
     manager = createManager();
     replenish = vi.fn(async () => undefined);
     const dataSource = {
-      transaction: vi.fn(async (work: (current: typeof manager) => Promise<unknown>) => work(manager)),
+      transaction: vi.fn(
+        async (work: (current: typeof manager) => Promise<unknown>) =>
+          work(manager),
+      ),
     };
-    const orders = { update: vi.fn(async () => undefined), find: vi.fn(), findOne: vi.fn() };
-    service = new OrdersService(dataSource as never, orders as never, { replenish } as never);
+    const orders = {
+      update: vi.fn(async () => undefined),
+      find: vi.fn(),
+      findOne: vi.fn(),
+    };
+    service = new OrdersService(
+      dataSource as never,
+      orders as never,
+      { replenish } as never,
+    );
   });
 
   it('accepts a pickup order that names who will collect it', async () => {
@@ -88,19 +108,23 @@ describe('OrdersService', () => {
   });
 
   it('rejects a pickup order that includes a delivery address', async () => {
-    await expect(service.create({
-      ...baseOrder(),
-      deliveryAddress: '123 Lê Lợi',
-    })).rejects.toMatchObject({
+    await expect(
+      service.create({
+        ...baseOrder(),
+        deliveryAddress: '123 Lê Lợi',
+      }),
+    ).rejects.toMatchObject({
       message: 'A pickup order does not take a delivery address',
     });
   });
 
   it('rejects a delivery order without an address', async () => {
-    await expect(service.create({
-      ...baseOrder(),
-      fulfillmentType: FulfillmentType.DELIVERY,
-    })).rejects.toMatchObject({ message: 'recipientName is required' });
+    await expect(
+      service.create({
+        ...baseOrder(),
+        fulfillmentType: FulfillmentType.DELIVERY,
+      }),
+    ).rejects.toMatchObject({ message: 'recipientName is required' });
   });
 
   it('submits the prescription lines and lets the pharmacy accept without a stock check', async () => {
@@ -113,7 +137,11 @@ describe('OrdersService', () => {
       unit: 'VIEN',
       quantity: 4,
     });
-    manager.orders.set(orderId, { ...created, id: orderId, items: created.items });
+    manager.orders.set(orderId, {
+      ...created,
+      id: orderId,
+      items: created.items,
+    });
 
     const accepted = await service.accept(orderId, pharmacistId);
 
@@ -146,7 +174,9 @@ describe('OrdersService', () => {
       message: 'rejectionReason is required',
     });
 
-    const rejected = await service.reject(orderId, { rejectionReason: 'Hết hàng' });
+    const rejected = await service.reject(orderId, {
+      rejectionReason: 'Hết hàng',
+    });
 
     expect(rejected.status).toBe(OrderStatus.CANCELLED);
     expect(rejected.rejectionReason).toBe('Hết hàng');
@@ -243,12 +273,15 @@ describe('OrdersService', () => {
       items: [],
     });
 
-    await expect(service.cancel(orderId, {
-      userId: caregiverId,
-      role: 'CARE_GIVER',
-      rejectionReason: 'Đổi ý',
-    })).rejects.toMatchObject({
-      message: 'Contact the pharmacy to cancel an order that is already being prepared',
+    await expect(
+      service.cancel(orderId, {
+        userId: caregiverId,
+        role: 'CARE_GIVER',
+        rejectionReason: 'Đổi ý',
+      }),
+    ).rejects.toMatchObject({
+      message:
+        'Contact the pharmacy to cancel an order that is already being prepared',
     });
   });
 
@@ -261,11 +294,13 @@ describe('OrdersService', () => {
       items: [],
     });
 
-    await expect(service.cancel(orderId, {
-      userId: pharmacistId,
-      role: 'CARE_GIVER',
-      rejectionReason: 'Đổi ý',
-    })).rejects.toMatchObject({
+    await expect(
+      service.cancel(orderId, {
+        userId: pharmacistId,
+        role: 'CARE_GIVER',
+        rejectionReason: 'Đổi ý',
+      }),
+    ).rejects.toMatchObject({
       message: 'Only the caregiver who submitted this order can cancel it',
     });
   });
@@ -279,11 +314,13 @@ describe('OrdersService', () => {
       items: [],
     });
 
-    await expect(service.cancel(orderId, {
-      userId: caregiverId,
-      role: 'PHARMACIST',
-      rejectionReason: 'Giao không được',
-    })).rejects.toMatchObject({
+    await expect(
+      service.cancel(orderId, {
+        userId: caregiverId,
+        role: 'PHARMACIST',
+        rejectionReason: 'Giao không được',
+      }),
+    ).rejects.toMatchObject({
       message: 'Only the pharmacist of this pharmacy can cancel the order',
     });
   });
@@ -297,11 +334,13 @@ describe('OrdersService', () => {
       items: [],
     });
 
-    await expect(service.cancel(orderId, {
-      userId: pharmacistId,
-      role: 'PHARMACIST',
-      rejectionReason: 'Hết hàng',
-    })).rejects.toMatchObject({
+    await expect(
+      service.cancel(orderId, {
+        userId: pharmacistId,
+        role: 'PHARMACIST',
+        rejectionReason: 'Hết hàng',
+      }),
+    ).rejects.toMatchObject({
       message: 'Reject a submitted order instead of cancelling it',
     });
   });
@@ -336,7 +375,9 @@ describe('OrdersService', () => {
     const completed = await service.complete(orderId);
 
     expect(completed.status).toBe(OrderStatus.COMPLETED);
-    expect(replenish).toHaveBeenCalledWith([{ prescriptionItemId, quantity: 4 }]);
+    expect(replenish).toHaveBeenCalledWith([
+      { prescriptionItemId, quantity: 4 },
+    ]);
   });
 
   it('adds the delivered quantity back to the patient stock', async () => {
@@ -350,7 +391,9 @@ describe('OrdersService', () => {
     const completed = await service.complete(orderId);
 
     expect(completed.status).toBe(OrderStatus.COMPLETED);
-    expect(replenish).toHaveBeenCalledWith([{ prescriptionItemId, quantity: 4 }]);
+    expect(replenish).toHaveBeenCalledWith([
+      { prescriptionItemId, quantity: 4 },
+    ]);
   });
 });
 
@@ -361,9 +404,11 @@ function baseOrder() {
     pharmacyId,
     prescriptionId,
     fulfillmentType: FulfillmentType.PICKUP,
-    items: [{
-      prescriptionItemId,
-      quantity: 4,
-    }],
+    items: [
+      {
+        prescriptionItemId,
+        quantity: 4,
+      },
+    ],
   };
 }
