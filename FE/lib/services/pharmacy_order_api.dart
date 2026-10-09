@@ -102,6 +102,9 @@ class PharmacyOrderApi {
     body: {'rejectionReason': reason.trim()},
   );
 
+  Future<PharmacyOrder> complete(String id) =>
+      _order('POST', '/api/v1/orders/${Uri.encodeComponent(id)}/complete');
+
   Future<PharmacyOrder> _order(
     String method,
     String path, {

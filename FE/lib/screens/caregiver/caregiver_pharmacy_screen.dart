@@ -52,6 +52,14 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
     _pharmacyApi = widget.pharmacyApi ?? PharmacyApi();
     _orderApi = widget.orderApi ?? PharmacyOrderApi();
     _locationProvider = widget.locationProvider ?? DeviceLocationService();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    try {
+      final mine = await _orderApi.listMine();
+      if (mounted) setState(() => _orders = mine);
+    } catch (_) {}
   }
 
   @override
@@ -68,11 +76,25 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
     });
     try {
       final location = await _locationProvider.currentLocation();
-      final geohash = encodeGeohash(location.latitude, location.longitude);
+      await _searchWithCoordinates(location.latitude, location.longitude);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _searchWithCoordinates(double latitude, double longitude) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final geohash = encodeGeohash(latitude, longitude);
       final results = await Future.wait<Object>([
         _pharmacyApi.list(
-          latitude: location.latitude,
-          longitude: location.longitude,
+          latitude: latitude,
+          longitude: longitude,
           geohash: geohash,
           radiusKm: 10,
         ),
@@ -118,6 +140,26 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
         content: Text('Đã gửi đơn ${order.orderCode} đến ${pharmacy.name}.'),
       ),
     );
+  }
+
+  Future<void> _openOrderDetail(PharmacyOrder initialOrder) async {
+    final updated = await showModalBottomSheet<PharmacyOrder>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _OrderDetailSheet(
+        initialOrder: initialOrder,
+        orderApi: _orderApi,
+      ),
+    );
+    if (updated != null && mounted) {
+      setState(() {
+        _orders = [
+          for (final o in _orders)
+            if (o.id == updated.id) updated else o,
+        ];
+      });
+    }
   }
 
   @override
@@ -182,14 +224,13 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
         if (_geohash == null)
           const _EmptyCard(
             icon: Icons.location_searching_rounded,
-            message: 'Chưa có vị trí để tìm nhà thuốc.',
+            message: 'Chưa có vị trí để tìm nhà thuốc. Hãy bấm "Dùng vị trí hiện tại".',
           )
         else if (_pharmacies.isEmpty)
           const _EmptyCard(
             icon: Icons.store_mall_directory_outlined,
             message: 'Không tìm thấy nhà thuốc nào trong phạm vi 10 km.',
-          )
-        else ...[
+          ) else ...[
           Text(
             '${_pharmacies.length} nhà thuốc trong 10 km',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
@@ -250,20 +291,29 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
           ),
         ],
         if (_orders.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text(
-            'Đơn gần đây',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Đơn gần đây (${_orders.length})',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: 'Tải lại đơn',
+                onPressed: _loadOrders,
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           ..._orders
-              .take(5)
+              .take(8)
               .map(
-                (order) => ListTile(
+                (order) => _OrderCard(
                   key: Key('caregiver-order-${order.id}'),
-                  leading: const Icon(Icons.receipt_long_rounded),
-                  title: Text(order.orderCode),
-                  subtitle: Text(order.status.label),
+                  order: order,
+                  onTap: () => _openOrderDetail(order),
                 ),
               ),
         ],
@@ -390,110 +440,243 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     color: const Color(0xFFF7F8FF),
     borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
     clipBehavior: Clip.antiAlias,
-    child: Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .9,
-      ),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        14,
-        20,
-        MediaQuery.viewInsetsOf(context).bottom + 24,
-      ),
-      child: _prescriptions.isEmpty
-          ? const Center(
-              child: Text('Bệnh nhân chưa có đơn thuốc đang hoạt động.'),
-            )
-          : SingleChildScrollView(
-              child: Column(
+    child: SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.88,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.viewInsetsOf(context).bottom + 20,
+        ),
+        child: _prescriptions.isEmpty
+            ? const Center(
+                child: Text('Bệnh nhân chưa có đơn thuốc đang hoạt động.'),
+              )
+            : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Đặt thuốc tại ${widget.pharmacy.name}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<Prescription>(
-                    key: const Key('order-prescription'),
-                    initialValue: _prescription,
-                    decoration: const InputDecoration(
-                      labelText: 'Đơn thuốc',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _prescriptions
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item,
-                            child: Text(item.title),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _selectPrescription(value!)),
-                  ),
-                  const SizedBox(height: 10),
-                  for (final item in _prescription!.items.where(
-                    (item) => item.id != null,
-                  ))
-                    CheckboxListTile(
-                      key: Key('order-item-${item.id}'),
-                      value: _selected.contains(item.id),
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(item.medicineName),
-                      subtitle: Text(
-                        'Tồn ${item.currentStock} · Ngưỡng ${item.reorderThreshold}',
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      onChanged: (checked) => setState(() {
-                        if (checked == true) {
-                          _selected.add(item.id!);
-                        } else {
-                          _selected.remove(item.id);
-                        }
-                      }),
-                      secondary: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Đặt thuốc tại ${widget.pharmacy.name}',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          IconButton(
-                            onPressed: () => setState(() {
-                              _quantities[item.id!] = math.max(
-                                1,
-                                (_quantities[item.id] ?? 1) - 1,
-                              );
-                            }),
-                            icon: const Icon(Icons.remove_circle_outline),
+                          DropdownButtonFormField<Prescription>(
+                            key: const Key('order-prescription'),
+                            initialValue: _prescription,
+                            decoration: const InputDecoration(
+                              labelText: 'Đơn thuốc cần đặt',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(
+                                Icons.receipt_long_rounded,
+                                color: Color(0xFF5267F4),
+                              ),
+                            ),
+                            items: _prescriptions
+                                .map(
+                                  (p) => DropdownMenuItem(
+                                    value: p,
+                                    child: Text(
+                                      p.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (p) =>
+                                setState(() => _selectPrescription(p!)),
                           ),
-                          Text('${_quantities[item.id] ?? 1}'),
-                          IconButton(
-                            onPressed: () => setState(() {
-                              _quantities[item.id!] =
-                                  (_quantities[item.id] ?? 1) + 1;
-                            }),
-                            icon: const Icon(Icons.add_circle_outline),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Chọn các thuốc cần đặt:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF475569),
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<FulfillmentType>(
-                    key: const Key('order-fulfillment'),
-                    initialValue: _fulfillment,
-                    decoration: const InputDecoration(
-                      labelText: 'Hình thức nhận thuốc',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: FulfillmentType.values
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item,
-                            child: Text(item.label),
+                          const SizedBox(height: 8),
+                          for (final item in _prescription!.items.where(
+                            (item) => item.id != null,
+                          ))
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Container(
+                                key: Key('order-item-${item.id}'),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: _selected.contains(item.id)
+                                        ? const Color(0xFF5267F4)
+                                        : const Color(0xFFE2E8F0),
+                                    width: _selected.contains(item.id) ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _selected.contains(item.id),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                                      activeColor: const Color(0xFF5267F4),
+                                      onChanged: (checked) => setState(() {
+                                        if (checked == true) {
+                                          _selected.add(item.id!);
+                                        } else {
+                                          _selected.remove(item.id);
+                                        }
+                                      }),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.medicineName,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF1E293B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  'Tồn kho: ${item.currentStock}',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF475569),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEF3C7),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  'Ngưỡng báo: ${item.reorderThreshold}',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFFB45309),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            visualDensity: VisualDensity.compact,
+                                            onPressed: () => setState(() {
+                                              _quantities[item.id!] = math.max(
+                                                1,
+                                                (_quantities[item.id] ?? 1) - 1,
+                                              );
+                                            }),
+                                            icon: const Icon(Icons.remove_rounded, size: 18),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                                            child: Text(
+                                              '${_quantities[item.id] ?? 1}',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF1E293B),
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            visualDensity: VisualDensity.compact,
+                                            onPressed: () => setState(() {
+                                              _quantities[item.id!] =
+                                                  (_quantities[item.id] ?? 1) + 1;
+                                            }),
+                                            icon: const Icon(Icons.add_rounded, size: 18),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<FulfillmentType>(
+                            key: const Key('order-fulfillment'),
+                            initialValue: _fulfillment,
+                            decoration: const InputDecoration(
+                              labelText: 'Hình thức nhận thuốc',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: FulfillmentType.values
+                                .map(
+                                  (item) => DropdownMenuItem(
+                                    value: item,
+                                    child: Text(item.label),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) => setState(() => _fulfillment = value!),
                           ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => _fulfillment = value!),
-                  ),
                   if (_fulfillment == FulfillmentType.delivery) ...[
                     const SizedBox(height: 10),
                     TextField(
@@ -550,8 +733,12 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
     ),
-  );
+  ),
+);
 }
 
 class _EmptyCard extends StatelessWidget {
@@ -573,3 +760,595 @@ class _EmptyCard extends StatelessWidget {
     ),
   );
 }
+
+class _OrderDetailSheet extends StatefulWidget {
+  const _OrderDetailSheet({
+    required this.initialOrder,
+    required this.orderApi,
+  });
+
+  final PharmacyOrder initialOrder;
+  final PharmacyOrderApi orderApi;
+
+  @override
+  State<_OrderDetailSheet> createState() => _OrderDetailSheetState();
+}
+
+class _OrderDetailSheetState extends State<_OrderDetailSheet> {
+  late PharmacyOrder _order;
+  bool _loading = false;
+  bool _acting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.initialOrder;
+    _fetchDetail();
+  }
+
+  Future<void> _fetchDetail() async {
+    setState(() => _loading = true);
+    try {
+      final fresh = await widget.orderApi.getById(_order.id);
+      if (mounted) setState(() => _order = fresh);
+    } catch (_) {
+      // Giữ nguyên initialOrder nếu getById lỗi mạng
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _cancelOrder() async {
+    final reasonController = TextEditingController(text: 'Không có nhu cầu mua nữa');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hủy đơn thuốc'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Vui lòng nhập lý do bạn muốn hủy đơn:'),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('cancel-order-reason-input'),
+              controller: reasonController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Lý do hủy đơn',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Đóng'),
+          ),
+          FilledButton(
+            key: const Key('confirm-cancel-order-button'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFC64E57),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xác nhận hủy'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _acting = true;
+      _error = null;
+    });
+    try {
+      final updated = await widget.orderApi.cancel(_order.id, reasonController.text);
+      if (mounted) {
+        setState(() => _order = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đã hủy đơn ${_order.orderCode}.')),
+        );
+        Navigator.pop(context, updated);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _completeOrder() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận đã nhận thuốc'),
+        content: const Text(
+          'Bạn xác nhận đã nhận đủ thuốc cho đơn hàng này? Số lượng thuốc sẽ được cộng vào tủ thuốc tại nhà của bệnh nhân.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Chưa nhận'),
+          ),
+          FilledButton(
+            key: const Key('confirm-complete-order-button'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF249D76),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Đã nhận thuốc'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _acting = true;
+      _error = null;
+    });
+    try {
+      final updated = await widget.orderApi.complete(_order.id);
+      if (mounted) {
+        setState(() => _order = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đã hoàn tất đơn ${_order.orderCode}!')),
+        );
+        Navigator.pop(context, updated);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  Widget _buildFieldCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color iconColor = const Color(0xFF5267F4),
+    Color? valueColor,
+    bool isItalic = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF94A3B8),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: valueColor ?? const Color(0xFF1E293B),
+                    fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: const Color(0xFFF7F8FF),
+    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+    clipBehavior: Clip.antiAlias,
+    child: SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.88,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.viewInsetsOf(context).bottom + 20,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Đơn: ${_order.orderCode}',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+                Chip(
+                  label: Text(_order.status.label),
+                  backgroundColor: const Color(0xFFE7E9FF),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const LinearProgressIndicator()
+            else
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildFieldCard(
+                        icon: _order.fulfillmentType == FulfillmentType.pickup
+                            ? Icons.storefront_rounded
+                            : Icons.local_shipping_rounded,
+                        iconColor: _order.fulfillmentType == FulfillmentType.pickup
+                            ? const Color(0xFF7C3AED)
+                            : const Color(0xFF2563EB),
+                        label: 'Hình thức nhận thuốc',
+                        value: _order.fulfillmentType.label,
+                      ),
+                      if (_order.recipientName != null && _order.recipientName!.isNotEmpty)
+                        _buildFieldCard(
+                          icon: Icons.person_rounded,
+                          iconColor: const Color(0xFF0284C7),
+                          label: 'Người nhận & Số điện thoại',
+                          value: '${_order.recipientName}${_order.recipientPhone != null && _order.recipientPhone!.isNotEmpty ? ' • ${_order.recipientPhone}' : ''}',
+                        ),
+                      if (_order.deliveryAddress != null && _order.deliveryAddress!.isNotEmpty)
+                        _buildFieldCard(
+                          icon: Icons.location_on_rounded,
+                          iconColor: const Color(0xFFE11D48),
+                          label: 'Địa chỉ giao hàng',
+                          value: _order.deliveryAddress!,
+                        ),
+                      if (_order.patientNote != null && _order.patientNote!.isNotEmpty)
+                        _buildFieldCard(
+                          icon: Icons.edit_note_rounded,
+                          iconColor: const Color(0xFFD97706),
+                          label: 'Ghi chú bệnh nhân',
+                          value: _order.patientNote!,
+                          isItalic: true,
+                        ),
+                      if (_order.rejectionReason != null && _order.rejectionReason!.isNotEmpty)
+                        _buildFieldCard(
+                          icon: Icons.error_outline_rounded,
+                          iconColor: const Color(0xFFDC2626),
+                          valueColor: const Color(0xFFDC2626),
+                          label: 'Lý do từ chối / hủy đơn',
+                          value: _order.rejectionReason!,
+                        ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Danh sách thuốc trong đơn:',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final item in _order.items)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(item.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                Text(
+                                  '${item.quantity} ${item.unit}',
+                                  style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF5267F4)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 10),
+                        Text(_error!, style: const TextStyle(color: Color(0xFFC64E57))),
+                      ],
+                      const SizedBox(height: 20),
+                      if (_order.status == PharmacyOrderStatus.pendingReview)
+                        FilledButton.icon(
+                          key: const Key('cancel-order-button'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFC64E57),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: _acting ? null : _cancelOrder,
+                          icon: const Icon(Icons.cancel_outlined),
+                          label: Text(_acting ? 'Đang xử lý...' : 'Hủy đơn này'),
+                        ),
+                      if (_order.status == PharmacyOrderStatus.readyForPickup ||
+                          _order.status == PharmacyOrderStatus.shipped)
+                        FilledButton.icon(
+                          key: const Key('complete-order-button'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF249D76),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: _acting ? null : _completeOrder,
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: Text(_acting ? 'Đang xử lý...' : 'Đã nhận được thuốc'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({super.key, required this.order, required this.onTap});
+
+  final PharmacyOrder order;
+  final VoidCallback onTap;
+
+  (Color text, Color bg, IconData icon) get _statusMeta => switch (order.status) {
+    PharmacyOrderStatus.pendingReview => (
+      const Color(0xFFD97706),
+      const Color(0xFFFEF3C7),
+      Icons.access_time_rounded,
+    ),
+    PharmacyOrderStatus.preparing => (
+      const Color(0xFF2563EB),
+      const Color(0xFFDBEAFE),
+      Icons.hourglass_top_rounded,
+    ),
+    PharmacyOrderStatus.readyForPickup => (
+      const Color(0xFF7C3AED),
+      const Color(0xFFEDE9FE),
+      Icons.store_rounded,
+    ),
+    PharmacyOrderStatus.shipped => (
+      const Color(0xFF0D9488),
+      const Color(0xFFCCFBF1),
+      Icons.local_shipping_rounded,
+    ),
+    PharmacyOrderStatus.completed => (
+      const Color(0xFF16A34A),
+      const Color(0xFFDCFCE7),
+      Icons.check_circle_rounded,
+    ),
+    PharmacyOrderStatus.cancelled => (
+      const Color(0xFFDC2626),
+      const Color(0xFFFEE2E2),
+      Icons.cancel_rounded,
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final (textColor, bgColor, statusIcon) = _statusMeta;
+    final isPickup = order.fulfillmentType == FulfillmentType.pickup;
+    final created = order.createdAt;
+    final timeStr = created == null
+        ? null
+        : '${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')} • ${created.day.toString().padLeft(2, '0')}/${created.month.toString().padLeft(2, '0')}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Glass(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isPickup
+                                ? const Color(0xFFF3E8FF)
+                                : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            isPickup
+                                ? Icons.storefront_rounded
+                                : Icons.local_shipping_rounded,
+                            color: isPickup
+                                ? const Color(0xFF7C3AED)
+                                : const Color(0xFF2563EB),
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.orderCode,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF1E293B),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            if (timeStr != null)
+                              Text(
+                                timeStr,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF94A3B8),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 13, color: textColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            order.status.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (order.items.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF1F5F9)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.medication_rounded,
+                          size: 16,
+                          color: Color(0xFF5267F4),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            order.items
+                                .map((i) => '${i.name} (x${i.quantity})')
+                                .join(', '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      order.fulfillmentType == FulfillmentType.pickup
+                          ? 'Nhận tại quầy'
+                          : 'Giao tận nơi',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const Row(
+                      children: [
+                        Text(
+                          'Chi tiết',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF5267F4),
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: Color(0xFF5267F4),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
