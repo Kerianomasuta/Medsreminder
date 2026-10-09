@@ -48,6 +48,33 @@ void main() {
     },
   );
 
+  test(
+    'alarm uses the updated scheduledAt supplied by the regenerated log',
+    () {
+      final original = _log(
+        status: DoseStatus.scheduled,
+        scheduledAt: DateTime(2026, 10, 9, 8),
+      );
+      final updated = _log(
+        status: DoseStatus.scheduled,
+        scheduledAt: DateTime(2026, 10, 9, 20, 30),
+      );
+
+      expect(medicationAlarmTriggerAt(original), DateTime(2026, 10, 9, 8));
+      expect(medicationAlarmTriggerAt(updated), DateTime(2026, 10, 9, 20, 30));
+    },
+  );
+
+  test('snooze time takes priority over the scheduled dose time', () {
+    final log = _log(
+      status: DoseStatus.snoozed,
+      scheduledAt: DateTime(2026, 10, 9, 8),
+      snoozeUntil: DateTime(2026, 10, 9, 8, 10),
+    );
+
+    expect(medicationAlarmTriggerAt(log), DateTime(2026, 10, 9, 8, 10));
+  });
+
   test('uses snoozeUntil as the effective reminder time', () {
     expect(
       shouldScheduleMedicationLog(

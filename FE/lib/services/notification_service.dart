@@ -21,7 +21,10 @@ class SkipReasonRequest {
 
 @visibleForTesting
 bool shouldScheduleMedicationLog(MedicationLog log, DateTime now) =>
-    log.isOpen && log.effectiveReminderAt.isAfter(now);
+    log.isOpen && medicationAlarmTriggerAt(log).isAfter(now);
+
+@visibleForTesting
+DateTime medicationAlarmTriggerAt(MedicationLog log) => log.effectiveReminderAt;
 
 class NotificationService {
   NotificationService._();
@@ -265,9 +268,16 @@ class NotificationService {
     }
   }
 
-  Future<void> refreshUpcomingMedicationLogs() {
+  Future<void> refreshUpcomingMedicationLogs({bool force = false}) {
     if (!_isSupported) return Future.value();
-    if (_refreshInFlight != null) return _refreshInFlight!;
+    final current = _refreshInFlight;
+    if (current != null) {
+      if (!force) return current;
+      return () async {
+        await current;
+        await refreshUpcomingMedicationLogs();
+      }();
+    }
     final refresh = _refreshUpcomingMedicationLogs();
     _refreshInFlight = refresh;
     refresh.whenComplete(() => _refreshInFlight = null);
@@ -287,7 +297,7 @@ class NotificationService {
   Future<void> scheduleMedicationLog(MedicationLog log) async {
     if (!_isSupported || !log.isOpen) return;
     await init();
-    final reminderAt = log.effectiveReminderAt;
+    final reminderAt = medicationAlarmTriggerAt(log);
     if (!reminderAt.isAfter(DateTime.now())) return;
     final triggerAt = reminderAt;
     final medicine = log.medicine?.name ?? 'Đến giờ uống thuốc';

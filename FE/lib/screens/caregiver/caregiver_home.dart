@@ -627,55 +627,64 @@ class _ScheduleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
-    child: Glass(
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE7E9FF),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              rule.displayTime,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF4659CF),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => showScheduleDetailsModal(
+        context,
+        scheduleId: rule.id,
+        initialRule: rule,
+        selectedDate: DateTime.now(),
+      ),
+      child: Glass(
+        padding: const EdgeInsets.all(15),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E9FF),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                rule.displayTime,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF4659CF),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rule.medicine.name,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                Text(
-                  '${rule.dosagePerTime.toStringAsFixed(rule.dosagePerTime % 1 == 0 ? 0 : 1)} ${rule.medicine.unit} · ${rule.prescription.title}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF687195),
-                  ),
-                ),
-                if (rule.instructions?.isNotEmpty == true)
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    rule.instructions!,
-                    style: const TextStyle(fontSize: 12),
+                    rule.medicine.name,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-              ],
+                  Text(
+                    '${rule.dosagePerTime.toStringAsFixed(rule.dosagePerTime % 1 == 0 ? 0 : 1)} ${rule.medicine.unit} · ${rule.prescription.title}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF687195),
+                    ),
+                  ),
+                  if (rule.instructions?.isNotEmpty == true)
+                    Text(
+                      rule.instructions!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
+              ),
             ),
-          ),
-          StatusChip(
-            rule.isActive ? 'Đang bật' : 'Đã tắt',
-            rule.isActive ? const Color(0xFF249D76) : const Color(0xFF9BA3BF),
-          ),
-        ],
+            StatusChip(
+              rule.isActive ? 'Đang bật' : 'Đã tắt',
+              rule.isActive ? const Color(0xFF249D76) : const Color(0xFF9BA3BF),
+            ),
+          ],
+        ),
       ),
     ),
   );
