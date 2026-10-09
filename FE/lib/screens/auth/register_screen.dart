@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../models/app_role.dart';
+import '../../models/pharmacist_dashboard.dart';
+import '../../models/registration_input.dart';
+import '../../services/geocoding_api.dart';
+import '../../services/device_location_service.dart';
+import '../../widgets/pharmacy_location_picker.dart';
 import 'auth_backdrop.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -8,17 +13,16 @@ class RegisterScreen extends StatefulWidget {
     super.key,
     required this.onRegister,
     required this.onBackToLogin,
+    this.geocodingApi,
+    this.locationProvider,
+    this.showLocationMap = true,
   });
 
-  final Future<void> Function(
-    String email,
-    String password,
-    String fullName,
-    String phone,
-    AppRole role,
-  )
-  onRegister;
+  final Future<void> Function(RegistrationInput input) onRegister;
   final VoidCallback onBackToLogin;
+  final GeocodingApi? geocodingApi;
+  final DeviceLocationProvider? locationProvider;
+  final bool showLocationMap;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -31,6 +35,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _pharmacyNameController = TextEditingController();
+  PharmacyLocationSelection? _pharmacyLocation;
   AppRole _role = AppRole.patient;
   bool _loading = false;
   bool _obscurePassword = true;
@@ -49,6 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _pharmacyNameController.dispose();
     super.dispose();
   }
 
@@ -59,12 +66,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _error = null;
     });
     try {
+      if (_role == AppRole.pharmacist && _pharmacyLocation == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Vui lòng tìm và xác nhận vị trí nhà thuốc.';
+        });
+        return;
+      }
       await widget.onRegister(
-        _emailController.text.trim(),
-        _passwordController.text,
-        _fullNameController.text.trim(),
-        _phoneController.text.trim(),
-        _role,
+        RegistrationInput(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          fullName: _fullNameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          role: _role,
+          pharmacyName: _role == AppRole.pharmacist
+              ? _pharmacyNameController.text.trim()
+              : null,
+          addressText: _pharmacyLocation?.addressText,
+          latitude: _pharmacyLocation?.latitude,
+          longitude: _pharmacyLocation?.longitude,
+        ),
       );
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -149,6 +171,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 14),
                   DropdownButtonFormField<AppRole>(
+                    key: const Key('registration-role'),
                     initialValue: _role,
                     decoration: _decoration('Vai trò', Icons.badge_outlined),
                     items: _registerableRoles
@@ -161,8 +184,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         .toList(),
                     onChanged: _loading
                         ? null
-                        : (value) => setState(() => _role = value!),
+                        : (value) => setState(() {
+                            _role = value!;
+                            if (_role != AppRole.pharmacist) {
+                              _pharmacyLocation = null;
+                            }
+                          }),
                   ),
+                  if (_role == AppRole.pharmacist) ...[
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      key: const Key('pharmacy-name'),
+                      controller: _pharmacyNameController,
+                      textInputAction: TextInputAction.next,
+                      decoration: _decoration(
+                        'Tên nhà thuốc',
+                        Icons.local_pharmacy_outlined,
+                      ),
+                      validator: (value) {
+                        if (_role != AppRole.pharmacist) {
+                          return null;
+                        }
+                        final length = value?.trim().length ?? 0;
+                        if (length == 0) return 'Vui lòng nhập tên nhà thuốc';
+                        if (length > 150) {
+                          return 'Tên nhà thuốc tối đa 150 ký tự';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    PharmacyLocationPicker(
+                      key: const Key('registration-pharmacy-location'),
+                      geocodingApi: widget.geocodingApi,
+                      locationProvider: widget.locationProvider,
+                      showMap: widget.showLocationMap,
+                      onChanged: (location) =>
+                          setState(() => _pharmacyLocation = location),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   TextFormField(
                     controller: _passwordController,
@@ -209,6 +269,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                   const SizedBox(height: 22),
                   FilledButton(
+                    key: const Key('registration-submit'),
                     onPressed: _loading ? null : _submit,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(54),

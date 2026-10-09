@@ -1,4 +1,4 @@
-import 'medicine.dart';
+import '../utils/geohash.dart';
 
 class PharmacyLocationSelection {
   const PharmacyLocationSelection({
@@ -10,6 +10,8 @@ class PharmacyLocationSelection {
   final String addressText;
   final double latitude;
   final double longitude;
+
+  String get geohash => encodeGeohash(latitude, longitude);
 }
 
 class Pharmacy {
@@ -21,7 +23,8 @@ class Pharmacy {
     required this.addressText,
     required this.latitude,
     required this.longitude,
-    required this.isActive,
+    required this.geohash,
+    this.distanceKm,
   });
 
   final String id;
@@ -31,7 +34,8 @@ class Pharmacy {
   final String addressText;
   final double latitude;
   final double longitude;
-  final bool isActive;
+  final String geohash;
+  final double? distanceKm;
 
   factory Pharmacy.fromJson(Map<String, dynamic> json) => Pharmacy(
     id: json['id']?.toString() ?? '',
@@ -41,95 +45,9 @@ class Pharmacy {
     addressText: json['addressText']?.toString() ?? '',
     latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
     longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
-    isActive: json['isActive'] == true,
+    geohash: json['geohash']?.toString() ?? '',
+    distanceKm: (json['distanceKm'] as num?)?.toDouble(),
   );
-}
-
-class PharmacyInput {
-  const PharmacyInput({
-    required this.pharmacistId,
-    required this.name,
-    required this.phoneNumber,
-    required this.addressText,
-    required this.latitude,
-    required this.longitude,
-    required this.isActive,
-  });
-
-  final String pharmacistId;
-  final String name;
-  final String phoneNumber;
-  final String addressText;
-  final double latitude;
-  final double longitude;
-  final bool isActive;
-
-  Map<String, dynamic> toJson({bool includeOwner = true}) => {
-    if (includeOwner) 'pharmacistId': pharmacistId,
-    'name': name.trim(),
-    'phoneNumber': phoneNumber.trim(),
-    'addressText': addressText.trim(),
-    'latitude': latitude,
-    'longitude': longitude,
-    'isActive': isActive,
-  };
-}
-
-class PharmacyInventoryItem {
-  const PharmacyInventoryItem({
-    required this.id,
-    required this.pharmacyId,
-    required this.medicineId,
-    required this.stockQuantity,
-    required this.pricePerUnit,
-    this.medicine,
-  });
-
-  final String id;
-  final String pharmacyId;
-  final String medicineId;
-  final int stockQuantity;
-  final double pricePerUnit;
-  final Medicine? medicine;
-
-  String get displayName => medicine?.name ?? medicineId;
-  MedicineUnit? get unit => medicine?.unit;
-
-  factory PharmacyInventoryItem.fromJson(Map<String, dynamic> json) =>
-      PharmacyInventoryItem(
-        id: json['id']?.toString() ?? '',
-        pharmacyId: json['pharmacyId']?.toString() ?? '',
-        medicineId: json['medicineId']?.toString() ?? '',
-        stockQuantity: (json['stockQuantity'] as num?)?.toInt() ?? 0,
-        pricePerUnit: (json['pricePerUnit'] as num?)?.toDouble() ?? 0,
-      );
-
-  PharmacyInventoryItem withMedicine(Medicine? value) => PharmacyInventoryItem(
-    id: id,
-    pharmacyId: pharmacyId,
-    medicineId: medicineId,
-    stockQuantity: stockQuantity,
-    pricePerUnit: pricePerUnit,
-    medicine: value,
-  );
-}
-
-class InventoryInput {
-  const InventoryInput({
-    required this.medicineId,
-    required this.stockQuantity,
-    required this.pricePerUnit,
-  });
-
-  final String medicineId;
-  final int stockQuantity;
-  final double pricePerUnit;
-
-  Map<String, dynamic> toJson() => {
-    'medicineId': medicineId,
-    'stockQuantity': stockQuantity,
-    'pricePerUnit': pricePerUnit,
-  };
 }
 
 enum PharmacyOrderStatus {

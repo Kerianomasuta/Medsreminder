@@ -9,7 +9,6 @@ import 'package:meds_reminder/services/pharmacy_order_api.dart';
 
 const pharmacyId = '11111111-1111-4111-8111-111111111111';
 const orderId = '22222222-2222-4222-8222-222222222222';
-const medicineId = '33333333-3333-4333-8333-333333333333';
 const pharmacyJson = {
   'id': pharmacyId,
   'pharmacistId': '507f1f77bcf86cd799439013',
@@ -18,7 +17,8 @@ const pharmacyJson = {
   'addressText': 'District 1',
   'latitude': 10.77,
   'longitude': 106.7,
-  'isActive': true,
+  'geohash': 'w3gvk1xyz',
+  'distanceKm': 1.25,
 };
 const orderJson = {
   'id': orderId,
@@ -32,74 +32,110 @@ const orderJson = {
 };
 
 void main() {
+  test('pharmacy API uses the existing list and detail routes', () async {
+    final calls = <http.BaseRequest>[];
+    final bodies = <Map<String, dynamic>?>[];
+    final client = MockClient((request) async {
+      calls.add(request);
+      bodies.add(
+        request.body.isNotEmpty
+            ? jsonDecode(request.body) as Map<String, dynamic>
+            : null,
+      );
+      if (request.method == 'GET' && request.url.path == '/api/v1/pharmacies') {
+        return http.Response(jsonEncode([pharmacyJson]), 200);
+      }
+      return http.Response(jsonEncode(pharmacyJson), 200);
+    });
+    final api = PharmacyApi(client: client);
+    await api.list();
+    await api.getById(pharmacyId);
+
+    expect(calls.map((r) => '${r.method} ${r.url.path}'), [
+      'GET /api/v1/pharmacies',
+      'GET /api/v1/pharmacies/$pharmacyId',
+    ]);
+    expect(bodies, everyElement(isNull));
+  });
+
   test(
-    'pharmacy API uses all six backend routes and expected payloads',
+    'pharmacist profile resolves its id then calls the detail route',
     () async {
-      final calls = <http.BaseRequest>[];
-      final bodies = <Map<String, dynamic>?>[];
+      final calls = <String>[];
       final client = MockClient((request) async {
-        calls.add(request);
-        bodies.add(
-          request.body.isNotEmpty
-              ? jsonDecode(request.body) as Map<String, dynamic>
-              : null,
-        );
-        if (request.url.path.endsWith('/inventory')) {
-          return http.Response(
-            jsonEncode([
-              {
-                'id': 'inventory-1',
-                'pharmacyId': pharmacyId,
-                'medicineId': medicineId,
-                'stockQuantity': 12,
-                'pricePerUnit': 15000,
-              },
-            ]),
-            200,
-          );
-        }
-        if (request.method == 'GET' &&
-            request.url.path == '/api/v1/pharmacies') {
+        calls.add('${request.method} ${request.url.path}');
+        if (request.url.path == '/api/v1/pharmacies') {
           return http.Response(jsonEncode([pharmacyJson]), 200);
         }
         return http.Response(jsonEncode(pharmacyJson), 200);
       });
       final api = PharmacyApi(client: client);
-      const input = PharmacyInput(
-        pharmacistId: '507f1f77bcf86cd799439013',
-        name: 'Nhà thuốc An Tâm',
-        phoneNumber: '0901234567',
-        addressText: 'Quận 1',
-        latitude: 10.77,
-        longitude: 106.7,
-        isActive: true,
-      );
 
-      await api.create(input);
-      await api.list(isActive: true);
-      await api.getById(pharmacyId);
-      await api.update(pharmacyId, input);
-      await api.listInventory(pharmacyId);
-      await api.upsertInventory(pharmacyId, const [
-        InventoryInput(
-          medicineId: medicineId,
-          stockQuantity: 12,
-          pricePerUnit: 15000,
-        ),
-      ]);
+      final pharmacy = await api.getForPharmacist('507f1f77bcf86cd799439013');
 
-      expect(calls.map((r) => '${r.method} ${r.url.path}'), [
-        'POST /api/v1/pharmacies',
+      expect(pharmacy.id, pharmacyId);
+      expect(calls, [
         'GET /api/v1/pharmacies',
         'GET /api/v1/pharmacies/$pharmacyId',
-        'PATCH /api/v1/pharmacies/$pharmacyId',
-        'GET /api/v1/pharmacies/$pharmacyId/inventory',
-        'PUT /api/v1/pharmacies/$pharmacyId/inventory',
       ]);
-      expect(calls[1].url.queryParameters['isActive'], 'true');
-      expect(bodies[0]!['pharmacistId'], '507f1f77bcf86cd799439013');
-      expect(bodies[3]!.containsKey('pharmacistId'), isFalse);
-      expect((bodies[5]!['items'] as List).single['medicineId'], medicineId);
+    },
+  );
+
+  test('pharmacy API sends the caregiver geohash and 10 km radius', () async {
+    Uri? requestedUri;
+    final client = MockClient((request) async {
+      requestedUri = request.url;
+      return http.Response(jsonEncode([pharmacyJson]), 200);
+    });
+    final api = PharmacyApi(client: client);
+
+    final result = await api.list(
+      latitude: 10.7769,
+      longitude: 106.7009,
+      geohash: 'w3gvk1xyz',
+      radiusKm: 10,
+    );
+
+    expect(requestedUri?.queryParameters, {
+      'latitude': '10.7769',
+      'longitude': '106.7009',
+      'geohash': 'w3gvk1xyz',
+      'radiusKm': '10.0',
+    });
+    expect(result.single.distanceKm, 1.25);
+  });
+
+  test(
+    'caregiver creates an order without a client supplied caregiver id',
+    () async {
+      Map<String, dynamic>? body;
+      final client = MockClient((request) async {
+        body = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response(jsonEncode(orderJson), 201);
+      });
+      final api = PharmacyOrderApi(client: client);
+
+      await api.create(
+        patientId: '507f1f77bcf86cd799439011',
+        pharmacyId: pharmacyId,
+        prescriptionId: '44444444-4444-4444-8444-444444444444',
+        fulfillmentType: FulfillmentType.pickup,
+        items: [
+          (
+            prescriptionItemId: '55555555-5555-4555-8555-555555555555',
+            quantity: 4,
+          ),
+        ],
+      );
+
+      expect(body?['caregiverId'], isNull);
+      expect(body?['patientId'], '507f1f77bcf86cd799439011');
+      expect(body?['pharmacyId'], pharmacyId);
+      expect(body?['fulfillmentType'], 'PICKUP');
+      expect((body?['items'] as List).single, {
+        'prescriptionItemId': '55555555-5555-4555-8555-555555555555',
+        'quantity': 4,
+      });
     },
   );
 

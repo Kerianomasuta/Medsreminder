@@ -102,21 +102,9 @@ class _MedsReminderAppState extends State<MedsReminderApp>
     _scheduleSkipReasonDialog();
   }
 
-  Future<void> _register(
-    String email,
-    String password,
-    String fullName,
-    String phone,
-    AppRole selectedRole,
-  ) async {
-    await _authApi.register(
-      email: email,
-      password: password,
-      fullName: fullName,
-      phone: phone,
-      role: selectedRole,
-    );
-    await _login(email, password);
+  Future<void> _register(RegistrationInput input) async {
+    await _authApi.register(input);
+    await _login(input.email, input.password);
   }
 
   Future<void> _logout() async {

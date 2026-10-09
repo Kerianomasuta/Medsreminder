@@ -12,12 +12,18 @@ export const ORDER_STATUSES = [
 ] as const;
 
 export class ListOrdersQueryDto {
-  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description: 'MongoDB ObjectId of the patient',
+  })
   @IsOptional()
   @IsMongoId()
   patientId?: string;
 
-  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439012',
+    description: 'MongoDB ObjectId of the caregiver',
+  })
   @IsOptional()
   @IsMongoId()
   caregiverId?: string;

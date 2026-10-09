@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../models/pharmacist_dashboard.dart';
+import '../services/device_location_service.dart';
 import '../services/geocoding_api.dart';
 
 class PharmacyLocationPicker extends StatefulWidget {
@@ -11,14 +12,16 @@ class PharmacyLocationPicker extends StatefulWidget {
     required this.onChanged,
     this.initialLocation,
     this.geocodingApi,
+    this.locationProvider,
     this.showMap = true,
   });
 
   final PharmacyLocationSelection? initialLocation;
   final ValueChanged<PharmacyLocationSelection?> onChanged;
   final GeocodingApi? geocodingApi;
+  final DeviceLocationProvider? locationProvider;
 
-  /// Kept configurable so the search flow can be tested without loading tiles.
+  /// Kept configurable so the GPS flow can be tested without loading tiles.
   final bool showMap;
 
   @override
@@ -26,20 +29,15 @@ class PharmacyLocationPicker extends StatefulWidget {
 }
 
 class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
-  static const _hoChiMinhCity = LatLng(10.7769, 106.7009);
-
-  late final TextEditingController _addressController;
   late final MapController _mapController;
   late final GeocodingApi _geocodingApi;
+  late final DeviceLocationProvider _locationProvider;
   late final bool _ownsGeocodingApi;
 
   PharmacyLocationSelection? _selection;
   LatLng? _markerPoint;
-  List<PharmacyLocationSelection> _results = const [];
-  bool _searching = false;
-  bool _resolvingPoint = false;
+  bool _usingDeviceLocation = false;
   String? _error;
-  int _operation = 0;
 
   @override
   void initState() {
@@ -51,114 +49,48 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
             widget.initialLocation!.latitude,
             widget.initialLocation!.longitude,
           );
-    _addressController = TextEditingController(
-      text: widget.initialLocation?.addressText,
-    );
     _mapController = MapController();
     _ownsGeocodingApi = widget.geocodingApi == null;
     _geocodingApi = widget.geocodingApi ?? GeocodingApi();
+    _locationProvider = widget.locationProvider ?? DeviceLocationService();
   }
 
   @override
   void dispose() {
-    _addressController.dispose();
     _mapController.dispose();
     if (_ownsGeocodingApi) _geocodingApi.close();
     super.dispose();
   }
 
-  Future<void> _search() async {
-    final query = _addressController.text.trim();
-    if (query.length < 3) {
-      setState(() {
-        _results = const [];
-        _error = 'Nhập ít nhất 3 ký tự để tìm địa chỉ.';
-      });
-      return;
-    }
-
-    final operation = ++_operation;
+  Future<void> _useCurrentLocation() async {
     setState(() {
-      _searching = true;
-      _results = const [];
+      _usingDeviceLocation = true;
       _error = null;
     });
     try {
-      final results = await _geocodingApi.searchAddress(query);
-      if (!mounted || operation != _operation) return;
-      setState(() {
-        _results = results;
-        if (results.isEmpty) {
-          _error = 'Không tìm thấy địa chỉ phù hợp tại Việt Nam.';
-        }
-      });
-    } catch (exception) {
-      if (!mounted || operation != _operation) return;
-      setState(() => _error = exception.toString());
-    } finally {
-      if (mounted && operation == _operation) {
-        setState(() => _searching = false);
-      }
-    }
-  }
-
-  void _chooseResult(PharmacyLocationSelection location) {
-    ++_operation;
-    final point = LatLng(location.latitude, location.longitude);
-    _addressController.text = location.addressText;
-    setState(() {
-      _selection = location;
-      _markerPoint = point;
-      _results = const [];
-      _error = null;
-      _searching = false;
-      _resolvingPoint = false;
-    });
-    if (widget.showMap) _mapController.move(point, 16);
-    widget.onChanged(location);
-  }
-
-  Future<void> _choosePoint(LatLng point) async {
-    final operation = ++_operation;
-    setState(() {
-      _selection = null;
-      _markerPoint = point;
-      _results = const [];
-      _error = null;
-      _resolvingPoint = true;
-    });
-    widget.onChanged(null);
-    try {
+      final deviceLocation = await _locationProvider.currentLocation();
+      if (!mounted) return;
       final location = await _geocodingApi.reverseGeocode(
-        point.latitude,
-        point.longitude,
+        deviceLocation.latitude,
+        deviceLocation.longitude,
       );
-      if (!mounted || operation != _operation) return;
-      _addressController.text = location.addressText;
+      if (!mounted) return;
+      final point = LatLng(location.latitude, location.longitude);
       setState(() {
         _selection = location;
-        _error = null;
+        _markerPoint = point;
       });
       widget.onChanged(location);
-    } catch (exception) {
-      if (!mounted || operation != _operation) return;
-      setState(() => _error = exception.toString());
-    } finally {
-      if (mounted && operation == _operation) {
-        setState(() => _resolvingPoint = false);
+      if (widget.showMap) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _mapController.move(point, 16);
+        });
       }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _usingDeviceLocation = false);
     }
-  }
-
-  void _invalidateSelection(String _) {
-    if (_selection == null) return;
-    ++_operation;
-    setState(() {
-      _selection = null;
-      _results = const [];
-      _error = 'Địa chỉ đã thay đổi. Hãy tìm và chọn lại vị trí.';
-    });
-    widget.onChanged(null);
   }
 
   @override
@@ -167,89 +99,51 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextField(
-                key: const Key('pharmacy-address-search'),
-                controller: _addressController,
-                minLines: 1,
-                maxLines: 2,
-                textInputAction: TextInputAction.search,
-                onChanged: _invalidateSelection,
-                onSubmitted: (_) => _search(),
-                decoration: const InputDecoration(
-                  labelText: 'Địa chỉ nhà thuốc',
-                  hintText: 'Ví dụ: 123 Nguyễn Huệ, Quận 1, TP.HCM',
-                  prefixIcon: Icon(Icons.search_rounded),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              height: 56,
-              child: FilledButton.tonalIcon(
-                key: const Key('search-pharmacy-address'),
-                onPressed: _searching || _resolvingPoint ? null : _search,
-                icon: _searching
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.search_rounded),
-                label: const Text('Tìm'),
-              ),
-            ),
-          ],
+        const Text(
+          'Vị trí nhà thuốc được lấy trực tiếp từ GPS của thiết bị.',
+          style: TextStyle(color: Color(0xFF687195)),
         ),
-        if (_results.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border.all(color: colorScheme.outlineVariant),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                for (var index = 0; index < _results.length; index++) ...[
-                  ListTile(
-                    key: Key('address-result-$index'),
-                    dense: true,
-                    leading: const Icon(Icons.location_on_outlined),
-                    title: Text(
-                      _results[index].addressText,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onTap: () => _chooseResult(_results[index]),
-                  ),
-                  if (index < _results.length - 1) const Divider(height: 1),
-                ],
-              ],
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const Key('use-current-pharmacy-location'),
+            onPressed: _usingDeviceLocation ? null : _useCurrentLocation,
+            icon: _usingDeviceLocation
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location_rounded),
+            label: Text(
+              _usingDeviceLocation
+                  ? 'Đang lấy vị trí...'
+                  : 'Dùng vị trí hiện tại',
             ),
           ),
-        ],
-        if (widget.showMap) ...[
+        ),
+        if (widget.showMap && _markerPoint != null) ...[
           const SizedBox(height: 12),
           Text(
-            'Chạm bản đồ để điều chỉnh vị trí',
+            'Vị trí GPS đã xác định',
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: SizedBox(
-              height: 260,
+              key: const Key('pharmacy-location-map'),
+              height: 150,
               child: FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
-                  initialCenter: _markerPoint ?? _hoChiMinhCity,
-                  initialZoom: _markerPoint == null ? 12 : 16,
-                  minZoom: 4,
-                  maxZoom: 19,
-                  onTap: (_, point) => _choosePoint(point),
+                  initialCenter: _markerPoint!,
+                  initialZoom: 16,
+                  minZoom: 16,
+                  maxZoom: 16,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.none,
+                  ),
                 ),
                 children: [
                   TileLayer(
@@ -287,12 +181,6 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
             ),
           ),
         ],
-        if (_resolvingPoint) ...[
-          const SizedBox(height: 8),
-          const LinearProgressIndicator(),
-          const SizedBox(height: 4),
-          const Text('Đang xác định địa chỉ tại vị trí đã chọn...'),
-        ],
         if (_error != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -324,9 +212,15 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                         'Đã xác nhận vị trí',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
+                      Text(_selection!.addressText),
                       Text(
                         '${_selection!.latitude.toStringAsFixed(6)}, '
                         '${_selection!.longitude.toStringAsFixed(6)}',
+                      ),
+                      Text(
+                        'Geohash: ${_selection!.geohash}',
+                        key: const Key('confirmed-pharmacy-geohash'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),

@@ -31,7 +31,10 @@ export class PharmaciesService {
     return this.send({ cmd: 'get_pharmacy' }, { id });
   }
 
-  private async send<T>(pattern: { cmd: string }, payload: unknown): Promise<T> {
+  private async send<T>(
+    pattern: { cmd: string },
+    payload: unknown,
+  ): Promise<T> {
     try {
       return await lastValueFrom(this.pharmacyClient.send<T>(pattern, payload));
     } catch (error) {
@@ -45,10 +48,16 @@ export class PharmaciesService {
     }
     if (typeof error === 'object' && error !== null) {
       const record = error as { status?: number; message?: unknown };
-      if (typeof record.status === 'number' && typeof record.message === 'string') {
+      if (
+        typeof record.status === 'number' &&
+        typeof record.message === 'string'
+      ) {
         return new HttpException(record.message, record.status);
       }
     }
-    return new HttpException('Pharmacy order service is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
+    return new HttpException(
+      'Pharmacy order service is unavailable',
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 }

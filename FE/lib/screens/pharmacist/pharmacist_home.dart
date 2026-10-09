@@ -2,35 +2,28 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/pharmacist_dashboard_controller.dart';
 import '../../models/models.dart';
-import '../../services/geocoding_api.dart';
 import '../../widgets/widgets.dart';
-import 'pharmacist_medicine_catalog_page.dart';
 
 class PharmacistHome extends StatelessWidget {
   const PharmacistHome({
     super.key,
     required this.tab,
     required this.controller,
-    this.geocodingApi,
   });
 
   final int tab;
   final PharmacistDashboardController controller;
-  final GeocodingApi? geocodingApi;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
     builder: (context, _) {
-      if (controller.loading && controller.pharmacies.isEmpty) {
+      if (controller.loading && controller.orders.isEmpty) {
         return const Center(child: CircularProgressIndicator());
       }
       return switch (tab) {
         0 => _OrdersPage(controller: controller, history: false),
-        1 => _InventoryPage(controller: controller),
-        2 => PharmacistMedicineCatalogPage(controller: controller),
-        3 => _OrdersPage(controller: controller, history: true),
-        _ => _PharmacyPage(controller: controller, geocodingApi: geocodingApi),
+        _ => _OrdersPage(controller: controller, history: true),
       };
     },
   );
@@ -63,25 +56,6 @@ class _DashboardHeader extends StatelessWidget {
           ),
         ],
       ),
-      if (controller.pharmacies.length > 1) ...[
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: controller.selectedPharmacyId,
-          decoration: const InputDecoration(
-            labelText: 'Nhà thuốc đang quản lý',
-            border: OutlineInputBorder(),
-          ),
-          items: controller.pharmacies
-              .map(
-                (item) =>
-                    DropdownMenuItem(value: item.id, child: Text(item.name)),
-              )
-              .toList(),
-          onChanged: (value) {
-            if (value != null) controller.selectPharmacy(value);
-          },
-        ),
-      ],
       if (controller.error != null) ...[
         const SizedBox(height: 10),
         _ErrorBanner(message: controller.error!),
@@ -272,215 +246,43 @@ class _OrderActions extends StatelessWidget {
   }
 }
 
-class _InventoryPage extends StatelessWidget {
-  const _InventoryPage({required this.controller});
-  final PharmacistDashboardController controller;
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
   @override
-  Widget build(BuildContext context) {
-    final pharmacy = controller.selectedPharmacy;
-    return AppScroll(
+  Widget build(BuildContext context) => Glass(
+    padding: const EdgeInsets.all(24),
+    child: Center(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _DashboardHeader(
-            controller: controller,
-            title: 'Kho thuốc',
-            subtitle: pharmacy == null
-                ? 'Đăng ký nhà thuốc trước khi nhập kho'
-                : '${controller.inventory.length} mặt hàng tại ${pharmacy.name}',
+          Icon(icon, size: 42, color: const Color(0xFF66738A)),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
-          if (pharmacy == null)
-            _EmptyCard(
-              icon: Icons.local_pharmacy_outlined,
-              title: 'Chưa có nhà thuốc',
-              subtitle: 'Mở tab Nhà thuốc để đăng ký thông tin kinh doanh.',
-            )
-          else ...[
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: controller.saving
-                    ? null
-                    : () => _editInventory(context),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Thêm / cập nhật thuốc'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (controller.inventory.isEmpty)
-              const _EmptyCard(
-                icon: Icons.inventory_2_outlined,
-                title: 'Kho đang trống',
-                subtitle:
-                    'Chọn thuốc từ danh mục để thiết lập tồn kho và giá bán.',
-              )
-            else
-              ...controller.inventory.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Glass(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor:
-                              (item.stockQuantity <= 5
-                                      ? const Color(0xFFE88C44)
-                                      : const Color(0xFF269E77))
-                                  .withValues(alpha: .12),
-                          child: const Icon(Icons.medication_rounded),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.displayName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Text(
-                                '${item.stockQuantity} ${item.unit?.label ?? ''} · ${_money(item.pricePerUnit)}',
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Cập nhật',
-                          onPressed: () =>
-                              _editInventory(context, current: item),
-                          icon: const Icon(Icons.edit_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
+          const SizedBox(height: 5),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF66738A)),
+          ),
         ],
       ),
-    );
-  }
-
-  Future<void> _editInventory(
-    BuildContext context, {
-    PharmacyInventoryItem? current,
-  }) async {
-    final input = await _inventoryDialog(
-      context,
-      controller.medicines,
-      current,
-    );
-    if (input == null || !context.mounted) return;
-    await _run(context, () => controller.saveInventory(input));
-  }
-}
-
-class _PharmacyPage extends StatelessWidget {
-  const _PharmacyPage({required this.controller, this.geocodingApi});
-  final PharmacistDashboardController controller;
-  final GeocodingApi? geocodingApi;
-
-  @override
-  Widget build(BuildContext context) {
-    final pharmacy = controller.selectedPharmacy;
-    return AppScroll(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _DashboardHeader(
-            controller: controller,
-            title: 'Nhà thuốc của tôi',
-            subtitle: pharmacy == null
-                ? 'Đăng ký nhà thuốc để bắt đầu nhận đơn'
-                : 'Thông tin được đồng bộ với hệ thống nhà thuốc',
-          ),
-          if (pharmacy == null)
-            _EmptyCard(
-              icon: Icons.add_business_rounded,
-              title: 'Chưa đăng ký nhà thuốc',
-              subtitle: 'Tạo hồ sơ nhà thuốc và vị trí để người dùng có thể tìm thấy bạn.',
-              action: FilledButton.icon(
-                onPressed: () => _edit(context),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Đăng ký nhà thuốc'),
-              ),
-            )
-          else
-            Glass(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 25,
-                        child: Icon(Icons.local_pharmacy_rounded),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              pharmacy.name,
-                              style: const TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            StatusChip(
-                              pharmacy.isActive
-                                  ? 'Đang hoạt động'
-                                  : 'Tạm ngưng',
-                              pharmacy.isActive
-                                  ? const Color(0xFF269E77)
-                                  : const Color(0xFFD75F4D),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 28),
-                  _InfoLine(label: 'Điện thoại', value: pharmacy.phoneNumber),
-                  _InfoLine(label: 'Địa chỉ', value: pharmacy.addressText),
-                  _InfoLine(
-                    label: 'Toạ độ',
-                    value: '${pharmacy.latitude}, ${pharmacy.longitude}',
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: controller.saving ? null : () => _edit(context),
-                    icon: const Icon(Icons.edit_rounded),
-                    label: const Text('Cập nhật thông tin'),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _edit(BuildContext context) async {
-    final input = await _pharmacyDialog(
-      context,
-      controller.user.id,
-      controller.selectedPharmacy,
-      geocodingApi: geocodingApi,
-    );
-    if (input == null || !context.mounted) return;
-    await _run(context, () => controller.savePharmacy(input));
-  }
+    ),
+  );
 }
 
 class _InfoLine extends StatelessWidget {
   const _InfoLine({required this.label, required this.value});
+
   final String label;
   final String value;
 
@@ -507,43 +309,6 @@ class _InfoLine extends StatelessWidget {
           ),
         ),
       ],
-    ),
-  );
-}
-
-class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.action,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) => Glass(
-    padding: const EdgeInsets.all(24),
-    child: Center(
-      child: Column(
-        children: [
-          Icon(icon, size: 42, color: const Color(0xFF66738A)),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF66738A)),
-          ),
-          if (action != null) ...[const SizedBox(height: 16), action!],
-        ],
-      ),
     ),
   );
 }
@@ -664,190 +429,6 @@ Future<(String, String)?> _shipperDialog(BuildContext context) async {
   return result;
 }
 
-Future<InventoryInput?> _inventoryDialog(
-  BuildContext context,
-  List<Medicine> medicines,
-  PharmacyInventoryItem? current,
-) async {
-  String? medicineId = current?.medicineId ?? medicines.firstOrNull?.id;
-  final stock = TextEditingController(
-    text: current?.stockQuantity.toString() ?? '0',
-  );
-  final price = TextEditingController(
-    text: current?.pricePerUnit.toString() ?? '0',
-  );
-  final result = await showDialog<InventoryInput>(
-    context: context,
-    builder: (context) => _ControllerOwner(
-      controllers: [stock, price],
-      child: StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            current == null ? 'Thêm thuốc vào kho' : 'Cập nhật tồn kho',
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: medicineId,
-                decoration: const InputDecoration(labelText: 'Thuốc'),
-                items: medicines
-                    .map(
-                      (item) => DropdownMenuItem(
-                        value: item.id,
-                        child: Text('${item.name} (${item.unit.label})'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: current == null
-                    ? (value) => setDialogState(() => medicineId = value)
-                    : null,
-              ),
-              TextField(
-                controller: stock,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Số lượng tồn'),
-              ),
-              TextField(
-                controller: price,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(labelText: 'Giá mỗi đơn vị'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Đóng'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final quantity = int.tryParse(stock.text.trim());
-                final unitPrice = double.tryParse(price.text.trim());
-                if (medicineId != null &&
-                    quantity != null &&
-                    quantity >= 0 &&
-                    unitPrice != null &&
-                    unitPrice >= 0) {
-                  Navigator.pop(
-                    context,
-                    InventoryInput(
-                      medicineId: medicineId!,
-                      stockQuantity: quantity,
-                      pricePerUnit: unitPrice,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Lưu'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  return result;
-}
-
-Future<PharmacyInput?> _pharmacyDialog(
-  BuildContext context,
-  String pharmacistId,
-  Pharmacy? current, {
-  GeocodingApi? geocodingApi,
-}) async {
-  final name = TextEditingController(text: current?.name);
-  final phone = TextEditingController(text: current?.phoneNumber);
-  PharmacyLocationSelection? location = current == null
-      ? null
-      : PharmacyLocationSelection(
-          addressText: current.addressText,
-          latitude: current.latitude,
-          longitude: current.longitude,
-        );
-  var active = current?.isActive ?? true;
-  final result = await showDialog<PharmacyInput>(
-    context: context,
-    builder: (context) => _ControllerOwner(
-      controllers: [name, phone],
-      child: StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            current == null ? 'Đăng ký nhà thuốc' : 'Cập nhật nhà thuốc',
-          ),
-          content: SizedBox(
-            width: 620,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(
-                      labelText: 'Tên nhà thuốc',
-                    ),
-                  ),
-                  TextField(
-                    controller: phone,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Số điện thoại',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  PharmacyLocationPicker(
-                    initialLocation: location,
-                    geocodingApi: geocodingApi,
-                    onChanged: (value) =>
-                        setDialogState(() => location = value),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Đang hoạt động'),
-                    value: active,
-                    onChanged: (value) => setDialogState(() => active = value),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Đóng'),
-            ),
-            FilledButton(
-              onPressed: location == null
-                  ? null
-                  : () {
-                      final selectedLocation = location!;
-                      if (name.text.trim().isNotEmpty &&
-                          phone.text.trim().isNotEmpty) {
-                        Navigator.pop(
-                          context,
-                          PharmacyInput(
-                            pharmacistId: pharmacistId,
-                            name: name.text,
-                            phoneNumber: phone.text,
-                            addressText: selectedLocation.addressText,
-                            latitude: selectedLocation.latitude,
-                            longitude: selectedLocation.longitude,
-                            isActive: active,
-                          ),
-                        );
-                      }
-                    },
-              child: const Text('Lưu'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  return result;
-}
-
 class _ControllerOwner extends StatefulWidget {
   const _ControllerOwner({required this.controllers, required this.child});
 
@@ -870,5 +451,3 @@ class _ControllerOwnerState extends State<_ControllerOwner> {
   @override
   Widget build(BuildContext context) => widget.child;
 }
-
-String _money(double value) => '${value.toStringAsFixed(0)} đ';
