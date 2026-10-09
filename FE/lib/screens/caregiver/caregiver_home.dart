@@ -4,7 +4,7 @@ import '../../controllers/care_network_controller.dart';
 import '../../models/care_network.dart';
 import '../../models/prescription.dart';
 import '../../models/schedule_rule.dart';
-import '../patient/medication_log_timeline_page.dart';
+import '../patient/schedule_timeline_page.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverHome extends StatelessWidget {
@@ -78,7 +78,7 @@ class CaregiverHome extends StatelessWidget {
       return switch (tab) {
         1 => _PatientFrame(
           controller: controller,
-          child: MedicationLogTimelinePage(
+          child: ScheduleTimelinePage(
             key: ValueKey(patientId),
             patientId: patientId,
           ),

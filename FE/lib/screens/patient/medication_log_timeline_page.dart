@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/medication_logs_controller.dart';
 import '../../models/medication_log.dart';
+import '../../services/notification_service.dart';
+import '../../services/schedule_api.dart';
 import '../../widgets/widgets.dart';
 
 class MedicationLogTimelinePage extends StatefulWidget {
@@ -38,8 +40,12 @@ class _MedicationLogTimelinePageState extends State<MedicationLogTimelinePage> {
     _load();
   }
 
-  Future<void> _load() =>
-      _controller.loadRange(_weekStart, _weekEnd, patientId: widget.patientId);
+  Future<void> _load() async {
+    await _controller.loadRange(_weekStart, _weekEnd, patientId: widget.patientId);
+    try {
+      await NotificationService.instance.refreshUpcomingMedicationLogs();
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -52,6 +58,73 @@ class _MedicationLogTimelinePageState extends State<MedicationLogTimelinePage> {
     return date.year == selected.year &&
         date.month == selected.month &&
         date.day == selected.day;
+  }
+
+  void _openScheduleDetails(MedicationLog log) {
+    if (log.scheduleRuleId.isEmpty) return;
+    showScheduleDetailsModal(
+      context,
+      scheduleId: log.scheduleRuleId,
+      onUpdated: _load,
+    );
+  }
+
+  Future<void> _openScheduleEdit(MedicationLog log) async {
+    if (log.scheduleRuleId.isEmpty) return;
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF5065F2)),
+        ),
+      );
+      final rule = await ScheduleApi().getById(log.scheduleRuleId);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (!mounted) return;
+      showScheduleEditModal(
+        context,
+        rule: rule,
+        onUpdated: _load,
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể tải thông tin cữ thuốc: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openAddScheduleFor(MedicationLog log) async {
+    if (log.scheduleRuleId.isEmpty) return;
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF5065F2)),
+        ),
+      );
+      final rule = await ScheduleApi().getById(log.scheduleRuleId);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (!mounted) return;
+      showAddScheduleModal(
+        context,
+        prescriptionItemId: rule.prescriptionItemId,
+        medicineName: rule.medicine.name,
+        prescriptionTitle: rule.prescription.title,
+        onCreated: _load,
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể tải thông tin thuốc: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -132,7 +205,14 @@ class _MedicationLogTimelinePageState extends State<MedicationLogTimelinePage> {
                 child: Center(child: Text('Không có cữ thuốc trong ngày này.')),
               )
             else
-              ...dayLogs.map((log) => _TimelineLogCard(log: log)),
+              ...dayLogs.map(
+                (log) => _TimelineLogCard(
+                  log: log,
+                  onOpenDetails: () => _openScheduleDetails(log),
+                  onAddSchedule: () => _openAddScheduleFor(log),
+                  onEditSchedule: () => _openScheduleEdit(log),
+                ),
+              ),
           ],
         ),
       );
@@ -141,9 +221,17 @@ class _MedicationLogTimelinePageState extends State<MedicationLogTimelinePage> {
 }
 
 class _TimelineLogCard extends StatelessWidget {
-  const _TimelineLogCard({required this.log});
+  const _TimelineLogCard({
+    required this.log,
+    required this.onOpenDetails,
+    required this.onAddSchedule,
+    required this.onEditSchedule,
+  });
 
   final MedicationLog log;
+  final VoidCallback onOpenDetails;
+  final VoidCallback onAddSchedule;
+  final VoidCallback onEditSchedule;
 
   @override
   Widget build(BuildContext context) {
@@ -159,51 +247,96 @@ class _TimelineLogCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Glass(
-        padding: const EdgeInsets.all(15),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 52,
-              child: Text(
-                '${time.hour.toString().padLeft(2, '0')}:'
-                '${time.minute.toString().padLeft(2, '0')}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            Container(
-              width: 7,
-              height: 38,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    log.medicine?.name ?? 'Thuốc',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  Text(
-                    '${amount == null ? '' : '${amount == amount.roundToDouble() ? amount.toInt() : amount} ${log.medicine?.unit ?? ''}'}'
-                    '${log.instructions == null ? '' : ' · ${log.instructions}'}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onOpenDetails,
+          child: Glass(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 50,
+                  child: Text(
+                    '${time.hour.toString().padLeft(2, '0')}:'
+                    '${time.minute.toString().padLeft(2, '0')}',
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ],
-              ),
+                ),
+                Container(
+                  width: 7,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        log.medicine?.name ?? 'Thuốc',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        '${amount == null ? '' : '${amount == amount.roundToDouble() ? amount.toInt() : amount} ${log.medicine?.unit ?? ''}'}'
+                        '${log.instructions == null ? '' : ' · ${log.instructions}'}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    StatusChip(log.status.label, color),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Thêm cữ thuốc',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                          onPressed: onAddSchedule,
+                          icon: const Icon(
+                            Icons.alarm_add_rounded,
+                            color: Color(0xFF5065F2),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: 'Chỉnh sửa lịch uống',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                          onPressed: onEditSchedule,
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            color: Color(0xFF526DB1),
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
-            StatusChip(log.status.label, color),
-          ],
+          ),
         ),
       ),
     );
