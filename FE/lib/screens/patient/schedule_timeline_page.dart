@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../services/notification_service.dart';
 import '../../services/schedule_api.dart';
 import '../../widgets/widgets.dart';
 
 class ScheduleTimelinePage extends StatefulWidget {
   const ScheduleTimelinePage({
     super.key,
-    this.patientId = '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    this.patientId,
     this.api,
   });
 
-  final String patientId;
+  final String? patientId;
   final ScheduleApi? api;
 
   @override
@@ -72,6 +73,9 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
           _schedules = items;
           _isLoading = false;
         });
+        try {
+          NotificationService.instance.refreshUpcomingMedicationLogs();
+        } catch (_) {}
       }
     } catch (e) {
       if (mounted) {

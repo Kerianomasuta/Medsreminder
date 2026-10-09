@@ -178,7 +178,26 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Chi tiết cữ uống',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Đóng',
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             if (_isLoading && _rule == null)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
@@ -487,6 +506,58 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
               ),
 
               const SizedBox(height: 20),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        showScheduleEditModal(
+                          context,
+                          rule: _rule!,
+                          onUpdated: widget.onUpdated,
+                        );
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Chỉnh sửa'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: const Color(0xFF5065F2),
+                        side: const BorderSide(color: Color(0xFF5065F2)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        showAddScheduleModal(
+                          context,
+                          prescriptionItemId: _rule!.prescriptionItemId,
+                          medicineName: _rule!.medicine.name,
+                          prescriptionTitle: _rule!.prescription.title,
+                          onCreated: widget.onUpdated,
+                        );
+                      },
+                      icon: const Icon(Icons.alarm_add_rounded, size: 18),
+                      label: const Text('Thêm cữ'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF5065F2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
 
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).pop(),

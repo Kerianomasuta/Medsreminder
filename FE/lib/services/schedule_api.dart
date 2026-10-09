@@ -27,10 +27,13 @@ class ScheduleApi {
 
   /// Gọi GET /api/v1/schedule-rules?patientId=...&isActive=...
   Future<List<ScheduleRule>> list({
-    required String patientId,
+    String? patientId,
     bool? isActive,
   }) async {
-    final queryParams = <String, String>{'patientId': patientId};
+    final queryParams = <String, String>{};
+    if (patientId != null && patientId.isNotEmpty) {
+      queryParams['patientId'] = patientId;
+    }
     if (isActive != null) {
       queryParams['isActive'] = isActive.toString();
     }
