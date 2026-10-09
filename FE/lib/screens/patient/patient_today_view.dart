@@ -1,23 +1,33 @@
 import 'package:flutter/material.dart';
 
-import '../../controllers/medication_logs_controller.dart';
-import '../../models/medication_log.dart';
+import '../../models/schedule_rule.dart';
 import '../../services/notification_service.dart';
+import '../../services/schedule_api.dart';
 import '../../widgets/widgets.dart';
 
-class PatientTodayView extends StatefulWidget {
-  const PatientTodayView({super.key, this.controller});
+enum _TodayScheduleFilter { all, active, inactive }
 
-  final MedicationLogsController? controller;
+class PatientTodayView extends StatefulWidget {
+  const PatientTodayView({super.key, this.api, this.patientId});
+
+  final ScheduleApi? api;
+  final String? patientId;
 
   @override
   State<PatientTodayView> createState() => _PatientTodayViewState();
 }
 
 class _PatientTodayViewState extends State<PatientTodayView> {
-  late final MedicationLogsController _controller =
-      widget.controller ?? MedicationLogsController();
-  late final bool _ownsController = widget.controller == null;
+  late final ScheduleApi _api = widget.api ?? ScheduleApi();
+  List<ScheduleRule> _schedules = const [];
+  bool _loading = true;
+  String? _error;
+  _TodayScheduleFilter _filter = _TodayScheduleFilter.active;
+
+  DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
 
   @override
   void initState() {
@@ -25,388 +35,285 @@ class _PatientTodayViewState extends State<PatientTodayView> {
     _load();
   }
 
-  Future<void> _load() async {
-    await _controller.loadToday();
-    if (!mounted) return;
-    if (_controller.loadError == null) {
-      await NotificationService.instance.refreshUpcomingMedicationLogs();
-    }
-  }
-
   @override
   void dispose() {
-    if (_ownsController) _controller.dispose();
+    if (widget.api == null) _api.close();
     super.dispose();
   }
 
-  Future<void> _take(MedicationLog log) async {
-    await _runAction(() async {
-      await _controller.take(log.id);
-      await NotificationService.instance.cancelMedicationLog(log.id);
-    }, success: 'Đã ghi nhận cữ thuốc.');
-  }
-
-  Future<void> _snooze(MedicationLog log) async {
-    final minutes = await showModalBottomSheet<int>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Nhắc lại sau bao lâu?',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, 5),
-                child: const Text('Sau 5 phút'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => Navigator.pop(context, 10),
-                child: const Text('Sau 10 phút'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (minutes == null || !mounted) return;
-    await _runAction(() async {
-      final updated = await _controller.snooze(log.id, minutes);
-      await NotificationService.instance.scheduleMedicationLog(updated);
-    }, success: 'Đã hoãn cữ thuốc $minutes phút.');
-  }
-
-  Future<void> _skip(MedicationLog log) async {
-    final reasonController = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Bỏ qua cữ thuốc'),
-        content: TextField(
-          controller: reasonController,
-          maxLength: 500,
-          maxLines: 3,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Lý do (không bắt buộc)',
-            hintText: 'Ví dụ: Buồn nôn',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, reasonController.text),
-            child: const Text('Xác nhận bỏ qua'),
-          ),
-        ],
-      ),
-    );
-    reasonController.dispose();
-    if (reason == null || !mounted) return;
-    await _runAction(() async {
-      await _controller.skip(log.id, reason: reason);
-      await NotificationService.instance.cancelMedicationLog(log.id);
-    }, success: 'Đã bỏ qua cữ thuốc.');
-  }
-
-  Future<void> _runAction(
-    Future<void> Function() action, {
-    required String success,
-  }) async {
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      await action();
+      final schedules = await _api.list(patientId: widget.patientId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(success)));
+      setState(() {
+        _schedules = schedules;
+        _loading = false;
+      });
+      await NotificationService.instance.refreshUpcomingMedicationLogs();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          backgroundColor: const Color(0xFFD65D4A),
-        ),
-      );
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
     }
   }
 
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, _) {
-      final logs = _controller.logs;
-      final takenCount = logs
-          .where((item) => item.status == DoseStatus.taken)
-          .length;
-      final hasMissed = logs.any((item) => item.status == DoseStatus.missed);
-      final openLogs = logs.where((item) => item.isOpen).toList()
-        ..sort(
-          (a, b) => a.effectiveReminderAt.compareTo(b.effectiveReminderAt),
-        );
-      final nextDose = openLogs.isEmpty ? null : openLogs.first;
-      final now = DateTime.now();
-      final nextDoseTitle = _controller.loading && logs.isEmpty
-          ? 'Đang tải cữ thuốc'
-          : _controller.loadError != null && logs.isEmpty
-          ? 'Không thể tải cữ thuốc'
-          : nextDose == null
-          ? 'Không còn cữ đang chờ'
-          : 'Cữ thuốc tiếp theo';
+  bool _isInPrescriptionRange(ScheduleRule rule) {
+    final start = DateTime.tryParse(rule.prescription.startDate ?? '');
+    final end = DateTime.tryParse(rule.prescription.endDate ?? '');
+    if (start != null &&
+        _today.isBefore(DateTime(start.year, start.month, start.day))) {
+      return false;
+    }
+    if (end != null && _today.isAfter(DateTime(end.year, end.month, end.day))) {
+      return false;
+    }
+    return rule.prescription.isActive;
+  }
 
-      return AppScroll(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const PageIntro(
-                  'Lịch uống hôm nay',
-                  'Theo dõi từng cữ thuốc trong ngày',
-                ),
-                IconButton(
-                  onPressed: _controller.loading ? null : _load,
-                  tooltip: 'Làm mới',
-                  icon: const Icon(
-                    Icons.refresh_rounded,
-                    color: Color(0xFF5167F2),
-                  ),
-                ),
-              ],
-            ),
-            Glass(
-              padding: const EdgeInsets.all(20),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF5368F4), Color(0xFF8068DD)],
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${now.day} tháng ${now.month}, ${now.year}',
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                        Text(
-                          _controller.loading
-                              ? 'Đang cập nhật...'
-                              : '$takenCount/${logs.length} cữ đã uống',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (hasMissed) ...[
-              const SizedBox(height: 14),
-              const EmergencyPatientCard(),
-            ],
-            const SizedBox(height: 20),
-            Text(
-              nextDoseTitle,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 10),
-            if (_controller.loading && logs.isEmpty)
-              const Center(child: CircularProgressIndicator())
-            else if (_controller.loadError != null && logs.isEmpty)
-              _ErrorCard(message: _controller.loadError!, onRetry: _load)
-            else if (nextDose != null)
-              _DoseLogCard(
-                log: nextDose,
-                processing: _controller.isProcessing(nextDose.id),
-                emphasized: true,
-                onTaken: () => _take(nextDose),
-                onSnooze: () => _snooze(nextDose),
-                onSkip: () => _skip(nextDose),
-              )
-            else
-              const Glass(
-                padding: EdgeInsets.all(18),
-                child: Center(child: Text('Các cữ hôm nay đã được xử lý.')),
-              ),
-            const SizedBox(height: 22),
-            const Text(
-              'Tất cả cữ thuốc hôm nay',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 10),
-            if (!_controller.loading &&
-                logs.isEmpty &&
-                _controller.loadError == null)
-              const Glass(
-                padding: EdgeInsets.all(18),
-                child: Center(child: Text('Hôm nay chưa có cữ thuốc nào.')),
-              )
-            else
-              ...logs.map(
-                (log) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _DoseLogCard(
-                    log: log,
-                    processing: _controller.isProcessing(log.id),
-                    onTaken: () => _take(log),
-                    onSnooze: () => _snooze(log),
-                    onSkip: () => _skip(log),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      );
-    },
-  );
-}
+  bool _matchesFilter(ScheduleRule rule) => switch (_filter) {
+    _TodayScheduleFilter.all => true,
+    _TodayScheduleFilter.active => rule.isActive,
+    _TodayScheduleFilter.inactive => !rule.isActive,
+  };
 
-class _DoseLogCard extends StatelessWidget {
-  const _DoseLogCard({
-    required this.log,
-    required this.processing,
-    required this.onTaken,
-    required this.onSnooze,
-    required this.onSkip,
-    this.emphasized = false,
-  });
+  DateTime _plannedAt(ScheduleRule rule) {
+    final parts = rule.reminderTime.split(':');
+    return DateTime(
+      _today.year,
+      _today.month,
+      _today.day,
+      int.tryParse(parts.first) ?? 0,
+      parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0,
+    );
+  }
 
-  final MedicationLog log;
-  final bool processing;
-  final VoidCallback onTaken;
-  final VoidCallback onSnooze;
-  final VoidCallback onSkip;
-  final bool emphasized;
+  void _openDetails(ScheduleRule rule) {
+    showScheduleDetailsModal(
+      context,
+      scheduleId: rule.id,
+      initialRule: rule,
+      selectedDate: _today,
+      onUpdated: _load,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(log.status);
-    final medicine = log.medicine?.name ?? 'Thuốc';
-    final unit = log.medicine?.unit ?? '';
-    final amount = log.dosagePerTime;
-    final dose = amount == null
-        ? null
-        : '${amount == amount.roundToDouble() ? amount.toInt() : amount} $unit';
-    final reminder = log.effectiveReminderAt;
+    final allToday = _schedules
+        .where((rule) => rule.daysOfWeek.contains(_today.weekday))
+        .where(_isInPrescriptionRange)
+        .toList();
+    final visible = allToday.where(_matchesFilter).toList()
+      ..sort((a, b) => a.reminderTime.compareTo(b.reminderTime));
+    final now = DateTime.now();
+    final upcoming =
+        allToday
+            .where((rule) => rule.isActive && _plannedAt(rule).isAfter(now))
+            .toList()
+          ..sort((a, b) => a.reminderTime.compareTo(b.reminderTime));
+    final next = upcoming.isEmpty ? null : upcoming.first;
 
-    return Glass(
-      padding: EdgeInsets.all(emphasized ? 18 : 14),
+    return AppScroll(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.medication_rounded, color: color),
+              const PageIntro(
+                'Lịch uống hôm nay',
+                'Thời gian luôn được cập nhật từ lịch uống thuốc',
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      medicine,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      '${_time(reminder)}${dose == null ? '' : ' · $dose'}'
-                      '${log.instructions == null ? '' : ' · ${log.instructions}'}',
-                      style: const TextStyle(color: Color(0xFF64748B)),
-                    ),
-                  ],
+              IconButton(
+                onPressed: _loading ? null : _load,
+                tooltip: 'Làm mới',
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Color(0xFF5167F2),
                 ),
               ),
-              StatusChip(log.status.label, color),
             ],
           ),
-          if (log.status == DoseStatus.snoozed && log.snoozeUntil != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Chuông sẽ reo lại lúc ${_time(log.snoozeUntil!)}',
-              style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          Glass(
+            padding: const EdgeInsets.all(20),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF5368F4), Color(0xFF8068DD)],
             ),
-          ],
-          if (log.status == DoseStatus.skipped &&
-              (log.skipReason?.isNotEmpty ?? false)) ...[
-            const SizedBox(height: 8),
-            Text('Lý do: ${log.skipReason}'),
-          ],
-          if (log.status == DoseStatus.taken && log.actualTakenAt != null) ...[
-            const SizedBox(height: 8),
-            Text('Đã uống lúc ${_time(log.actualTakenAt!)}'),
-          ],
-          if (log.isOpen) ...[
-            const SizedBox(height: 14),
-            if (processing)
-              const Center(child: CircularProgressIndicator())
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: onTaken,
-                    icon: const Icon(Icons.check_rounded),
-                    label: const Text('Đã uống'),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_today.day} tháng ${_today.month}, ${_today.year}',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                      Text(
+                        _loading
+                            ? 'Đang cập nhật...'
+                            : '${allToday.where((item) => item.isActive).length} cữ đang bật',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
-                  OutlinedButton.icon(
-                    onPressed: onSnooze,
-                    icon: const Icon(Icons.snooze_rounded),
-                    label: const Text('Nhắc lại'),
-                  ),
-                  TextButton.icon(
-                    onPressed: onSkip,
-                    icon: const Icon(Icons.skip_next_rounded),
-                    label: const Text('Bỏ qua'),
-                  ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          _filterBar(),
+          const SizedBox(height: 20),
+          const Text(
+            'Cữ thuốc tiếp theo',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          if (_loading && _schedules.isEmpty)
+            const Center(child: CircularProgressIndicator())
+          else if (_error != null && _schedules.isEmpty)
+            _ErrorCard(message: _error!, onRetry: _load)
+          else if (next != null)
+            _ScheduleCard(
+              rule: next,
+              emphasized: true,
+              onTap: () => _openDetails(next),
+            )
+          else
+            const Glass(
+              padding: EdgeInsets.all(18),
+              child: Center(
+                child: Text('Không còn cữ đang bật trong hôm nay.'),
               ),
-          ],
+            ),
+          const SizedBox(height: 22),
+          Text(
+            'Các lịch uống hôm nay (${visible.length})',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          if (!_loading && visible.isEmpty && _error == null)
+            const Glass(
+              padding: EdgeInsets.all(18),
+              child: Center(child: Text('Không có lịch phù hợp bộ lọc.')),
+            )
+          else
+            ...visible.map(
+              (rule) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ScheduleCard(
+                  rule: rule,
+                  onTap: () => _openDetails(rule),
+                ),
+              ),
+            ),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  static String _time(DateTime value) =>
-      '${value.hour.toString().padLeft(2, '0')}:'
-      '${value.minute.toString().padLeft(2, '0')}';
+  Widget _filterBar() => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        _filterChip(_TodayScheduleFilter.all, 'Tất cả'),
+        const SizedBox(width: 8),
+        _filterChip(_TodayScheduleFilter.active, 'Đang bật'),
+        const SizedBox(width: 8),
+        _filterChip(_TodayScheduleFilter.inactive, 'Đã tắt'),
+      ],
+    ),
+  );
 
-  static Color _statusColor(DoseStatus status) => switch (status) {
-    DoseStatus.scheduled => const Color(0xFF5065F2),
-    DoseStatus.snoozed => const Color(0xFFF0A042),
-    DoseStatus.taken => const Color(0xFF239E77),
-    DoseStatus.skipped => const Color(0xFF8B6BC4),
-    DoseStatus.missed => const Color(0xFFD65D4A),
-  };
+  Widget _filterChip(_TodayScheduleFilter value, String label) => FilterChip(
+    key: ValueKey('today-status-${value.name}'),
+    label: Text(label),
+    selected: _filter == value,
+    onSelected: (_) => setState(() => _filter = value),
+    selectedColor: const Color(0xFFE7E9FF),
+    checkmarkColor: const Color(0xFF3F51C7),
+  );
+}
+
+class _ScheduleCard extends StatelessWidget {
+  const _ScheduleCard({
+    required this.rule,
+    required this.onTap,
+    this.emphasized = false,
+  });
+
+  final ScheduleRule rule;
+  final VoidCallback onTap;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = rule.isActive
+        ? const Color(0xFF5065F2)
+        : const Color(0xFF94A3B8);
+    final amount = rule.dosagePerTime == rule.dosagePerTime.roundToDouble()
+        ? rule.dosagePerTime.toInt().toString()
+        : rule.dosagePerTime.toString();
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Glass(
+        padding: EdgeInsets.all(emphasized ? 18 : 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.medication_rounded, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    rule.medicine.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    '${rule.displayTime} · $amount ${rule.medicine.unit}'
+                    '${rule.instructions == null ? '' : ' · ${rule.instructions}'}',
+                    style: const TextStyle(color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            StatusChip(rule.isActive ? 'Đang bật' : 'Đã tắt', color),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ErrorCard extends StatelessWidget {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../models/models.dart';
+import '../services/medication_logs_api.dart';
+import '../services/notification_service.dart';
 import '../services/schedule_api.dart';
 
 /// Hiển thị modal Xem chi tiết lịch uống thuốc
@@ -7,6 +10,7 @@ void showScheduleDetailsModal(
   BuildContext context, {
   required String scheduleId,
   ScheduleRule? initialRule,
+  DateTime? selectedDate,
   VoidCallback? onUpdated,
 }) {
   showModalBottomSheet<void>(
@@ -16,6 +20,7 @@ void showScheduleDetailsModal(
     builder: (ctx) => ScheduleDetailsModalSheet(
       scheduleId: scheduleId,
       initialRule: initialRule,
+      selectedDate: selectedDate,
       onUpdated: onUpdated,
     ),
   );
@@ -31,10 +36,7 @@ void showScheduleEditModal(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => ScheduleEditModalSheet(
-      rule: rule,
-      onUpdated: onUpdated,
-    ),
+    builder: (ctx) => ScheduleEditModalSheet(rule: rule, onUpdated: onUpdated),
   );
 }
 
@@ -67,12 +69,18 @@ class ScheduleDetailsModalSheet extends StatefulWidget {
     super.key,
     required this.scheduleId,
     this.initialRule,
+    this.selectedDate,
     this.onUpdated,
+    this.scheduleApi,
+    this.medicationLogsApi,
   });
 
   final String scheduleId;
   final ScheduleRule? initialRule;
+  final DateTime? selectedDate;
   final VoidCallback? onUpdated;
+  final ScheduleApi? scheduleApi;
+  final MedicationLogsApi? medicationLogsApi;
 
   @override
   State<ScheduleDetailsModalSheet> createState() =>
@@ -80,15 +88,26 @@ class ScheduleDetailsModalSheet extends StatefulWidget {
 }
 
 class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
-  final _api = ScheduleApi();
+  late final ScheduleApi _api;
+  late final MedicationLogsApi _medicationLogsApi;
   ScheduleRule? _rule;
   List<ScheduleRule> _allDoses = [];
+  List<MedicationLog> _doseLogs = [];
   bool _isLoading = true;
+  bool _logsLoading = true;
   String? _errorMessage;
+  String? _logsError;
+
+  DateTime get _selectedDate {
+    final value = widget.selectedDate ?? DateTime.now();
+    return DateTime(value.year, value.month, value.day);
+  }
 
   @override
   void initState() {
     super.initState();
+    _api = widget.scheduleApi ?? ScheduleApi();
+    _medicationLogsApi = widget.medicationLogsApi ?? MedicationLogsApi();
     if (widget.initialRule != null) {
       _rule = widget.initialRule;
       _allDoses = [widget.initialRule!];
@@ -101,8 +120,16 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
     try {
       final detailed = await _api.getById(widget.scheduleId);
       List<ScheduleRule> sameMedicineRules = [detailed];
+      List<MedicationLog> doseLogs = const [];
+      String? logsError;
+      final allRulesRequest = _api.list(patientId: detailed.patientId);
+      final logsRequest = _medicationLogsApi.list(
+        from: _selectedDate,
+        to: _selectedDate,
+        patientId: detailed.patientId,
+      );
       try {
-        final allRules = await _api.list(patientId: detailed.patientId);
+        final allRules = await allRulesRequest;
         final matches = allRules
             .where((r) => r.prescriptionItemId == detailed.prescriptionItemId)
             .toList();
@@ -111,11 +138,22 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
           sameMedicineRules = matches;
         }
       } catch (_) {}
+      try {
+        final logs = await logsRequest;
+        doseLogs =
+            logs.where((log) => log.scheduleRuleId == detailed.id).toList()
+              ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+      } catch (error) {
+        logsError = error.toString();
+      }
 
       if (mounted) {
         setState(() {
           _rule = detailed;
           _allDoses = sameMedicineRules;
+          _doseLogs = doseLogs;
+          _logsError = logsError;
+          _logsLoading = false;
           _isLoading = false;
         });
       }
@@ -127,6 +165,13 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    if (widget.scheduleApi == null) _api.close();
+    if (widget.medicationLogsApi == null) _medicationLogsApi.close();
+    super.dispose();
   }
 
   String _formatDays(List<int> days) {
@@ -226,13 +271,14 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
                       width: 54,
                       height: 54,
                       color: const Color(0xFFE8EDFF),
-                      child: (_rule!.medicine.imageUrl != null &&
+                      child:
+                          (_rule!.medicine.imageUrl != null &&
                               _rule!.medicine.imageUrl!.trim().isNotEmpty &&
                               _rule!.medicine.imageUrl!.startsWith('http'))
                           ? Image.network(
                               _rule!.medicine.imageUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
+                              errorBuilder: (_, _, _) => const Icon(
                                 Icons.medication_rounded,
                                 color: Color(0xFF5065F2),
                                 size: 28,
@@ -469,6 +515,8 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
                     : const Color(0xFF94A3B8),
               ),
               const SizedBox(height: 12),
+              _buildDoseResult(),
+              const SizedBox(height: 12),
               _detailRow(
                 Icons.verified_rounded,
                 'Trạng thái toa thuốc',
@@ -606,6 +654,165 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
     );
   }
 
+  Widget _buildDoseResult() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.fact_check_outlined,
+                size: 20,
+                color: Color(0xFF5065F2),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Kết quả ngày ${_dateLabel(_selectedDate)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_logsLoading)
+            const LinearProgressIndicator()
+          else if (_logsError != null)
+            Text(
+              'Không tải được kết quả cữ thuốc: $_logsError',
+              style: const TextStyle(color: Color(0xFFD65D4A)),
+            )
+          else if (_doseLogs.isEmpty)
+            const Text(
+              'Chưa có dữ liệu ghi nhận cho cữ thuốc này.',
+              style: TextStyle(color: Color(0xFF64748B)),
+            )
+          else
+            ..._doseLogs.map(_doseLogTile),
+        ],
+      ),
+    );
+  }
+
+  Widget _doseLogTile(MedicationLog log) {
+    final presentation = _logPresentation(log);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            margin: const EdgeInsets.only(top: 5),
+            decoration: BoxDecoration(
+              color: presentation.color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  presentation.label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: presentation.color,
+                  ),
+                ),
+                if (presentation.detail != null)
+                  Text(
+                    presentation.detail!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                if (log.status == DoseStatus.skipped &&
+                    (log.skipReason?.trim().isNotEmpty ?? false))
+                  Text(
+                    'Lý do: ${log.skipReason}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  _DoseLogPresentation _logPresentation(MedicationLog log) {
+    if (log.status == DoseStatus.taken && log.actualTakenAt != null) {
+      final planned = _plannedAt(_rule!, _selectedDate);
+      final late = log.actualTakenAt!.isAfter(planned);
+      final lateMinutes = log.actualTakenAt!.difference(planned).inMinutes;
+      return _DoseLogPresentation(
+        label: late ? 'Uống trễ' : 'Đã uống',
+        detail: late
+            ? 'Đã uống lúc ${_clock(log.actualTakenAt!)} · trễ ${lateMinutes < 1 ? 1 : lateMinutes} phút'
+            : 'Đã uống lúc ${_clock(log.actualTakenAt!)}',
+        color: late ? const Color(0xFFF0A042) : const Color(0xFF239E77),
+      );
+    }
+    return switch (log.status) {
+      DoseStatus.scheduled => const _DoseLogPresentation(
+        label: 'Chưa uống',
+        color: Color(0xFF5065F2),
+      ),
+      DoseStatus.snoozed => _DoseLogPresentation(
+        label: 'Đã hoãn',
+        detail: log.snoozeUntil == null
+            ? null
+            : 'Nhắc lại lúc ${_clock(log.snoozeUntil!)}',
+        color: const Color(0xFFF0A042),
+      ),
+      DoseStatus.taken => const _DoseLogPresentation(
+        label: 'Đã uống',
+        color: Color(0xFF239E77),
+      ),
+      DoseStatus.skipped => const _DoseLogPresentation(
+        label: 'Đã bỏ qua',
+        color: Color(0xFF8B6BC4),
+      ),
+      DoseStatus.missed => const _DoseLogPresentation(
+        label: 'Đã bỏ lỡ',
+        color: Color(0xFFD65D4A),
+      ),
+    };
+  }
+
+  DateTime _plannedAt(ScheduleRule rule, DateTime date) {
+    final parts = rule.reminderTime.split(':');
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      int.tryParse(parts.first) ?? 0,
+      parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0,
+    );
+  }
+
+  String _dateLabel(DateTime value) =>
+      '${value.day.toString().padLeft(2, '0')}/'
+      '${value.month.toString().padLeft(2, '0')}/${value.year}';
+
+  String _clock(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:'
+      '${value.minute.toString().padLeft(2, '0')}';
+
   Widget _detailRow(IconData icon, String label, String value, {Color? color}) {
     return Row(
       children: [
@@ -635,15 +842,23 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
   }
 }
 
+class _DoseLogPresentation {
+  const _DoseLogPresentation({
+    required this.label,
+    required this.color,
+    this.detail,
+  });
+
+  final String label;
+  final String? detail;
+  final Color color;
+}
+
 /// ============================================================================
 /// 2. MODAL CHỈNH SỬA LỊCH UỐNG THUỐC (GỌI PATCH API)
 /// ============================================================================
 class ScheduleEditModalSheet extends StatefulWidget {
-  const ScheduleEditModalSheet({
-    super.key,
-    required this.rule,
-    this.onUpdated,
-  });
+  const ScheduleEditModalSheet({super.key, required this.rule, this.onUpdated});
 
   final ScheduleRule rule;
   final VoidCallback? onUpdated;
@@ -704,10 +919,7 @@ class _ScheduleEditModalSheetState extends State<ScheduleEditModalSheet> {
       minute: int.tryParse(parts.length > 1 ? parts[1] : '00') ?? 0,
     );
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-    );
+    final picked = await showTimePicker(context: context, initialTime: initial);
 
     if (picked != null) {
       final hour = picked.hour.toString().padLeft(2, '0');
@@ -738,6 +950,9 @@ class _ScheduleEditModalSheetState extends State<ScheduleEditModalSheet> {
         reminderTime: _reminderTime,
         daysOfWeek: sortedDays,
         isActive: _isActive,
+      );
+      await NotificationService.instance.refreshUpcomingMedicationLogs(
+        force: true,
       );
 
       if (mounted) {
@@ -869,7 +1084,10 @@ class _ScheduleEditModalSheetState extends State<ScheduleEditModalSheet> {
                     children: [
                       const Text(
                         'Giờ nhắc uống',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
                       Text(
                         _reminderTime,
@@ -1024,7 +1242,7 @@ class _ScheduleEditModalSheetState extends State<ScheduleEditModalSheet> {
                   ),
                   Switch(
                     value: _isActive,
-                    activeColor: const Color(0xFF5065F2),
+                    activeThumbColor: const Color(0xFF5065F2),
                     onChanged: _isSaving
                         ? null
                         : (val) => setState(() => _isActive = val),
@@ -1111,10 +1329,7 @@ class _AddScheduleModalSheetState extends State<AddScheduleModalSheet> {
       minute: int.tryParse(parts.length > 1 ? parts[1] : '00') ?? 0,
     );
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-    );
+    final picked = await showTimePicker(context: context, initialTime: initial);
 
     if (picked != null) {
       final hour = picked.hour.toString().padLeft(2, '0');

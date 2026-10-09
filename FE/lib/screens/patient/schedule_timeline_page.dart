@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+
 import '../../models/models.dart';
 import '../../services/notification_service.dart';
 import '../../services/schedule_api.dart';
 import '../../widgets/widgets.dart';
 
+enum ScheduleStatusFilter { all, active, inactive }
+
 class ScheduleTimelinePage extends StatefulWidget {
-  const ScheduleTimelinePage({
-    super.key,
-    this.patientId,
-    this.api,
-  });
+  const ScheduleTimelinePage({super.key, this.patientId, this.api});
 
   final String? patientId;
   final ScheduleApi? api;
@@ -24,11 +23,30 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
   bool _isLoading = true;
   String? _errorMessage;
   int _selectedDay = DateTime.now().weekday; // 1 = T2, 2 = T3, ..., 7 = CN
+  ScheduleStatusFilter _statusFilter = ScheduleStatusFilter.all;
+
+  Iterable<ScheduleRule> get _statusFilteredSchedules => _schedules.where(
+    (rule) => switch (_statusFilter) {
+      ScheduleStatusFilter.all => true,
+      ScheduleStatusFilter.active => rule.isActive,
+      ScheduleStatusFilter.inactive => !rule.isActive,
+    },
+  );
+
+  DateTime get _selectedDate {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return today
+        .subtract(Duration(days: now.weekday - 1))
+        .add(Duration(days: _selectedDay - 1));
+  }
 
   Map<int, int> get _countsByDay {
     final map = <int, int>{};
     for (var i = 1; i <= 7; i++) {
-      map[i] = _schedules.where((r) => r.daysOfWeek.contains(i)).length;
+      map[i] = _statusFilteredSchedules
+          .where((r) => r.daysOfWeek.contains(i))
+          .length;
     }
     return map;
   }
@@ -87,7 +105,6 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
     }
   }
 
-
   Color _periodColor(String period) {
     switch (period) {
       case 'Sáng':
@@ -108,17 +125,14 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
       context,
       scheduleId: rule.id,
       initialRule: rule,
+      selectedDate: _selectedDate,
       onUpdated: _loadSchedules,
     );
   }
 
   /// Mở modal chỉnh sửa lịch uống (gọi PATCH)
   void _openScheduleEdit(ScheduleRule rule) {
-    showScheduleEditModal(
-      context,
-      rule: rule,
-      onUpdated: _loadSchedules,
-    );
+    showScheduleEditModal(context, rule: rule, onUpdated: _loadSchedules);
   }
 
   /// Mở modal thêm cữ uống cho thuốc (gọi POST)
@@ -150,10 +164,11 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
 
   @override
   Widget build(BuildContext context) {
-    final daySchedules = _schedules
-        .where((rule) => rule.daysOfWeek.contains(_selectedDay))
-        .toList()
-      ..sort((a, b) => a.reminderTime.compareTo(b.reminderTime));
+    final daySchedules =
+        _statusFilteredSchedules
+            .where((rule) => rule.daysOfWeek.contains(_selectedDay))
+            .toList()
+          ..sort((a, b) => a.reminderTime.compareTo(b.reminderTime));
 
     return AppScroll(
       child: Column(
@@ -162,10 +177,16 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const PageIntro('Lịch uống thuốc', 'Theo dõi và chỉnh sửa cữ uống'),
+              const PageIntro(
+                'Lịch uống thuốc',
+                'Theo dõi và chỉnh sửa cữ uống',
+              ),
               IconButton(
                 onPressed: _loadSchedules,
-                icon: const Icon(Icons.refresh_rounded, color: Color(0xFF5167F2)),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Color(0xFF5167F2),
+                ),
                 tooltip: 'Làm mới lịch uống',
               ),
             ],
@@ -178,6 +199,31 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
               });
             },
             badgeCounts: _countsByDay,
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _statusChip(
+                  ScheduleStatusFilter.all,
+                  'Tất cả',
+                  Icons.filter_list_rounded,
+                ),
+                const SizedBox(width: 8),
+                _statusChip(
+                  ScheduleStatusFilter.active,
+                  'Đang bật',
+                  Icons.notifications_active_rounded,
+                ),
+                const SizedBox(width: 8),
+                _statusChip(
+                  ScheduleStatusFilter.inactive,
+                  'Đã tắt',
+                  Icons.notifications_off_rounded,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           if (_isLoading)
@@ -265,10 +311,7 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
                     const SizedBox(height: 4),
                     const Text(
                       'Các thuốc được lên lịch vào những ngày khác trong tuần.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -289,7 +332,10 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF5167F2).withValues(alpha: .12),
                       borderRadius: BorderRadius.circular(12),
@@ -431,6 +477,26 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
             }),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _statusChip(ScheduleStatusFilter value, String label, IconData icon) {
+    final selected = _statusFilter == value;
+    return FilterChip(
+      key: ValueKey('schedule-status-${value.name}'),
+      selected: selected,
+      onSelected: (_) => setState(() => _statusFilter = value),
+      avatar: Icon(
+        icon,
+        size: 17,
+        color: selected ? const Color(0xFF3F51C7) : const Color(0xFF64748B),
+      ),
+      label: Text(label),
+      selectedColor: const Color(0xFFE7E9FF),
+      checkmarkColor: const Color(0xFF3F51C7),
+      side: BorderSide(
+        color: selected ? const Color(0xFF6979EC) : const Color(0xFFD7DEEA),
       ),
     );
   }

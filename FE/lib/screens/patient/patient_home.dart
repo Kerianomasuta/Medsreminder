@@ -19,6 +19,6 @@ class PatientHome extends StatelessWidget {
   Widget build(BuildContext context) => switch (tab) {
     1 => ScheduleTimelinePage(patientId: networkController.user.id),
     2 => PatientConnectionsPage(controller: networkController),
-    _ => const PatientTodayView(),
+    _ => PatientTodayView(patientId: networkController.user.id),
   };
 }
