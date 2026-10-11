@@ -8,6 +8,8 @@ abstract interface class AuthCookieAdapter {
   Map<String, String> get requestHeaders;
   String? get accessToken;
 
+  Future<void> restore();
+
   void capture(Map<String, String> responseHeaders);
   void clear();
 }

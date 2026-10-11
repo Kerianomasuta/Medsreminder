@@ -1,7 +1,5 @@
 package com.medsreminder.meds_reminder
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -18,8 +16,9 @@ class AlarmReceiver : BroadcastReceiver() {
         val dosage = intent.getStringExtra("dosage") ?: "Hãy uống thuốc đúng cữ"
         val time = intent.getStringExtra("time") ?: ""
         val notifId = intent.getIntExtra("notification_id", 9998)
-        val triggerAtMillis = intent.getLongExtra("trigger_at_millis", 0L)
         val snoozeCount = intent.getIntExtra("snooze_count", 0)
+        val medicationLogId = intent.getStringExtra("medication_log_id") ?: ""
+        val alarmRound = intent.getIntExtra("alarm_round", 1)
 
         Log.d(TAG, "AlarmReceiver triggered for $medicineName at $time (id=$notifId, snoozeCount=$snoozeCount)")
 
@@ -30,6 +29,8 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra("time", time)
             putExtra("notification_id", notifId)
             putExtra("snooze_count", snoozeCount)
+            putExtra("medication_log_id", medicationLogId)
+            putExtra("alarm_round", alarmRound)
         }
 
         try {
@@ -42,50 +43,5 @@ class AlarmReceiver : BroadcastReceiver() {
             Log.e(TAG, "Error starting ReminderAlarmService from AlarmReceiver", e)
         }
 
-        // 2. Chỉ lên lịch lại cho 7 ngày sau nếu đây là báo thức gốc (snoozeCount == 0)
-        if (triggerAtMillis > 0L && snoozeCount == 0) {
-            val nextWeekMillis = triggerAtMillis + 7L * 24 * 60 * 60 * 1000L
-            rescheduleNextWeek(context, intent, notifId, nextWeekMillis)
-        }
-    }
-
-    private fun rescheduleNextWeek(
-        context: Context,
-        originalIntent: Intent,
-        notifId: Int,
-        nextTriggerMillis: Long
-    ) {
-        try {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-            val repeatIntent = Intent(context, AlarmReceiver::class.java).apply {
-                action = "com.medsreminder.ALARM_TRIGGER"
-                putExtras(originalIntent)
-                putExtra("trigger_at_millis", nextTriggerMillis)
-                putExtra("snooze_count", 0)
-            }
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-            val pendingIntent = PendingIntent.getBroadcast(context, notifId, repeatIntent, flags)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    nextTriggerMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    nextTriggerMillis,
-                    pendingIntent
-                )
-            }
-            Log.d(TAG, "Rescheduled alarm $notifId for next week at $nextTriggerMillis")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to reschedule alarm for next week", e)
-        }
     }
 }

@@ -15,7 +15,9 @@ const CLOCK_SKEW_MS = 2 * 60 * 1000;
 const OPEN_STATUSES = new Set<DoseStatus>([DoseStatus.SCHEDULED, DoseStatus.SNOOZED]);
 
 export type ListLogsInput = {
-  userId?: string;
+  patientId?: string;
+  actorUserId?: string;
+  actorRole?: string;
   from?: string;
   to?: string;
 };
@@ -36,7 +38,7 @@ export class MedicationLogsService {
   ) {}
 
   async list(input: ListLogsInput = {}) {
-    const patientId = this.requireObjectId(input.userId, 'userId');
+    const patientId = this.listPatientId(input);
     const from = input.from === undefined ? this.today() : this.requireDate(input.from, 'from');
     const to = input.to === undefined ? undefined : this.requireDate(input.to, 'to');
     if (to !== undefined && to < from) {
@@ -125,6 +127,16 @@ export class MedicationLogsService {
       saved.scheduleRule = log.scheduleRule;
       return this.toResponse(saved);
     });
+  }
+
+  private listPatientId(actor: ListLogsInput) {
+    if (actor.actorRole === 'PATIENT') {
+      return this.requireObjectId(actor.actorUserId, 'actorUserId');
+    }
+    if (actor.actorRole === 'CARE_GIVER') {
+      return this.requireObjectId(actor.patientId, 'patientId');
+    }
+    throw ErrorHandling.Forbidden('Only patients and caregivers can access medication logs');
   }
 
   private async lockLog(manager: EntityManager, id: string) {

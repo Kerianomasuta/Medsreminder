@@ -4,6 +4,7 @@ import '../../controllers/care_network_controller.dart';
 import '../../models/care_network.dart';
 import '../../models/prescription.dart';
 import '../../models/schedule_rule.dart';
+import '../patient/schedule_timeline_page.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverHome extends StatelessWidget {
@@ -75,7 +76,13 @@ class CaregiverHome extends StatelessWidget {
       if (bundle == null) return const SizedBox.shrink();
 
       return switch (tab) {
-        1 => _SchedulePage(controller: controller, bundle: bundle),
+        1 => _PatientFrame(
+          controller: controller,
+          child: ScheduleTimelinePage(
+            key: ValueKey(patientId),
+            patientId: patientId,
+          ),
+        ),
         2 => _PrescriptionPage(controller: controller, bundle: bundle),
         4 => _ProfilePage(
           controller: controller,
@@ -373,32 +380,6 @@ class _OverviewPage extends StatelessWidget {
   }
 }
 
-class _SchedulePage extends StatelessWidget {
-  const _SchedulePage({required this.controller, required this.bundle});
-  final CareNetworkController controller;
-  final PatientBundle bundle;
-
-  @override
-  Widget build(BuildContext context) => _PatientFrame(
-    controller: controller,
-    child: AppScroll(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PageIntro(
-            'Lịch uống thuốc',
-            'Toàn bộ cữ thuốc của ${bundle.detail.fullName}',
-          ),
-          if (bundle.schedules.isEmpty)
-            const _EmptyCard(message: 'Chưa có lịch uống thuốc.')
-          else
-            ...bundle.schedules.map(_ScheduleTile.new),
-        ],
-      ),
-    ),
-  );
-}
-
 class _PrescriptionPage extends StatelessWidget {
   const _PrescriptionPage({required this.controller, required this.bundle});
   final CareNetworkController controller;
@@ -646,55 +627,64 @@ class _ScheduleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
-    child: Glass(
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE7E9FF),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              rule.displayTime,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF4659CF),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => showScheduleDetailsModal(
+        context,
+        scheduleId: rule.id,
+        initialRule: rule,
+        selectedDate: DateTime.now(),
+      ),
+      child: Glass(
+        padding: const EdgeInsets.all(15),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E9FF),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                rule.displayTime,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF4659CF),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rule.medicine.name,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                Text(
-                  '${rule.dosagePerTime.toStringAsFixed(rule.dosagePerTime % 1 == 0 ? 0 : 1)} ${rule.medicine.unit} · ${rule.prescription.title}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF687195),
-                  ),
-                ),
-                if (rule.instructions?.isNotEmpty == true)
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    rule.instructions!,
-                    style: const TextStyle(fontSize: 12),
+                    rule.medicine.name,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-              ],
+                  Text(
+                    '${rule.dosagePerTime.toStringAsFixed(rule.dosagePerTime % 1 == 0 ? 0 : 1)} ${rule.medicine.unit} · ${rule.prescription.title}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF687195),
+                    ),
+                  ),
+                  if (rule.instructions?.isNotEmpty == true)
+                    Text(
+                      rule.instructions!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
+              ),
             ),
-          ),
-          StatusChip(
-            rule.isActive ? 'Đang bật' : 'Đã tắt',
-            rule.isActive ? const Color(0xFF249D76) : const Color(0xFF9BA3BF),
-          ),
-        ],
+            StatusChip(
+              rule.isActive ? 'Đang bật' : 'Đã tắt',
+              rule.isActive ? const Color(0xFF249D76) : const Color(0xFF9BA3BF),
+            ),
+          ],
+        ),
       ),
     ),
   );

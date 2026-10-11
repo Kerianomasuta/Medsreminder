@@ -16,7 +16,11 @@ import {
 } from 'class-validator';
 
 export class CreateOrderItemDto {
-  @ApiProperty({ format: 'uuid', description: 'Prescription line to buy. The pharmacy reviews the name stored on that line.' })
+  @ApiProperty({
+    format: 'uuid',
+    description:
+      'Prescription line to buy. The pharmacy reviews the name stored on that line.',
+  })
   @IsUUID()
   prescriptionItemId: string;
 
@@ -27,13 +31,12 @@ export class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'MongoDB ObjectId of the patient',
+  })
   @IsMongoId()
   patientId: string;
-
-  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
-  @IsMongoId()
-  caregiverId: string;
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
@@ -47,19 +50,27 @@ export class CreateOrderDto {
   @IsIn(['PICKUP', 'DELIVERY'])
   fulfillmentType: 'PICKUP' | 'DELIVERY';
 
-  @ApiPropertyOptional({ description: 'Who receives the medicine. Optional for PICKUP, required for DELIVERY.' })
+  @ApiPropertyOptional({
+    description:
+      'Who receives the medicine. Optional for PICKUP, required for DELIVERY.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   recipientName?: string;
 
-  @ApiPropertyOptional({ description: 'Phone of the person who receives the medicine. Optional for PICKUP, required for DELIVERY.' })
+  @ApiPropertyOptional({
+    description:
+      'Phone of the person who receives the medicine. Optional for PICKUP, required for DELIVERY.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(15)
   recipientPhone?: string;
 
-  @ApiPropertyOptional({ description: 'Required for DELIVERY. Omit this field for PICKUP.' })
+  @ApiPropertyOptional({
+    description: 'Required for DELIVERY. Omit this field for PICKUP.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -80,19 +91,41 @@ export class CreateOrderDto {
 }
 
 export class ListMyOrdersQueryDto {
-  @ApiPropertyOptional({ enum: ['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'] })
+  @ApiPropertyOptional({
+    enum: [
+      'PENDING_REVIEW',
+      'PREPARING',
+      'READY_FOR_PICKUP',
+      'SHIPPED',
+      'COMPLETED',
+      'CANCELLED',
+    ],
+  })
   @IsOptional()
-  @IsIn(['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'])
+  @IsIn([
+    'PENDING_REVIEW',
+    'PREPARING',
+    'READY_FOR_PICKUP',
+    'SHIPPED',
+    'COMPLETED',
+    'CANCELLED',
+  ])
   status?: string;
 }
 
 export class ListOrdersQueryDto {
-  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description: 'MongoDB ObjectId of the patient',
+  })
   @IsOptional()
   @IsMongoId()
   patientId?: string;
 
-  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439012',
+    description: 'MongoDB ObjectId of the caregiver',
+  })
   @IsOptional()
   @IsMongoId()
   caregiverId?: string;
@@ -102,9 +135,25 @@ export class ListOrdersQueryDto {
   @IsUUID()
   pharmacyId?: string;
 
-  @ApiPropertyOptional({ enum: ['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'] })
+  @ApiPropertyOptional({
+    enum: [
+      'PENDING_REVIEW',
+      'PREPARING',
+      'READY_FOR_PICKUP',
+      'SHIPPED',
+      'COMPLETED',
+      'CANCELLED',
+    ],
+  })
   @IsOptional()
-  @IsIn(['PENDING_REVIEW', 'PREPARING', 'READY_FOR_PICKUP', 'SHIPPED', 'COMPLETED', 'CANCELLED'])
+  @IsIn([
+    'PENDING_REVIEW',
+    'PREPARING',
+    'READY_FOR_PICKUP',
+    'SHIPPED',
+    'COMPLETED',
+    'CANCELLED',
+  ])
   status?: string;
 }
 

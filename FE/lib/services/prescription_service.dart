@@ -127,8 +127,9 @@ class PrescriptionService {
     // ── DEV MOCK ─────────────────────────────────────────────────────────────
     if (_isDevId(id)) {
       final found = _allMockPrescriptions().where((p) => p.id == id).toList();
-      if (found.isEmpty)
+      if (found.isEmpty) {
         throw PrescriptionServiceException(404, 'Prescription not found');
+      }
       return found.first;
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -166,8 +167,10 @@ class PrescriptionService {
         items: prescription.items.map((item) {
           return PrescriptionItem(
             id: 'mock-item-new-${DateTime.now().microsecondsSinceEpoch}',
-            medicineId: item.medicineId,
             medicineName: item.medicineName,
+            genericName: item.genericName,
+            unit: item.unit,
+            imageUrl: item.imageUrl,
             dosagePerTime: item.dosagePerTime,
             currentStock: item.currentStock,
             reorderThreshold: item.reorderThreshold,
@@ -195,8 +198,9 @@ class PrescriptionService {
       await Future<void>.delayed(const Duration(milliseconds: 400));
       final all = _allMockPrescriptions();
       final idx = all.indexWhere((p) => p.id == id);
-      if (idx == -1)
+      if (idx == -1) {
         throw PrescriptionServiceException(404, 'Prescription not found');
+      }
       final old = all[idx];
       return Prescription(
         id: old.id,
@@ -238,8 +242,10 @@ class PrescriptionService {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       return PrescriptionItem(
         id: 'mock-item-added-${DateTime.now().millisecondsSinceEpoch}',
-        medicineId: item.medicineId,
         medicineName: item.medicineName,
+        genericName: item.genericName,
+        unit: item.unit,
+        imageUrl: item.imageUrl,
         dosagePerTime: item.dosagePerTime,
         currentStock: item.currentStock,
         reorderThreshold: item.reorderThreshold,
@@ -266,8 +272,10 @@ class PrescriptionService {
       await Future<void>.delayed(const Duration(milliseconds: 400));
       return PrescriptionItem(
         id: itemId,
-        medicineId: item.medicineId,
         medicineName: item.medicineName,
+        genericName: item.genericName,
+        unit: item.unit,
+        imageUrl: item.imageUrl,
         dosagePerTime: item.dosagePerTime,
         currentStock: item.currentStock,
         reorderThreshold: item.reorderThreshold,
@@ -297,17 +305,6 @@ class PrescriptionService {
     );
     return !idRe.hasMatch(id);
   }
-
-  // ── Mock medicines catalog (UUID chuẩn để dùng khi tạo đơn) ─────────────
-  // Khi tạo đơn mới, dùng những medicineId này
-  static const _kMockMedicines = <String, String>{
-    'aaaaaaaa-0001-4000-a000-000000000001': 'Amlodipine 5mg',
-    'aaaaaaaa-0002-4000-a000-000000000002': 'Atorvastatin 10mg',
-    'aaaaaaaa-0003-4000-a000-000000000003': 'Metformin 500mg',
-    'aaaaaaaa-0004-4000-a000-000000000004': 'Vitamin D3 1000IU',
-    'aaaaaaaa-0005-4000-a000-000000000005': 'Lisinopril 10mg',
-    'aaaaaaaa-0006-4000-a000-000000000006': 'Omeprazole 20mg',
-  };
 
   // ── Mock patient IDs (để dùng trong linkedPatients) ──────────────────────
   // PA-8899 → bbbbbbbb-0001-4000-b000-000000000001
@@ -346,7 +343,6 @@ class PrescriptionService {
       items: [
         PrescriptionItem(
           id: 'mock-item-p1-001',
-          medicineId: 'aaaaaaaa-0001-4000-a000-000000000001',
           medicineName: 'Amlodipine 5mg',
           dosagePerTime: 1,
           currentStock: 28,
@@ -362,7 +358,6 @@ class PrescriptionService {
         ),
         PrescriptionItem(
           id: 'mock-item-p1-002',
-          medicineId: 'aaaaaaaa-0002-4000-a000-000000000002',
           medicineName: 'Atorvastatin 10mg',
           dosagePerTime: 1,
           currentStock: 5,
@@ -390,7 +385,6 @@ class PrescriptionService {
       items: [
         PrescriptionItem(
           id: 'mock-item-p1-003',
-          medicineId: 'aaaaaaaa-0003-4000-a000-000000000003',
           medicineName: 'Metformin 500mg',
           dosagePerTime: 2,
           currentStock: 60,
@@ -411,7 +405,6 @@ class PrescriptionService {
         ),
         PrescriptionItem(
           id: 'mock-item-p1-004',
-          medicineId: 'aaaaaaaa-0004-4000-a000-000000000004',
           medicineName: 'Vitamin D3 1000IU',
           dosagePerTime: 1,
           currentStock: 90,
@@ -439,7 +432,6 @@ class PrescriptionService {
       items: [
         PrescriptionItem(
           id: 'mock-item-p1-005',
-          medicineId: 'aaaaaaaa-0006-4000-a000-000000000006',
           medicineName: 'Omeprazole 20mg',
           dosagePerTime: 1,
           currentStock: 0,
@@ -469,7 +461,6 @@ class PrescriptionService {
       items: [
         PrescriptionItem(
           id: 'mock-item-p2-001',
-          medicineId: 'aaaaaaaa-0005-4000-a000-000000000005',
           medicineName: 'Lisinopril 10mg',
           dosagePerTime: 1,
           currentStock: 3,
@@ -485,7 +476,6 @@ class PrescriptionService {
         ),
         PrescriptionItem(
           id: 'mock-item-p2-002',
-          medicineId: 'aaaaaaaa-0002-4000-a000-000000000002',
           medicineName: 'Atorvastatin 10mg',
           dosagePerTime: 1,
           currentStock: 20,
@@ -513,7 +503,6 @@ class PrescriptionService {
       items: [
         PrescriptionItem(
           id: 'mock-item-p2-003',
-          medicineId: 'aaaaaaaa-0004-4000-a000-000000000004',
           medicineName: 'Vitamin D3 1000IU',
           dosagePerTime: 1,
           currentStock: 45,
@@ -583,8 +572,8 @@ class PrescriptionValidator {
   }
 
   static String? validateItem(PrescriptionItem item) {
-    if (!isValidUuid(item.medicineId)) {
-      return 'medicineId không hợp lệ: ${item.medicineName}';
+    if (item.medicineName.trim().isEmpty) {
+      return 'Tên thuốc không được để trống';
     }
     if (item.dosagePerTime <= 0) return 'Liều dùng phải > 0';
     if (item.currentStock < 0) return 'Tồn kho không được âm';

@@ -3,6 +3,14 @@ import { IsIn, IsISO8601, IsOptional, IsString, Matches, MaxLength } from 'class
 
 export class ListMedicationLogsQueryDto {
   @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Required for CARE_GIVER. PATIENT always uses the patient id from the access token.',
+  })
+  @IsOptional()
+  @Matches(/^[0-9a-fA-F]{24}$/)
+  patientId?: string;
+
+  @ApiPropertyOptional({
     example: '2026-10-08',
     description: 'First calendar day to include, Asia/Ho_Chi_Minh. Defaults to today. Doses scheduled before this day are omitted.',
   })

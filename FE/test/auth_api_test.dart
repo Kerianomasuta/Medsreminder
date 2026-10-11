@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:meds_reminder/models/app_role.dart';
+import 'package:meds_reminder/models/registration_input.dart';
 import 'package:meds_reminder/services/auth_api.dart';
 
 void main() {
@@ -35,14 +36,44 @@ void main() {
     });
 
     await AuthApi(client: client).register(
-      email: 'caregiver@example.com',
-      password: 'password123',
-      fullName: 'Người chăm sóc',
-      phone: '0912345678',
-      role: AppRole.caregiver,
+      const RegistrationInput(
+        email: 'caregiver@example.com',
+        password: 'password123',
+        fullName: 'Người chăm sóc',
+        phone: '0912345678',
+        role: AppRole.caregiver,
+      ),
     );
 
     expect(sentBody?['role'], 'CARE_GIVER');
+    expect(sentBody, isNot(contains('pharmacyName')));
+  });
+
+  test('pharmacist registration includes its pharmacy profile', () async {
+    Map<String, dynamic>? sentBody;
+    final client = MockClient((request) async {
+      sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+      return http.Response(jsonEncode({'status': 201}), 201);
+    });
+
+    await AuthApi(client: client).register(
+      const RegistrationInput(
+        email: 'pharmacist@example.com',
+        password: 'password123',
+        fullName: 'Dược sĩ Demo',
+        phone: '0912345678',
+        role: AppRole.pharmacist,
+        pharmacyName: 'Nhà thuốc An Tâm',
+        addressText: 'Quận 1, TP.HCM',
+        latitude: 10.77,
+        longitude: 106.7,
+      ),
+    );
+
+    expect(sentBody, containsPair('pharmacyName', 'Nhà thuốc An Tâm'));
+    expect(sentBody, containsPair('addressText', 'Quận 1, TP.HCM'));
+    expect(sentBody, containsPair('latitude', 10.77));
+    expect(sentBody, containsPair('longitude', 106.7));
   });
 }
 
