@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { FulfillmentType } from '../../enums/fulfillment-type.enum.js';
 import { OrderStatus } from '../../enums/order-status.enum.js';
 import { OrderItem } from './order-item.entity.js';
@@ -13,10 +13,10 @@ export class Order {
   @Column({ type: 'varchar', length: 20, name: 'order_code', unique: true })
   orderCode: string;
 
-  @Column({ type: 'uuid', name: 'patient_id' })
+  @Column({ type: 'varchar', length: 24, name: 'patient_id' })
   patientId: string;
 
-  @Column({ type: 'uuid', name: 'caregiver_id' })
+  @Column({ type: 'varchar', length: 24, name: 'caregiver_id' })
   caregiverId: string;
 
   @Column({ type: 'uuid', name: 'pharmacy_id' })
@@ -62,5 +62,5 @@ export class Order {
   updatedAt: Date;
 
   @OneToMany(() => OrderItem, (item) => item.order)
-  items: OrderItem[];
+  items: Relation<OrderItem>[];
 }

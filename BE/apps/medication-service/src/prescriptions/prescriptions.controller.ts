@@ -19,7 +19,12 @@ type ItemMessage = {
   schedules?: ScheduleMessage[];
 };
 
-type CreatePrescriptionMessage = {
+type ActorMessage = {
+  actorUserId?: string;
+  actorRole?: string;
+};
+
+type CreatePrescriptionMessage = ActorMessage & {
   patientId?: string;
   createdByCgId?: string;
   title?: string;
@@ -31,7 +36,7 @@ type CreatePrescriptionMessage = {
   items?: ItemMessage[];
 };
 
-type UpdatePrescriptionMessage = {
+type UpdatePrescriptionMessage = ActorMessage & {
   id: string;
   title?: string;
   doctorName?: string | null;
@@ -52,25 +57,25 @@ export class PrescriptionsController {
   }
 
   @MessagePattern({ cmd: 'list_prescriptions' })
-  list(@Payload() payload: { patientId?: string }) {
-    return this.prescriptionsService.list(payload?.patientId);
+  list(@Payload() payload: ActorMessage & { patientId?: string }) {
+    return this.prescriptionsService.list(payload?.patientId, this.actor(payload));
   }
 
   @MessagePattern({ cmd: 'get_prescription' })
-  getById(@Payload() payload: { id: string }) {
-    return this.prescriptionsService.getById(payload.id);
+  getById(@Payload() payload: ActorMessage & { id: string }) {
+    return this.prescriptionsService.getById(payload.id, this.actor(payload));
   }
 
   @MessagePattern({ cmd: 'update_prescription' })
   update(@Payload() payload: UpdatePrescriptionMessage) {
-    const { id, ...changes } = payload;
-    return this.prescriptionsService.update(id, changes);
+    const { id, actorUserId, actorRole, ...changes } = payload;
+    return this.prescriptionsService.update(id, changes, { userId: actorUserId, role: actorRole });
   }
 
   @MessagePattern({ cmd: 'add_prescription_item' })
-  addItem(@Payload() payload: ItemMessage & { prescriptionId?: string }) {
-    const { prescriptionId, ...item } = payload;
-    return this.prescriptionsService.addItem(prescriptionId, item);
+  addItem(@Payload() payload: ItemMessage & ActorMessage & { prescriptionId?: string }) {
+    const { prescriptionId, actorUserId, actorRole, ...item } = payload;
+    return this.prescriptionsService.addItem(prescriptionId, item, { userId: actorUserId, role: actorRole });
   }
 
   @MessagePattern({ cmd: 'replenish_prescription_stock' })
@@ -82,7 +87,7 @@ export class PrescriptionsController {
 
   @MessagePattern({ cmd: 'update_prescription_item' })
   updateItem(
-    @Payload() payload: {
+    @Payload() payload: ActorMessage & {
       id: string;
       name?: string;
       genericName?: string | null;
@@ -94,7 +99,14 @@ export class PrescriptionsController {
       instructions?: string | null;
     },
   ) {
-    const { id, ...changes } = payload;
-    return this.prescriptionsService.updateItem(id, changes);
+    const { id, actorUserId, actorRole, ...changes } = payload;
+    return this.prescriptionsService.updateItem(id, changes, { userId: actorUserId, role: actorRole });
+  }
+
+  private actor(payload?: ActorMessage) {
+    if (!payload?.actorRole) {
+      return undefined;
+    }
+    return { userId: payload.actorUserId, role: payload.actorRole };
   }
 }

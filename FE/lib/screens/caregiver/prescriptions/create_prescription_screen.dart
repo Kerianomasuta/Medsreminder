@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../models/medicine.dart';
+
 import '../../../models/prescription.dart';
-import '../../../services/medicine_api.dart';
 import '../../../services/prescription_service.dart';
 import '../../../widgets/glass.dart';
 
@@ -81,8 +80,9 @@ class _CreatePrescriptionScreenState extends State<CreatePrescriptionScreen> {
     });
   }
 
-  void _showError(String msg) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(msg), backgroundColor: const Color(0xFFD65B49)));
+  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(msg), backgroundColor: const Color(0xFFD65B49)),
+  );
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -106,10 +106,6 @@ class _CreatePrescriptionScreenState extends State<CreatePrescriptionScreen> {
       return;
     }
     for (final item in _items) {
-      if (!PrescriptionValidator.isValidUuid(item.medicineId)) {
-        _showError('medicineId của "${item.medicineName}" không hợp lệ');
-        return;
-      }
       if (item.medicineName.trim().isEmpty) {
         _showError('Tên thuốc không được để trống');
         return;
@@ -135,8 +131,12 @@ class _CreatePrescriptionScreenState extends State<CreatePrescriptionScreen> {
       final prescription = Prescription(
         patientId: widget.patientId,
         title: _titleCtrl.text.trim(),
-        doctorName: _doctorCtrl.text.trim().isEmpty ? null : _doctorCtrl.text.trim(),
-        prescriptionCode: _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
+        doctorName: _doctorCtrl.text.trim().isEmpty
+            ? null
+            : _doctorCtrl.text.trim(),
+        prescriptionCode: _codeCtrl.text.trim().isEmpty
+            ? null
+            : _codeCtrl.text.trim(),
         startDate: _fmt(_startDate),
         endDate: _endDate != null ? _fmt(_endDate!) : null,
         isActive: _isActive,
@@ -227,37 +227,32 @@ class _CreatePrescriptionScreenState extends State<CreatePrescriptionScreen> {
   }
 
   Widget _buildStepIndicator() => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-        child: Row(
-          children: [
-            _StepDot(
-              number: 1,
-              label: 'Thông tin',
-              active: _step == 0,
-              done: _step > 0,
-            ),
-            Expanded(
-              child: Container(
-                height: 2,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: _step > 0
-                        ? [const Color(0xFF5168F4), const Color(0xFF5168F4)]
-                        : [const Color(0xFFDEE2F5), const Color(0xFFDEE2F5)],
-                  ),
-                ),
+    padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+    child: Row(
+      children: [
+        _StepDot(
+          number: 1,
+          label: 'Thông tin',
+          active: _step == 0,
+          done: _step > 0,
+        ),
+        Expanded(
+          child: Container(
+            height: 2,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _step > 0
+                    ? [const Color(0xFF5168F4), const Color(0xFF5168F4)]
+                    : [const Color(0xFFDEE2F5), const Color(0xFFDEE2F5)],
               ),
             ),
-            _StepDot(
-              number: 2,
-              label: 'Thuốc',
-              active: _step == 1,
-              done: false,
-            ),
-          ],
+          ),
         ),
-      );
+        _StepDot(number: 2, label: 'Thuốc', active: _step == 1, done: false),
+      ],
+    ),
+  );
 
   void _showAddItemDialog() {
     showModalBottomSheet(
@@ -291,45 +286,42 @@ class _StepDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active || done
-                  ? const Color(0xFF5168F4)
-                  : const Color(0xFFDEE2F5),
-            ),
-            child: Center(
-              child: done
-                  ? const Icon(Icons.check_rounded,
-                      color: Colors.white, size: 18)
-                  : Text(
-                      '$number',
-                      style: TextStyle(
-                        color: active ? Colors.white : const Color(0xFF9BA3BF),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w800 : FontWeight.w500,
-              color: active
-                  ? const Color(0xFF5168F4)
-                  : const Color(0xFF9BA3BF),
-            ),
-          ),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: active || done
+              ? const Color(0xFF5168F4)
+              : const Color(0xFFDEE2F5),
+        ),
+        child: Center(
+          child: done
+              ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+              : Text(
+                  '$number',
+                  style: TextStyle(
+                    color: active ? Colors.white : const Color(0xFF9BA3BF),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+          color: active ? const Color(0xFF5168F4) : const Color(0xFF9BA3BF),
+        ),
+      ),
+    ],
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +374,10 @@ class _Step1 extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
-                const Icon(Icons.check_circle_rounded, color: Color(0xFF249D76)),
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF249D76),
+                ),
               ],
             ),
           ),
@@ -417,7 +412,9 @@ class _Step1 extends StatelessWidget {
                   children: [
                     _label('Ngày kết thúc'),
                     _datePicker(
-                      value: endDate != null ? displayDate(endDate!) : 'Tuỳ chọn',
+                      value: endDate != null
+                          ? displayDate(endDate!)
+                          : 'Tuỳ chọn',
                       onTap: onPickEnd,
                     ),
                   ],
@@ -438,7 +435,9 @@ class _Step1 extends StatelessWidget {
                 isActive ? 'Đang sử dụng' : 'Ngừng sử dụng',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: isActive ? const Color(0xFF249D76) : const Color(0xFF9BA3BF),
+                  color: isActive
+                      ? const Color(0xFF249D76)
+                      : const Color(0xFF9BA3BF),
                 ),
               ),
             ],
@@ -454,7 +453,9 @@ class _Step1 extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF5168F4),
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ],
@@ -463,22 +464,34 @@ class _Step1 extends StatelessWidget {
   }
 
   Widget _label(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      t,
+      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+    ),
+  );
 
   Widget _tf(TextEditingController ctrl, String hint) => TextField(
-        controller: ctrl,
-        decoration: InputDecoration(
-          hintText: hint,
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDEE2F5))),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDEE2F5))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6)),
-        ),
-      );
+    controller: ctrl,
+    decoration: InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6),
+      ),
+    ),
+  );
 
   Widget _datePicker({required String value, required VoidCallback onTap}) =>
       GestureDetector(
@@ -492,9 +505,19 @@ class _Step1 extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF5168F4)),
+              const Icon(
+                Icons.calendar_today_rounded,
+                size: 16,
+                color: Color(0xFF5168F4),
+              ),
               const SizedBox(width: 8),
-              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -535,7 +558,11 @@ class _Step2 extends StatelessWidget {
                   const Expanded(
                     child: Text(
                       'Danh sách thuốc',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF1F2A54)),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1F2A54),
+                      ),
                     ),
                   ),
                   TextButton.icon(
@@ -551,7 +578,11 @@ class _Step2 extends StatelessWidget {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      const Icon(Icons.medication_outlined, size: 40, color: Color(0xFFB0B8D8)),
+                      const Icon(
+                        Icons.medication_outlined,
+                        size: 40,
+                        color: Color(0xFFB0B8D8),
+                      ),
                       const SizedBox(height: 12),
                       const Text(
                         'Chưa có thuốc nào.\nNhấn "Thêm thuốc" để bắt đầu.',
@@ -584,7 +615,9 @@ class _Step2 extends StatelessWidget {
                 label: const Text('Quay lại'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(110, 52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -592,13 +625,25 @@ class _Step2 extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: submitting ? null : onSubmit,
                   icon: submitting
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.check_circle_rounded),
-                  label: const Text('Tạo đơn thuốc', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  label: const Text(
+                    'Tạo đơn thuốc',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF249D76),
                     minimumSize: const Size.fromHeight(52),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -635,8 +680,11 @@ class _DraftItemCard extends StatelessWidget {
                   color: const Color(0xFFE5E8FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.medication_rounded,
-                    color: Color(0xFF5167F2), size: 18),
+                child: const Icon(
+                  Icons.medication_rounded,
+                  color: Color(0xFF5167F2),
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -644,18 +692,29 @@ class _DraftItemCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      draft.medicineName.isEmpty ? '(Tên thuốc)' : draft.medicineName,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                      draft.medicineName.isEmpty
+                          ? '(Tên thuốc)'
+                          : draft.medicineName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
                     ),
                     Text(
                       'Liều: ${draft.dosagePerTime}/lần  ·  Kho: ${draft.currentStock}',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF6B7492)),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6B7492),
+                      ),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFD65B49)),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFD65B49),
+                ),
                 tooltip: 'Xoá thuốc',
                 onPressed: onRemove,
               ),
@@ -669,11 +728,12 @@ class _DraftItemCard extends StatelessWidget {
               children: draft.schedules.map((s) {
                 final dayStr = s.daysOfWeek.isEmpty
                     ? 'Mỗi ngày'
-                    : s.daysOfWeek
-                        .map((d) => days[d - 1])
-                        .join(', ');
+                    : s.daysOfWeek.map((d) => days[d - 1]).join(', ');
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEEF0FF),
                     borderRadius: BorderRadius.circular(20),
@@ -710,12 +770,10 @@ class _AddItemDraftSheet extends StatefulWidget {
 }
 
 class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
-  // ── Medicine search ──────────────────────────────────────────────────────
-  final _searchCtrl = TextEditingController();
-  Medicine? _selectedMedicine;
-  List<Medicine> _suggestions = [];
-  bool _searching = false;
-  bool _showDropdown = false;
+  final _nameCtrl = TextEditingController();
+  final _genericNameCtrl = TextEditingController();
+  final _imageUrlCtrl = TextEditingController();
+  String _unit = 'VIEN';
 
   // ── Item fields ──────────────────────────────────────────────────────────
   final _dosageCtrl = TextEditingController(text: '1');
@@ -724,58 +782,16 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
   final _instructionsCtrl = TextEditingController();
 
   final List<ScheduleDraft> _schedules = [ScheduleDraft()];
-  final _api = MedicineApi();
-
   @override
   void dispose() {
-    _searchCtrl.dispose();
+    _nameCtrl.dispose();
+    _genericNameCtrl.dispose();
+    _imageUrlCtrl.dispose();
     _dosageCtrl.dispose();
     _stockCtrl.dispose();
     _thresholdCtrl.dispose();
     _instructionsCtrl.dispose();
-    _api.close();
     super.dispose();
-  }
-
-  Future<void> _onSearchChanged(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() { _suggestions = []; _showDropdown = false; });
-      return;
-    }
-    setState(() { _searching = true; _showDropdown = true; });
-    try {
-      final results = await _api.list(search: query.trim());
-      if (mounted) setState(() => _suggestions = results);
-    } catch (_) {
-      if (mounted) {
-        setState(() => _suggestions = _mockMedicines
-            .where((m) => m.name.toLowerCase().contains(query.toLowerCase()))
-            .toList());
-      }
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
-  }
-
-  void _selectMedicine(Medicine m) {
-    setState(() {
-      _selectedMedicine = m;
-      _searchCtrl.text = m.name;
-      _showDropdown = false;
-      _suggestions = [];
-      if (m.instructionNote != null && _instructionsCtrl.text.isEmpty) {
-        _instructionsCtrl.text = m.instructionNote!;
-      }
-    });
-  }
-
-  void _clearSelection() {
-    setState(() {
-      _selectedMedicine = null;
-      _searchCtrl.clear();
-      _showDropdown = false;
-      _suggestions = [];
-    });
   }
 
   Future<void> _pickTime(int index) async {
@@ -794,8 +810,9 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
   }
 
   void _confirm() {
-    if (_selectedMedicine == null) {
-      _showError('Vui lòng chọn thuốc từ danh sách');
+    final medicineName = _nameCtrl.text.trim();
+    if (medicineName.isEmpty || medicineName.length > 200) {
+      _showError('Tên thuốc bắt buộc và tối đa 200 ký tự');
       return;
     }
     final dosage = double.tryParse(_dosageCtrl.text.trim());
@@ -822,8 +839,14 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
     }
 
     final draft = PrescriptionItemDraft(
-      medicineId: _selectedMedicine!.id,
-      medicineName: _selectedMedicine!.name,
+      medicineName: medicineName,
+      genericName: _genericNameCtrl.text.trim().isEmpty
+          ? null
+          : _genericNameCtrl.text.trim(),
+      unit: _unit,
+      imageUrl: _imageUrlCtrl.text.trim().isEmpty
+          ? null
+          : _imageUrlCtrl.text.trim(),
       dosagePerTime: dosage,
       currentStock: stock,
       reorderThreshold: threshold,
@@ -837,8 +860,9 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
     widget.onAdded(draft);
   }
 
-  void _showError(String msg) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(msg), backgroundColor: const Color(0xFFD65B49)));
+  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(msg), backgroundColor: const Color(0xFFD65B49)),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -857,127 +881,118 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
           children: [
             Center(
               child: Container(
-                width: 44, height: 5,
-                decoration: BoxDecoration(color: const Color(0xFFD4D8EF), borderRadius: BorderRadius.circular(10)),
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4D8EF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             const SizedBox(height: 14),
             Row(
               children: [
-                const CircleAvatar(radius: 20, backgroundColor: Color(0xFF5168F4), child: Icon(Icons.medication_rounded, color: Colors.white, size: 20)),
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFF5168F4),
+                  child: Icon(
+                    Icons.medication_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
                 const SizedBox(width: 12),
-                const Expanded(child: Text('Thêm thuốc vào đơn', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+                const Expanded(
+                  child: Text(
+                    'Thêm thuốc vào đơn',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
             const SizedBox(height: 20),
 
-            _lbl('Tìm kiếm thuốc *'),
-            if (_selectedMedicine != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF0FF),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF5168F4), width: 1.6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, color: Color(0xFF5168F4), size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_selectedMedicine!.name,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                          Text(_selectedMedicine!.unit.label,
-                              style: const TextStyle(color: Color(0xFF6B7492), fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: _clearSelection,
-                      child: const Icon(Icons.close_rounded, color: Color(0xFF6B7492), size: 20),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              TextField(
-                controller: _searchCtrl,
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: 'Gõ tên thuốc để tìm kiếm...',
-                  prefixIcon: _searching
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 18, height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF5168F4)),
-                          ),
-                        )
-                      : const Icon(Icons.search_rounded, color: Color(0xFF5168F4)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDEE2F5))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDEE2F5))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6)),
-                ),
-              ),
-              if (_showDropdown && _suggestions.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFDEE2F5)),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4)),
+            _lbl('Tên thuốc *'),
+            _tf(_nameCtrl, 'Ví dụ: Paracetamol'),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _lbl('Hoạt chất (tuỳ chọn)'),
+                      _tf(_genericNameCtrl, 'Ví dụ: Acetaminophen'),
                     ],
                   ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    itemCount: _suggestions.length,
-                    separatorBuilder: (_, _2) => const Divider(height: 1, indent: 14, endIndent: 14),
-                    itemBuilder: (context, i) {
-                      final m = _suggestions[i];
-                      return ListTile(
-                        dense: true,
-                        leading: const CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Color(0xFFEEF0FF),
-                          child: Icon(Icons.medication_rounded, color: Color(0xFF5168F4), size: 16),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _lbl('Đơn vị *'),
+                      DropdownButtonFormField<String>(
+                        initialValue: _unit,
+                        items: const [
+                          DropdownMenuItem(value: 'VIEN', child: Text('Viên')),
+                          DropdownMenuItem(value: 'GOI', child: Text('Gói')),
+                          DropdownMenuItem(value: 'CHAI', child: Text('Chai')),
+                        ],
+                        onChanged: (value) => setState(() => _unit = value!),
+                        decoration: const InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(),
                         ),
-                        title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        subtitle: Text(m.unit.label, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7492))),
-                        onTap: () => _selectMedicine(m),
-                      );
-                    },
+                      ),
+                    ],
                   ),
                 ),
-            ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            _lbl('URL ảnh thuốc (tuỳ chọn)'),
+            _tf(_imageUrlCtrl, 'https://example.com/medicine.png'),
 
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _lbl('Liều / lần'),
-                  _tf(_dosageCtrl, '1', keyboard: TextInputType.number),
-                ])),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _lbl('Liều / lần'),
+                      _tf(_dosageCtrl, '1', keyboard: TextInputType.number),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _lbl('Tồn kho'),
-                  _tf(_stockCtrl, '30', keyboard: TextInputType.number),
-                ])),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _lbl('Tồn kho'),
+                      _tf(_stockCtrl, '30', keyboard: TextInputType.number),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _lbl('Ngưỡng đặt'),
-                  _tf(_thresholdCtrl, '5', keyboard: TextInputType.number),
-                ])),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _lbl('Ngưỡng đặt'),
+                      _tf(_thresholdCtrl, '5', keyboard: TextInputType.number),
+                    ],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -986,10 +1001,14 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text('Lịch nhắc', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Lịch nhắc',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                ),
                 const Spacer(),
                 TextButton.icon(
-                  onPressed: () => setState(() => _schedules.add(ScheduleDraft())),
+                  onPressed: () =>
+                      setState(() => _schedules.add(ScheduleDraft())),
                   icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
                   label: const Text('Thêm giờ'),
                 ),
@@ -1011,36 +1030,63 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.alarm_rounded, size: 16, color: Color(0xFF5168F4)),
+                        const Icon(
+                          Icons.alarm_rounded,
+                          size: 16,
+                          color: Color(0xFF5168F4),
+                        ),
                         const SizedBox(width: 8),
-                        const Text('Giờ nhắc', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        const Text(
+                          'Giờ nhắc',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
                         const Spacer(),
                         GestureDetector(
                           onTap: () => _pickTime(index),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFEEF0FF),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFBCC3F5)),
+                              border: Border.all(
+                                color: const Color(0xFFBCC3F5),
+                              ),
                             ),
                             child: Text(
                               s.reminderTime,
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF5168F4)),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF5168F4),
+                              ),
                             ),
                           ),
                         ),
                         if (_schedules.length > 1) ...[
                           const SizedBox(width: 8),
                           GestureDetector(
-                            onTap: () => setState(() => _schedules.removeAt(index)),
-                            child: const Icon(Icons.remove_circle_outline_rounded, color: Color(0xFFD65B49), size: 20),
+                            onTap: () =>
+                                setState(() => _schedules.removeAt(index)),
+                            child: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                              color: Color(0xFFD65B49),
+                              size: 20,
+                            ),
                           ),
                         ],
                       ],
                     ),
                     const SizedBox(height: 10),
-                    const Text('Ngày trong tuần (bỏ chọn = mỗi ngày)', style: TextStyle(fontSize: 12, color: Color(0xFF6B7492))),
+                    const Text(
+                      'Ngày trong tuần (bỏ chọn = mỗi ngày)',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF6B7492)),
+                    ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -1052,8 +1098,12 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
                           selected: selected,
                           labelStyle: TextStyle(
                             fontSize: 12,
-                            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                            color: selected ? Colors.white : const Color(0xFF2D3748),
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.w500,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF2D3748),
                           ),
                           selectedColor: const Color(0xFF5168F4),
                           checkmarkColor: Colors.white,
@@ -1078,11 +1128,16 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
             FilledButton.icon(
               onPressed: _confirm,
               icon: const Icon(Icons.check_circle_rounded),
-              label: const Text('Xác nhận thêm thuốc', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              label: const Text(
+                'Xác nhận thêm thuốc',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF5168F4),
                 minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ],
@@ -1092,34 +1147,39 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
   }
 
   Widget _lbl(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      t,
+      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+    ),
+  );
 
-  Widget _tf(TextEditingController ctrl, String hint,
-      {TextInputType? keyboard, int maxLines = 1}) =>
-      TextField(
-        controller: ctrl,
-        keyboardType: keyboard,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          hintText: hint,
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDEE2F5))),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDEE2F5))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6)),
-        ),
-      );
+  Widget _tf(
+    TextEditingController ctrl,
+    String hint, {
+    TextInputType? keyboard,
+    int maxLines = 1,
+  }) => TextField(
+    controller: ctrl,
+    keyboardType: keyboard,
+    maxLines: maxLines,
+    decoration: InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF5168F4), width: 1.6),
+      ),
+    ),
+  );
 }
-
-final _mockMedicines = [
-  const Medicine(id: 'aaaaaaaa-0001-4000-a000-000000000001', name: 'Amlodipine 5mg', unit: MedicineUnit.vien),
-  const Medicine(id: 'aaaaaaaa-0002-4000-a000-000000000002', name: 'Atorvastatin 10mg', unit: MedicineUnit.vien),
-  const Medicine(id: 'aaaaaaaa-0003-4000-a000-000000000003', name: 'Metformin 500mg', unit: MedicineUnit.vien),
-  const Medicine(id: 'aaaaaaaa-0004-4000-a000-000000000004', name: 'Vitamin D3 1000IU', unit: MedicineUnit.vien),
-  const Medicine(id: 'aaaaaaaa-0005-4000-a000-000000000005', name: 'Lisinopril 10mg', unit: MedicineUnit.vien),
-  const Medicine(id: 'aaaaaaaa-0006-4000-a000-000000000006', name: 'Omeprazole 20mg', unit: MedicineUnit.vien),
-];
-

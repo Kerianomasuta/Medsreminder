@@ -1,12 +1,17 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import { PharmacyInventory } from './pharmacy-inventory.entity.js';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ schema: 'pharmacy', name: 'pharmacies' })
 export class Pharmacy {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', name: 'pharmacist_id' })
+  @Column({ type: 'varchar', length: 24, name: 'pharmacist_id' })
   pharmacistId: string;
 
   @Column({ type: 'varchar', length: 150 })
@@ -24,15 +29,12 @@ export class Pharmacy {
   @Column({ type: 'double precision' })
   longitude: number;
 
-  @Column({ type: 'boolean', name: 'is_active', default: true })
-  isActive: boolean;
+  @Column({ type: 'varchar', length: 12 })
+  geohash: string;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
-
-  @OneToMany(() => PharmacyInventory, (row) => row.pharmacy)
-  inventory: PharmacyInventory[];
 }

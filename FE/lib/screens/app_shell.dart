@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../widgets/widgets.dart';
+import '../controllers/care_network_controller.dart';
+import '../controllers/pharmacist_dashboard_controller.dart';
 
 import 'patient/patient_home.dart';
 import 'caregiver/caregiver_home.dart';
 import 'caregiver/caregiver_pharmacy_screen.dart';
-import 'caregiver/caregiver_tracking_screen.dart';
 import 'pharmacist/pharmacist_home.dart';
-import 'pharmacist/pharmacist_verification_screen.dart';
-import 'shipper/shipper_home.dart';
-import 'shipper/shipper_task_screen.dart';
 import 'admin/admin_home.dart';
 
 class AppShell extends StatefulWidget {
@@ -20,37 +18,18 @@ class AppShell extends StatefulWidget {
     required this.userName,
     required this.userEmail,
     required this.onLogout,
-    required this.doseTaken,
-    required this.doseMissed,
-    required this.prescriptionAdded,
-    required this.orderStage,
-    required this.linkedPatients,
-    required this.activePatientIndex,
+    required this.networkController,
+    required this.pharmacistController,
     required this.onRoleChanged,
-    required this.onTaken,
-    required this.onMissed,
-    required this.onPrescriptionAdded,
-    required this.onOrderStageChanged,
-    required this.onAddPatient,
-    required this.onRemovePatient,
-    required this.onSelectPatient,
   });
 
   final AppRole role;
   final String userName;
   final String userEmail;
   final Future<void> Function() onLogout;
-  final bool doseTaken, doseMissed, prescriptionAdded;
-  final List<PatientProfileItem> linkedPatients;
-  final int activePatientIndex;
-  final OrderStage orderStage;
+  final CareNetworkController networkController;
+  final PharmacistDashboardController? pharmacistController;
   final ValueChanged<AppRole> onRoleChanged;
-  final VoidCallback onTaken, onMissed, onPrescriptionAdded;
-  final ValueChanged<OrderStage> onOrderStageChanged;
-  final void Function(String code, {String? name, String? relation})
-  onAddPatient;
-  final ValueChanged<int> onRemovePatient;
-  final ValueChanged<int> onSelectPatient;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -79,26 +58,19 @@ class _AppShellState extends State<AppShell>
   List<NavItem> get nav => switch (widget.role) {
     AppRole.patient => const [
       NavItem(Icons.home_rounded, 'Hôm nay'),
-      NavItem(Icons.medication_rounded, 'Uống thuốc'),
       NavItem(Icons.calendar_month_rounded, 'Lịch uống'),
       NavItem(Icons.person_rounded, 'Hồ sơ'),
     ],
     AppRole.caregiver => const [
       NavItem(Icons.grid_view_rounded, 'Tổng quan'),
+      NavItem(Icons.calendar_month_rounded, 'Lịch uống'),
       NavItem(Icons.receipt_long_rounded, 'Đơn thuốc'),
       NavItem(Icons.storefront_rounded, 'Nhà thuốc'),
-      NavItem(Icons.near_me_rounded, 'Theo dõi'),
       NavItem(Icons.person_rounded, 'Hồ sơ'),
     ],
     AppRole.pharmacist => const [
       NavItem(Icons.dashboard_rounded, 'Xử lý đơn'),
-      NavItem(Icons.inventory_2_rounded, 'Kho thuốc'),
       NavItem(Icons.history_rounded, 'Lịch sử'),
-    ],
-    AppRole.shipper => const [
-      NavItem(Icons.route_rounded, 'Chuyến giao'),
-      NavItem(Icons.assignment_turned_in_rounded, 'Đã giao'),
-      NavItem(Icons.person_rounded, 'Tài khoản'),
     ],
     AppRole.admin => const [
       NavItem(Icons.insights_rounded, 'Hệ thống'),
@@ -124,6 +96,8 @@ class _AppShellState extends State<AppShell>
             TopBar(
               role: widget.role,
               userName: widget.userName,
+              userEmail: widget.userEmail,
+              pharmacistController: widget.pharmacistController,
               onLogout: widget.onLogout,
             ),
             Expanded(
@@ -155,80 +129,32 @@ class _AppShellState extends State<AppShell>
     AppRole.patient => PatientHome(
       key: ValueKey('${widget.role}$tab'),
       tab: tab,
-      doseTaken: widget.doseTaken,
-      doseMissed: widget.doseMissed,
-      prescriptionAdded: widget.prescriptionAdded,
-      onPrescriptionAdded: widget.onPrescriptionAdded,
-      isLinked: widget.linkedPatients.isNotEmpty,
-      linkedPatientCode: widget.linkedPatients.isNotEmpty
-          ? widget.linkedPatients[widget.activePatientIndex].code
-          : 'PA-8899',
-      onTaken: widget.onTaken,
+      networkController: widget.networkController,
     ),
 
     AppRole.caregiver =>
-      tab == 2
+      tab == 3
           ? CaregiverPharmacyScreen(
               key: ValueKey('${widget.role}$tab'),
-              onSendRefill: () => widget.onRoleChanged(AppRole.pharmacist),
-            )
-          : tab == 3
-          ? CaregiverTrackingScreen(
-              key: ValueKey('${widget.role}$tab'),
-              onReceiptConfirmed: () => setState(() => tab = 0),
+              controller: widget.networkController,
             )
           : CaregiverHome(
-              key: ValueKey('${widget.role}$tab${widget.activePatientIndex}'),
+              key: ValueKey(
+                '${widget.role}$tab${widget.networkController.selectedPatientId}',
+              ),
               tab: tab,
               userName: widget.userName,
               userEmail: widget.userEmail,
-              doseTaken: widget.doseTaken,
-              doseMissed: widget.doseMissed,
-              prescriptionAdded: widget.prescriptionAdded,
-              linkedPatients: widget.linkedPatients,
-              activePatientIndex: widget.activePatientIndex,
-              onMissed: widget.onMissed,
-              onPrescriptionAdded: widget.onPrescriptionAdded,
-              onAddPatient: widget.onAddPatient,
-              onRemovePatient: widget.onRemovePatient,
-              onSelectPatient: widget.onSelectPatient,
+              controller: widget.networkController,
             ),
 
-    AppRole.pharmacist =>
-      tab == 0
-          ? PharmacistVerificationScreen(
-              key: ValueKey('${widget.role}$tab'),
-              onApproveAndDispatch: () => widget.onRoleChanged(AppRole.shipper),
-            )
-          : PharmacistHome(
-              key: ValueKey('${widget.role}$tab'),
-              tab: tab,
-              orderStage: widget.orderStage,
-              onOrderStageChanged: widget.onOrderStageChanged,
-            ),
-
-    AppRole.shipper =>
-      tab == 0
-          ? ShipperTaskScreen(
-              key: ValueKey('${widget.role}$tab'),
-              onConfirmPickup: () {
-                widget.onRoleChanged(AppRole.caregiver);
-                Future.delayed(const Duration(milliseconds: 150), () {
-                  if (mounted) setState(() => tab = 3);
-                });
-              },
-            )
-          : ShipperHome(
-              key: ValueKey('${widget.role}$tab'),
-              tab: tab,
-              orderStage: widget.orderStage,
-              onOrderStageChanged: widget.onOrderStageChanged,
-            ),
-
-    AppRole.admin => AdminHome(
+    AppRole.pharmacist => PharmacistHome(
       key: ValueKey('${widget.role}$tab'),
-      doseMissed: widget.doseMissed,
+      tab: tab,
+      controller: widget.pharmacistController!,
     ),
+
+    AppRole.admin => AdminHome(key: ValueKey('${widget.role}$tab')),
   };
 }
 
@@ -237,11 +163,15 @@ class TopBar extends StatelessWidget {
     super.key,
     required this.role,
     required this.userName,
+    required this.userEmail,
     required this.onLogout,
+    this.pharmacistController,
   });
   final AppRole role;
   final String userName;
+  final String userEmail;
   final Future<void> Function() onLogout;
+  final PharmacistDashboardController? pharmacistController;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -251,6 +181,7 @@ class TopBar extends StatelessWidget {
         const BrandMark(),
         const Spacer(),
         GestureDetector(
+          key: const Key('account-information-button'),
           onTap: () => _showAccount(context),
           child: Glass(
             radius: 18,
@@ -281,57 +212,263 @@ class TopBar extends StatelessWidget {
     ),
   );
 
-  void _showAccount(BuildContext context) => showModalBottomSheet(
+  void _showAccount(BuildContext context) => showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => Container(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF6F7FF),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+    builder: (_) => _AccountInformationSheet(
+      role: role,
+      userName: userName,
+      userEmail: userEmail,
+      pharmacistController: pharmacistController,
+      onLogout: onLogout,
+    ),
+  );
+}
+
+class _AccountInformationSheet extends StatefulWidget {
+  const _AccountInformationSheet({
+    required this.role,
+    required this.userName,
+    required this.userEmail,
+    required this.onLogout,
+    this.pharmacistController,
+  });
+
+  final AppRole role;
+  final String userName;
+  final String userEmail;
+  final Future<void> Function() onLogout;
+  final PharmacistDashboardController? pharmacistController;
+
+  @override
+  State<_AccountInformationSheet> createState() =>
+      _AccountInformationSheetState();
+}
+
+class _AccountInformationSheetState extends State<_AccountInformationSheet> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.role == AppRole.pharmacist) {
+      widget.pharmacistController?.loadPharmacy();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.pharmacistController;
+    return Material(
+      color: const Color(0xFFF6F7FF),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      clipBehavior: Clip.antiAlias,
+      child: SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .88,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Thông tin',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 21),
+                ),
+                const SizedBox(height: 16),
+                _InformationCard(
+                  key: const Key('pharmacist-account-information'),
+                  title: 'Thông tin dược sĩ',
+                  icon: Icons.badge_outlined,
+                  rows: [
+                    _InformationValue('Họ và tên', widget.userName),
+                    _InformationValue('Email', widget.userEmail),
+                    _InformationValue('Vai trò', widget.role.label),
+                  ],
+                ),
+                if (widget.role == AppRole.pharmacist &&
+                    controller != null) ...[
+                  const SizedBox(height: 12),
+                  AnimatedBuilder(
+                    animation: controller,
+                    builder: (context, _) => _buildPharmacy(controller),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Material(
+                  color: const Color(0xFFFFE9EC),
+                  borderRadius: BorderRadius.circular(16),
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    leading: const Icon(
+                      Icons.logout_rounded,
+                      color: Color(0xFFC34B55),
+                    ),
+                    title: const Text(
+                      'Đăng xuất',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      widget.onLogout();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildPharmacy(PharmacistDashboardController controller) {
+    final pharmacy = controller.pharmacy;
+    if (controller.pharmacyLoading && pharmacy == null) {
+      return const Padding(
+        padding: EdgeInsets.all(22),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (pharmacy == null) {
+      return Material(
+        key: const Key('pharmacist-pharmacy-error'),
+        color: const Color(0xFFFFF0F1),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Text(
+                controller.pharmacyError ?? 'Không tìm thấy hồ sơ nhà thuốc.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFFC34B55)),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => controller.loadPharmacy(force: true),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return _InformationCard(
+      key: const Key('pharmacist-pharmacy-information'),
+      title: 'Thông tin nhà thuốc',
+      icon: Icons.local_pharmacy_outlined,
+      rows: [
+        _InformationValue('Tên nhà thuốc', pharmacy.name),
+        _InformationValue('Số điện thoại', pharmacy.phoneNumber),
+        _InformationValue('Địa chỉ', pharmacy.addressText),
+        _InformationValue(
+          'Tọa độ',
+          '${pharmacy.latitude.toStringAsFixed(6)}, '
+              '${pharmacy.longitude.toStringAsFixed(6)}',
+        ),
+        _InformationValue('Geohash', pharmacy.geohash),
+      ],
+    );
+  }
+}
+
+class _InformationValue {
+  const _InformationValue(this.label, this.value);
+
+  final String label;
+  final String value;
+}
+
+class _InformationCard extends StatelessWidget {
+  const _InformationCard({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.rows,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<_InformationValue> rows;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white.withValues(alpha: .82),
+    borderRadius: BorderRadius.circular(18),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 38,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.black12,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            userName,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-          ),
-          const SizedBox(height: 4),
-          Text(role.label, style: const TextStyle(color: Color(0xFF66738A))),
-          const SizedBox(height: 14),
-          Material(
-            color: const Color(0xFFFFE9EC),
-            borderRadius: BorderRadius.circular(16),
-            child: ListTile(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          Row(
+            children: [
+              Icon(icon, color: const Color(0xFF5267F4)),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              leading: const Icon(
-                Icons.logout_rounded,
-                color: Color(0xFFC34B55),
-              ),
-              title: const Text(
-                'Đăng xuất',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                onLogout();
-              },
-            ),
+            ],
           ),
+          const SizedBox(height: 10),
+          for (var index = 0; index < rows.length; index++) ...[
+            _InformationRow(value: rows[index]),
+            if (index < rows.length - 1) const Divider(height: 18),
+          ],
         ],
       ),
     ),
+  );
+}
+
+class _InformationRow extends StatelessWidget {
+  const _InformationRow({required this.value});
+
+  final _InformationValue value;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: 105,
+        child: Text(
+          value.label,
+          style: const TextStyle(
+            color: Color(0xFF687195),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          value.value,
+          key: Key('information-${value.label}'),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+    ],
   );
 }

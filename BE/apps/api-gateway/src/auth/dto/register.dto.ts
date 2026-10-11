@@ -1,5 +1,5 @@
-import { IsEmail, IsEnum, IsNotEmpty, Matches, MaxLength, MinLength } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
+import { IsEmail, IsEnum, IsNotEmpty, IsNumber, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class RegisterDto {
     @ApiProperty({
@@ -51,4 +51,44 @@ export class RegisterDto {
         message: 'please provide Vietnam phone number'
     })
     phone: string
+
+    @ApiPropertyOptional({
+        example: 'Nhà thuốc An Khang',
+        description: 'Pharmacy name. Required when role is PHARMACIST. This is the shop name, not the account holder name.',
+    })
+    @ValidateIf((dto: RegisterDto) => dto.role === 'PHARMACIST')
+    @IsString()
+    @IsNotEmpty({ message: 'pharmacyName is required for a pharmacist' })
+    @MaxLength(150)
+    pharmacyName?: string;
+
+    @ApiPropertyOptional({
+        example: '123 Lê Lợi, Quận 1, TP.HCM',
+        description: 'Street address from the phone GPS. Required when role is PHARMACIST. This becomes the pharmacy address.',
+    })
+    @ValidateIf((dto: RegisterDto) => dto.role === 'PHARMACIST')
+    @IsString()
+    @IsNotEmpty({ message: 'addressText is required for a pharmacist' })
+    @MaxLength(2000)
+    addressText?: string;
+
+    @ApiPropertyOptional({
+        example: 10.7769,
+        description: 'GPS latitude. Required when role is PHARMACIST.',
+    })
+    @ValidateIf((dto: RegisterDto) => dto.role === 'PHARMACIST')
+    @IsNumber()
+    @Min(-90)
+    @Max(90)
+    latitude?: number;
+
+    @ApiPropertyOptional({
+        example: 106.7009,
+        description: 'GPS longitude. Required when role is PHARMACIST.',
+    })
+    @ValidateIf((dto: RegisterDto) => dto.role === 'PHARMACIST')
+    @IsNumber()
+    @Min(-180)
+    @Max(180)
+    longitude?: number;
 }

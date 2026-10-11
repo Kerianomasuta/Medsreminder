@@ -38,7 +38,7 @@ export class ScheduleRuleResponseDto {
   @ApiProperty({ format: 'uuid' })
   prescriptionItemId: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
   patientId: string;
 
   @ApiProperty({ example: '08:00:00', description: 'Stored as HH:mm:ss' })

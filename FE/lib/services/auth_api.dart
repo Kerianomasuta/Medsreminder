@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../models/app_role.dart';
 import '../models/auth_user.dart';
+import '../models/registration_input.dart';
 import 'api_base_url.dart';
 import 'auth_cookie_adapter.dart';
 import 'http_client_factory.dart';
@@ -33,20 +33,8 @@ class AuthApi {
   Future<AuthUser> refreshSession() =>
       _authenticate('/api/v1/auth/refreshToken', const {});
 
-  Future<void> register({
-    required String email,
-    required String password,
-    required String fullName,
-    required String phone,
-    required AppRole role,
-  }) async {
-    await _post('/api/v1/auth/register', {
-      'email': email,
-      'password': password,
-      'fullName': fullName,
-      'phone': phone,
-      'role': role.apiValue,
-    });
+  Future<void> register(RegistrationInput input) async {
+    await _post('/api/v1/auth/register', input.toJson());
   }
 
   Future<void> logout() async {

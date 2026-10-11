@@ -6,6 +6,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtModule } from '@nestjs/jwt'
 import { JwtAuthGuard } from "./guards/jwt-auth.guards.js";
 import { RolesGuard } from "./guards/authorizedByRoles/roles.guard.js";
+import { PharmaciesModule } from "../pharmacies/pharmacies.module.js";
 
 @Module({
     imports: [
@@ -24,6 +25,8 @@ import { RolesGuard } from "./guards/authorizedByRoles/roles.guard.js";
                 })
             }
         ])
+        ,
+        PharmaciesModule,
     ],
     controllers: [AuthController],
     providers: [

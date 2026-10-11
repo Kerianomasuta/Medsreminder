@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from 'typeorm';
 import { Order } from './order.entity.js';
 
 @Entity({ schema: 'pharmacy', name: 'order_items' })
@@ -21,9 +21,6 @@ export class OrderItem {
   @Column({ type: 'text', name: 'image_url', nullable: true })
   imageUrl: string | null;
 
-  @Column({ type: 'uuid', name: 'medicine_id', nullable: true })
-  medicineId: string | null;
-
   @Column({ type: 'int' })
   quantity: number;
 
@@ -32,5 +29,5 @@ export class OrderItem {
 
   @ManyToOne(() => Order, (order) => order.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'order_id' })
-  order: Order;
+  order: Relation<Order>;
 }

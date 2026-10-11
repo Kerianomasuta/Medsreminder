@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
-import { PharmacyInventory } from './schema/pharmacy-inventory.entity.js';
+import {
+  encodeGeohash,
+  geohashWithNeighbors,
+  SEARCH_GEOHASH_PRECISION,
+} from './geohash.js';
 import { Pharmacy } from './schema/pharmacy.entity.js';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 
 export type PharmacyInput = {
   pharmacistId?: string;
@@ -14,42 +20,59 @@ export type PharmacyInput = {
   addressText?: string;
   latitude?: number;
   longitude?: number;
-  isActive?: boolean;
-};
-
-export type InventoryInput = {
-  medicineId?: string;
-  stockQuantity?: number;
-  pricePerUnit?: number;
 };
 
 export type ListPharmaciesInput = {
   latitude?: number;
   longitude?: number;
-  isActive?: boolean;
+  geohash?: string;
+  radiusKm?: number;
 };
+
+const MAX_SEARCH_RADIUS_KM = 10;
 
 @Injectable()
 export class PharmaciesService {
   constructor(
     @InjectRepository(Pharmacy)
     private readonly pharmacies: Repository<Pharmacy>,
-    @InjectRepository(PharmacyInventory)
-    private readonly inventory: Repository<PharmacyInventory>,
   ) {}
 
   async create(payload: PharmacyInput) {
-    const pharmacy = this.pharmacies.create(this.preparePharmacy(payload, true));
+    const pharmacistId = this.requireObjectId(
+      payload.pharmacistId,
+      'pharmacistId',
+    );
+    const existing = await this.pharmacies.findOne({ where: { pharmacistId } });
+    if (existing) {
+      throw ErrorHandling.Conflict('This pharmacist already has a pharmacy');
+    }
+    const pharmacy = this.pharmacies.create(
+      this.preparePharmacy({ ...payload, pharmacistId }, true),
+    );
     return this.toPharmacy(await this.pharmacies.save(pharmacy));
   }
 
   async list(query: ListPharmaciesInput = {}) {
-    const isActive = query.isActive === undefined ? true : this.requireBoolean(query.isActive, 'isActive');
-    const rows = await this.pharmacies.find({
-      where: { isActive },
-      order: { name: 'ASC' },
-    });
     const located = this.hasCoordinates(query.latitude, query.longitude);
+    const radiusKm = located ? this.requireRadius(query.radiusKm) : undefined;
+    let rows: Pharmacy[];
+    if (located) {
+      const latitude = query.latitude as number;
+      const longitude = query.longitude as number;
+      this.validateClientGeohash(query.geohash, latitude, longitude);
+      const prefixes = geohashWithNeighbors(latitude, longitude);
+      rows = await this.pharmacies.find({
+        where: prefixes.map((geohash) => ({
+          geohash: Like(`${geohash}%`),
+        })),
+        order: { name: 'ASC' },
+      });
+    } else {
+      rows = await this.pharmacies.find({
+        order: { name: 'ASC' },
+      });
+    }
     return rows
       .map((row) => {
         const pharmacy = this.toPharmacy(row);
@@ -58,9 +81,18 @@ export class PharmaciesService {
         }
         return {
           ...pharmacy,
-          distanceKm: this.distanceKm(query.latitude as number, query.longitude as number, row.latitude, row.longitude),
+          distanceKm: this.distanceKm(
+            query.latitude as number,
+            query.longitude as number,
+            row.latitude,
+            row.longitude,
+          ),
         };
       })
+      .filter(
+        (pharmacy) =>
+          !located || (pharmacy.distanceKm ?? Infinity) <= (radiusKm as number),
+      )
       .sort((left, right) => {
         if (!located) {
           return left.name.localeCompare(right.name);
@@ -73,63 +105,11 @@ export class PharmaciesService {
     return this.toPharmacy(await this.findPharmacy(id));
   }
 
-  async update(id: string, payload: PharmacyInput) {
-    const pharmacy = await this.findPharmacy(id);
-    const changes = this.preparePharmacy(payload, false);
-    if (Object.keys(changes).length === 0) {
-      throw ErrorHandling.BadRequest('Provide at least one field to update');
-    }
-    Object.assign(pharmacy, changes);
-    return this.toPharmacy(await this.pharmacies.save(pharmacy));
-  }
-
-  async listInventory(pharmacyId: string) {
-    await this.findPharmacy(pharmacyId);
-    const rows = await this.inventory.find({
-      where: { pharmacyId },
-      order: { medicineId: 'ASC' },
-    });
-    return rows.map((row) => this.toInventory(row));
-  }
-
-  async upsertInventory(pharmacyId: string, items: InventoryInput[] | undefined) {
-    await this.findPharmacy(pharmacyId);
-    if (!Array.isArray(items) || items.length === 0) {
-      throw ErrorHandling.BadRequest('items must contain at least one medicine');
-    }
-
-    const prepared = items.map((item, index) => ({
-      medicineId: this.requireUuid(item?.medicineId, `items[${index}].medicineId`),
-      stockQuantity: this.requireWholeNumber(item?.stockQuantity, `items[${index}].stockQuantity`),
-      pricePerUnit: this.requireMoney(item?.pricePerUnit, `items[${index}].pricePerUnit`),
-    }));
-    const seen = new Set<string>();
-    for (const item of prepared) {
-      if (seen.has(item.medicineId)) {
-        throw ErrorHandling.BadRequest('Each medicineId can appear only once');
-      }
-      seen.add(item.medicineId);
-    }
-
-    const saved = await this.inventory.manager.transaction(async (manager) => {
-      const inventory = manager.getRepository(PharmacyInventory);
-      const rows: PharmacyInventory[] = [];
-      for (const item of prepared) {
-        const existing = await inventory.findOne({ where: { pharmacyId, medicineId: item.medicineId } });
-        rows.push(await inventory.save(
-          existing
-            ? Object.assign(existing, { stockQuantity: item.stockQuantity, pricePerUnit: item.pricePerUnit })
-            : inventory.create({ pharmacyId, ...item }),
-        ));
-      }
-      return rows;
-    });
-    return saved.map((row) => this.toInventory(row));
-  }
-
   private async findPharmacy(id: string) {
     const pharmacyId = this.requireUuid(id, 'pharmacyId');
-    const pharmacy = await this.pharmacies.findOne({ where: { id: pharmacyId } });
+    const pharmacy = await this.pharmacies.findOne({
+      where: { id: pharmacyId },
+    });
     if (!pharmacy) {
       throw ErrorHandling.NotFound('Pharmacy not found');
     }
@@ -139,25 +119,46 @@ export class PharmaciesService {
   private preparePharmacy(payload: PharmacyInput, creating: boolean) {
     const changes: Partial<Pharmacy> = {};
     if (creating || payload.pharmacistId !== undefined) {
-      changes.pharmacistId = this.requireUuid(payload.pharmacistId, 'pharmacistId');
+      changes.pharmacistId = this.requireObjectId(
+        payload.pharmacistId,
+        'pharmacistId',
+      );
     }
     if (creating || payload.name !== undefined) {
       changes.name = this.requireText(payload.name, 'name', 150);
     }
     if (creating || payload.phoneNumber !== undefined) {
-      changes.phoneNumber = this.requireText(payload.phoneNumber, 'phoneNumber', 15);
+      changes.phoneNumber = this.requireText(
+        payload.phoneNumber,
+        'phoneNumber',
+        15,
+      );
     }
     if (creating || payload.addressText !== undefined) {
-      changes.addressText = this.requireText(payload.addressText, 'addressText', 2000);
+      changes.addressText = this.requireText(
+        payload.addressText,
+        'addressText',
+        2000,
+      );
     }
-    if (creating || payload.latitude !== undefined || payload.longitude !== undefined) {
-      changes.latitude = this.requireCoordinate(payload.latitude, 'latitude', -90, 90);
-      changes.longitude = this.requireCoordinate(payload.longitude, 'longitude', -180, 180);
-    }
-    if (payload.isActive !== undefined) {
-      changes.isActive = this.requireBoolean(payload.isActive, 'isActive');
-    } else if (creating) {
-      changes.isActive = true;
+    if (
+      creating ||
+      payload.latitude !== undefined ||
+      payload.longitude !== undefined
+    ) {
+      changes.latitude = this.requireCoordinate(
+        payload.latitude,
+        'latitude',
+        -90,
+        90,
+      );
+      changes.longitude = this.requireCoordinate(
+        payload.longitude,
+        'longitude',
+        -180,
+        180,
+      );
+      changes.geohash = encodeGeohash(changes.latitude, changes.longitude);
     }
     return changes;
   }
@@ -171,25 +172,17 @@ export class PharmaciesService {
       addressText: pharmacy.addressText,
       latitude: pharmacy.latitude,
       longitude: pharmacy.longitude,
-      isActive: pharmacy.isActive,
+      geohash: pharmacy.geohash,
       createdAt: pharmacy.createdAt,
       updatedAt: pharmacy.updatedAt,
       distanceKm: undefined as number | undefined,
     };
   }
 
-  private toInventory(row: PharmacyInventory) {
-    return {
-      id: row.id,
-      pharmacyId: row.pharmacyId,
-      medicineId: row.medicineId,
-      stockQuantity: row.stockQuantity,
-      pricePerUnit: Number(row.pricePerUnit),
-      updatedAt: row.updatedAt,
-    };
-  }
-
-  private hasCoordinates(latitude: number | undefined, longitude: number | undefined) {
+  private hasCoordinates(
+    latitude: number | undefined,
+    longitude: number | undefined,
+  ) {
     if (latitude === undefined && longitude === undefined) {
       return false;
     }
@@ -198,12 +191,61 @@ export class PharmaciesService {
     return true;
   }
 
-  private distanceKm(fromLat: number, fromLng: number, toLat: number, toLng: number) {
+  private requireRadius(value: number | undefined) {
+    const radius = value ?? MAX_SEARCH_RADIUS_KM;
+    if (
+      !Number.isFinite(radius) ||
+      radius <= 0 ||
+      radius > MAX_SEARCH_RADIUS_KM
+    ) {
+      throw ErrorHandling.BadRequest(
+        `radiusKm must be greater than 0 and at most ${MAX_SEARCH_RADIUS_KM}`,
+      );
+    }
+    return radius;
+  }
+
+  private validateClientGeohash(
+    value: string | undefined,
+    latitude: number,
+    longitude: number,
+  ) {
+    if (value === undefined) return;
+    const normalized = value.trim().toLowerCase();
+    if (!/^[0-9bcdefghjkmnpqrstuvwxyz]{4,12}$/.test(normalized)) {
+      throw ErrorHandling.BadRequest('geohash is invalid');
+    }
+    const expected = encodeGeohash(latitude, longitude, normalized.length);
+    if (expected !== normalized) {
+      throw ErrorHandling.BadRequest(
+        'geohash does not match latitude and longitude',
+      );
+    }
+    if (
+      !geohashWithNeighbors(
+        latitude,
+        longitude,
+        SEARCH_GEOHASH_PRECISION,
+      ).includes(expected.slice(0, SEARCH_GEOHASH_PRECISION))
+    ) {
+      throw ErrorHandling.BadRequest('geohash is outside the requested area');
+    }
+  }
+
+  private distanceKm(
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number,
+  ) {
     const earthRadiusKm = 6371;
     const latDelta = this.toRadians(toLat - fromLat);
     const lngDelta = this.toRadians(toLng - fromLng);
-    const a = Math.sin(latDelta / 2) ** 2
-      + Math.cos(this.toRadians(fromLat)) * Math.cos(this.toRadians(toLat)) * Math.sin(lngDelta / 2) ** 2;
+    const a =
+      Math.sin(latDelta / 2) ** 2 +
+      Math.cos(this.toRadians(fromLat)) *
+        Math.cos(this.toRadians(toLat)) *
+        Math.sin(lngDelta / 2) ** 2;
     return Math.round(earthRadiusKm * 2 * Math.asin(Math.sqrt(a)) * 100) / 100;
   }
 
@@ -218,41 +260,45 @@ export class PharmaciesService {
     return value;
   }
 
-  private requireText(value: string | undefined, label: string, maxLength: number) {
+  private requireObjectId(value: string | undefined, label: string) {
+    if (!value || !OBJECT_ID_PATTERN.test(value)) {
+      throw ErrorHandling.BadRequest(`${label} must be an ObjectId`);
+    }
+    return value;
+  }
+
+  private requireText(
+    value: string | undefined,
+    label: string,
+    maxLength: number,
+  ) {
     const trimmed = value?.trim() ?? '';
     if (!trimmed) {
       throw ErrorHandling.BadRequest(`${label} is required`);
     }
     if (trimmed.length > maxLength) {
-      throw ErrorHandling.BadRequest(`${label} must be at most ${maxLength} characters`);
+      throw ErrorHandling.BadRequest(
+        `${label} must be at most ${maxLength} characters`,
+      );
     }
     return trimmed;
   }
 
-  private requireWholeNumber(value: number | undefined, label: string) {
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-      throw ErrorHandling.BadRequest(`${label} must be a whole number of 0 or more`);
-    }
-    return value;
-  }
-
-  private requireMoney(value: number | undefined, label: string) {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-      throw ErrorHandling.BadRequest(`${label} must be 0 or more`);
-    }
-    return value.toFixed(2);
-  }
-
-  private requireCoordinate(value: number | undefined, label: string, min: number, max: number) {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
-      throw ErrorHandling.BadRequest(`${label} must be between ${min} and ${max}`);
-    }
-    return value;
-  }
-
-  private requireBoolean(value: boolean, label: string) {
-    if (typeof value !== 'boolean') {
-      throw ErrorHandling.BadRequest(`${label} must be true or false`);
+  private requireCoordinate(
+    value: number | undefined,
+    label: string,
+    min: number,
+    max: number,
+  ) {
+    if (
+      typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      value < min ||
+      value > max
+    ) {
+      throw ErrorHandling.BadRequest(
+        `${label} must be between ${min} and ${max}`,
+      );
     }
     return value;
   }

@@ -1,9 +1,15 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
+import { toRpcHttpException } from '../rpc-http-exception.js';
 import { CreateScheduleRuleDto } from './dto/create-schedule-rule.dto.js';
 import { ListScheduleRulesQueryDto } from './dto/list-schedule-rules.query.js';
 import { UpdateScheduleRuleDto } from './dto/update-schedule-rule.dto.js';
+
+type AccessUser = {
+  userId: string;
+  role: string;
+};
 
 @Injectable()
 export class ScheduleRulesService {
@@ -12,23 +18,28 @@ export class ScheduleRulesService {
     private readonly medicationClient: ClientProxy,
   ) {}
 
-  list(query: ListScheduleRulesQueryDto) {
+  list(query: ListScheduleRulesQueryDto, user: AccessUser) {
     return this.send({ cmd: 'list_schedule_rules' }, {
       patientId: query.patientId,
       isActive: query.isActive === undefined ? undefined : query.isActive === 'true',
+      ...this.actor(user),
     });
   }
 
-  getById(id: string) {
-    return this.send({ cmd: 'get_schedule_rule' }, { id });
+  getById(id: string, user: AccessUser) {
+    return this.send({ cmd: 'get_schedule_rule' }, { id, ...this.actor(user) });
   }
 
-  create(prescriptionItemId: string, dto: CreateScheduleRuleDto) {
-    return this.send({ cmd: 'create_schedule_rule' }, { prescriptionItemId, ...dto });
+  create(prescriptionItemId: string, dto: CreateScheduleRuleDto, user: AccessUser) {
+    return this.send({ cmd: 'create_schedule_rule' }, { prescriptionItemId, ...dto, ...this.actor(user) });
   }
 
-  update(id: string, dto: UpdateScheduleRuleDto) {
-    return this.send({ cmd: 'update_schedule_rule' }, { id, ...dto });
+  update(id: string, dto: UpdateScheduleRuleDto, user: AccessUser) {
+    return this.send({ cmd: 'update_schedule_rule' }, { id, ...dto, ...this.actor(user) });
+  }
+
+  private actor(user: AccessUser) {
+    return { actorUserId: user.userId, actorRole: user.role };
   }
 
   private async send<T>(pattern: { cmd: string }, payload: unknown): Promise<T> {
@@ -40,17 +51,6 @@ export class ScheduleRulesService {
   }
 
   private toHttpException(error: unknown) {
-    if (error instanceof HttpException) {
-      return error;
-    }
-
-    if (typeof error === 'object' && error !== null) {
-      const record = error as { status?: number; message?: unknown };
-      if (typeof record.status === 'number' && typeof record.message === 'string') {
-        return new HttpException(record.message, record.status);
-      }
-    }
-
-    return new HttpException('Medication service is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
+    return toRpcHttpException(error, 'Medication service is unavailable');
   }
 }

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { PrescriptionItem } from './prescription-item.entity.js';
 
 @Entity({ schema: 'medication', name: 'prescriptions' })
@@ -7,10 +7,10 @@ export class Prescription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', name: 'patient_id' })
+  @Column({ type: 'varchar', length: 24, name: 'patient_id' })
   patientId: string;
 
-  @Column({ type: 'uuid', name: 'created_by_cg_id' })
+  @Column({ type: 'varchar', length: 24, name: 'created_by_cg_id' })
   createdByCgId: string;
 
   @Column({ type: 'text' })
@@ -41,5 +41,5 @@ export class Prescription {
   updatedAt: Date;
 
   @OneToMany(() => PrescriptionItem, (item) => item.prescription)
-  items: PrescriptionItem[];
+  items: Relation<PrescriptionItem>[];
 }

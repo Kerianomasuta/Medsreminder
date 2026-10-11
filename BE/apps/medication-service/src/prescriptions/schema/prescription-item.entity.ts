@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { MedicineUnit } from '../../enums/medicine-unit.enum.js';
 import { ScheduleRule } from '../../schedule-rules/schema/schedule-rule.entity.js';
 import { Prescription } from './prescription.entity.js';
@@ -43,8 +43,8 @@ export class PrescriptionItem {
 
   @ManyToOne(() => Prescription, (prescription) => prescription.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'prescription_id' })
-  prescription: Prescription;
+  prescription: Relation<Prescription>;
 
   @OneToMany(() => ScheduleRule, (rule) => rule.prescriptionItem)
-  scheduleRules: ScheduleRule[];
+  scheduleRules: Relation<ScheduleRule>[];
 }

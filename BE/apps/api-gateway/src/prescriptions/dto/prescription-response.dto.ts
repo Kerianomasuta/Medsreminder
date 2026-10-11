@@ -7,7 +7,7 @@ export class PrescriptionScheduleResponseDto {
   @ApiProperty({ format: 'uuid' })
   prescriptionItemId: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
   patientId: string;
 
   @ApiProperty({ example: '08:00:00', description: 'Stored as HH:mm:ss' })
@@ -59,10 +59,10 @@ export class PrescriptionResponseDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
   patientId: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
   createdByCgId: string;
 
   @ApiProperty({ example: 'Đơn tháng 10' })

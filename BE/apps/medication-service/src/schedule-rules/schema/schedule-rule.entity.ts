@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
 import { MedicationLog } from '../../medication-logs/schema/medication-log.entity.js';
 import { PrescriptionItem } from '../../prescriptions/schema/prescription-item.entity.js';
 
@@ -11,7 +11,7 @@ export class ScheduleRule {
   @Column({ type: 'uuid', name: 'prescription_item_id' })
   prescriptionItemId: string;
 
-  @Column({ type: 'uuid', name: 'patient_id' })
+  @Column({ type: 'varchar', length: 24, name: 'patient_id' })
   patientId: string;
 
   @Column({ type: 'time', name: 'reminder_time' })
@@ -31,8 +31,8 @@ export class ScheduleRule {
 
   @ManyToOne(() => PrescriptionItem, (item) => item.scheduleRules, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'prescription_item_id' })
-  prescriptionItem: PrescriptionItem;
+  prescriptionItem: Relation<PrescriptionItem>;
 
   @OneToMany(() => MedicationLog, (log) => log.scheduleRule)
-  logs: MedicationLog[];
+  logs: Relation<MedicationLog>[];
 }

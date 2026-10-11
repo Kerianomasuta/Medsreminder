@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'controllers/care_network_controller.dart';
+import 'controllers/pharmacist_dashboard_controller.dart';
 import 'models/models.dart';
 import 'routing/url_strategy.dart';
 import 'screens/app_shell.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/splash_screen.dart';
+import 'screens/invitation/invitation_screen.dart';
 import 'services/auth_api.dart';
+import 'services/auth_cookie_adapter.dart';
 import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configureUrlStrategy();
+  await AuthCookieAdapter().restore();
   await NotificationService.instance.init();
   // Đặt thanh trạng thái iOS / Android trong suốt như yêu cầu
   SystemChrome.setSystemUIOverlayStyle(
@@ -33,44 +38,28 @@ class MedsReminderApp extends StatefulWidget {
   State<MedsReminderApp> createState() => _MedsReminderAppState();
 }
 
-class _MedsReminderAppState extends State<MedsReminderApp> {
+class _MedsReminderAppState extends State<MedsReminderApp>
+    with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final AuthApi _authApi;
   AuthUser? _currentUser;
+  CareNetworkController? _networkController;
+  PharmacistDashboardController? _pharmacistController;
+  String? _pendingInvitationUuid;
   bool _checkingSession = true;
   bool _showingRegistration = false;
+  bool _showingSkipReason = false;
   AppRole role = AppRole.patient;
-  bool doseTaken = false;
-  bool doseMissed = false;
-  bool prescriptionAdded = false;
-  OrderStage orderStage = OrderStage.review;
-
-  List<PatientProfileItem> linkedPatients = [
-    const PatientProfileItem(
-      code: 'PA-8899',
-      name: 'Nguyễn Thị Lan',
-      age: 72,
-      relation: 'Mẹ ruột',
-      condition: 'Huyết áp & Tiểu đường',
-      avatarBg: Color(0xFFFFD9C6),
-      avatarIcon: Icons.face_3_rounded,
-    ),
-    const PatientProfileItem(
-      code: 'PA-5521',
-      name: 'Trần Văn Nam',
-      age: 76,
-      relation: 'Bố ruột',
-      condition: 'Tim mạch',
-      avatarBg: Color(0xFFD6E4FF),
-      avatarIcon: Icons.face_rounded,
-    ),
-  ];
-  int activePatientIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    NotificationService.instance.skipReasonRequest.addListener(
+      _onSkipReasonRequested,
+    );
     _authApi = widget.authApi ?? AuthApi();
+    _pendingInvitationUuid = Uri.base.queryParameters['invitationUUID'];
     _restoreSession();
   }
 
@@ -84,40 +73,38 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
       restoredUser = results.first as AuthUser;
     } catch (_) {}
     if (!mounted) return;
+    _replaceNetworkController(restoredUser);
     setState(() {
       _currentUser = restoredUser;
       if (restoredUser != null) role = restoredUser.role;
       _checkingSession = false;
     });
-    _replaceRoute(restoredUser?.role.route ?? '/login');
+    if (restoredUser?.role == AppRole.patient) {
+      NotificationService.instance.refreshUpcomingMedicationLogs();
+    }
+    _replaceRoute(_routeFor(restoredUser));
+    _scheduleSkipReasonDialog();
   }
 
   Future<void> _login(String email, String password) async {
     final user = await _authApi.login(email: email, password: password);
     if (!mounted) return;
+    _replaceNetworkController(user);
     setState(() {
       _currentUser = user;
       role = user.role;
       _showingRegistration = false;
     });
-    _replaceRoute(user.role.route);
+    if (user.role == AppRole.patient) {
+      NotificationService.instance.refreshUpcomingMedicationLogs();
+    }
+    _replaceRoute(_routeFor(user));
+    _scheduleSkipReasonDialog();
   }
 
-  Future<void> _register(
-    String email,
-    String password,
-    String fullName,
-    String phone,
-    AppRole selectedRole,
-  ) async {
-    await _authApi.register(
-      email: email,
-      password: password,
-      fullName: fullName,
-      phone: phone,
-      role: selectedRole,
-    );
-    await _login(email, password);
+  Future<void> _register(RegistrationInput input) async {
+    await _authApi.register(input);
+    await _login(input.email, input.password);
   }
 
   Future<void> _logout() async {
@@ -126,11 +113,15 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
     } catch (_) {
       // The server session may already be expired; still clear local UI state.
     } finally {
+      AuthCookieAdapter().clear();
+      await NotificationService.instance.clearMedicationState();
       if (mounted) {
         setState(() {
           _currentUser = null;
           _showingRegistration = false;
+          _pendingInvitationUuid = null;
         });
+        _replaceNetworkController(null);
       }
       _replaceRoute('/login');
     }
@@ -142,54 +133,91 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
     });
   }
 
+  String _routeFor(AuthUser? user) {
+    if (user == null) return '/login';
+    if (_pendingInvitationUuid != null) {
+      return '/invitation?invitationUUID=$_pendingInvitationUuid';
+    }
+    return user.role.route;
+  }
+
+  void _replaceNetworkController(AuthUser? user) {
+    _networkController?.dispose();
+    _pharmacistController?.dispose();
+    _pharmacistController = null;
+    _networkController = user == null
+        ? null
+        : CareNetworkController(user: user);
+    if (user?.role == AppRole.patient || user?.role == AppRole.caregiver) {
+      _networkController!.initialize();
+    }
+    if (user?.role == AppRole.pharmacist) {
+      _pharmacistController = PharmacistDashboardController(user: user!)
+        ..initialize();
+    }
+  }
+
+  void _closeInvitation() {
+    setState(() => _pendingInvitationUuid = null);
+    _replaceRoute(_currentUser!.role.route);
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    NotificationService.instance.skipReasonRequest.removeListener(
+      _onSkipReasonRequested,
+    );
     _authApi.close();
+    _networkController?.dispose();
+    _pharmacistController?.dispose();
     super.dispose();
   }
 
-  void markTaken() => setState(() {
-    doseTaken = true;
-    doseMissed = false;
-  });
-
-  void markMissed() => setState(() {
-    doseTaken = false;
-    doseMissed = true;
-  });
-
-  void addPatient(String code, {String? name, String? relation}) =>
-      setState(() {
-        linkedPatients.add(
-          PatientProfileItem(
-            code: code,
-            name: (name != null && name.trim().isNotEmpty)
-                ? name.trim()
-                : 'Bệnh nhân $code',
-            age: 70,
-            relation: (relation != null && relation.trim().isNotEmpty)
-                ? relation.trim()
-                : 'Người thân',
-            condition: 'Đang theo dõi',
-            avatarBg: const Color(0xFFFFE5D0),
-            avatarIcon: Icons.person_rounded,
-          ),
-        );
-        activePatientIndex = linkedPatients.length - 1;
-      });
-
-  void removePatient(int index) => setState(() {
-    if (linkedPatients.length > 1) {
-      linkedPatients.removeAt(index);
-      if (activePatientIndex >= linkedPatients.length) {
-        activePatientIndex = linkedPatients.length - 1;
-      }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _currentUser?.role == AppRole.patient) {
+      NotificationService.instance.refreshUpcomingMedicationLogs();
+      _scheduleSkipReasonDialog();
     }
-  });
+  }
 
-  void selectPatient(int index) => setState(() {
-    activePatientIndex = index;
-  });
+  void _onSkipReasonRequested() => _scheduleSkipReasonDialog();
+
+  void _scheduleSkipReasonDialog() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showSkipReasonDialogIfNeeded();
+    });
+  }
+
+  Future<void> _showSkipReasonDialogIfNeeded() async {
+    final request = NotificationService.instance.skipReasonRequest.value;
+    if (!mounted ||
+        request == null ||
+        _showingSkipReason ||
+        _checkingSession ||
+        _currentUser?.role != AppRole.patient) {
+      return;
+    }
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+
+    _showingSkipReason = true;
+    final reason = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _SkipMedicationDialog(),
+    );
+    try {
+      if (reason != null) {
+        await NotificationService.instance.submitSkipReason(request, reason);
+      }
+    } finally {
+      NotificationService.instance.clearSkipReasonRequest(request);
+      _showingSkipReason = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -249,25 +277,87 @@ class _MedsReminderAppState extends State<MedsReminderApp> {
                     _replaceRoute('/register');
                   },
                 )
-        : AppShell(
-            key: const ValueKey('app-shell'),
-            role: role,
-            userName: _currentUser!.fullName,
-            onLogout: _logout,
-            doseTaken: doseTaken,
-            doseMissed: doseMissed,
-            prescriptionAdded: prescriptionAdded,
-            orderStage: orderStage,
-            linkedPatients: linkedPatients,
-            activePatientIndex: activePatientIndex,
-            onRoleChanged: (_) {},
-            onTaken: markTaken,
-            onMissed: markMissed,
-            onPrescriptionAdded: () => setState(() => prescriptionAdded = true),
-            onOrderStageChanged: (value) => setState(() => orderStage = value),
-            onAddPatient: addPatient,
-            onRemovePatient: removePatient,
-            onSelectPatient: selectPatient,
+        : _signedInContent(),
+  );
+
+  Widget _signedInContent() {
+    final user = _currentUser!;
+    final controller = _networkController!;
+    final invitationUuid = _pendingInvitationUuid;
+    if (invitationUuid != null) {
+      return InvitationScreen(
+        key: const ValueKey('invitation'),
+        invitationUuid: invitationUuid,
+        user: user,
+        controller: controller,
+        onCompleted: _closeInvitation,
+        onCancel: _closeInvitation,
+      );
+    }
+    return AppShell(
+      key: const ValueKey('app-shell'),
+      role: role,
+      userName: user.fullName,
+      userEmail: user.email,
+      networkController: controller,
+      pharmacistController: _pharmacistController,
+      onLogout: _logout,
+      onRoleChanged: (_) {},
+    );
+  }
+}
+
+class _SkipMedicationDialog extends StatefulWidget {
+  const _SkipMedicationDialog();
+
+  @override
+  State<_SkipMedicationDialog> createState() => _SkipMedicationDialogState();
+}
+
+class _SkipMedicationDialogState extends State<_SkipMedicationDialog> {
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Bỏ qua cữ thuốc'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Nhập lý do nếu có. Cữ thuốc chỉ được đánh dấu bỏ qua sau khi bạn xác nhận.',
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('skip-reason-field'),
+          controller: _reasonController,
+          autofocus: true,
+          maxLength: 500,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Lý do bỏ qua (không bắt buộc)',
+            hintText: 'Ví dụ: Buồn nôn',
+            border: OutlineInputBorder(),
           ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Quay lại'),
+      ),
+      FilledButton(
+        key: const Key('confirm-skip-dose'),
+        onPressed: () => Navigator.pop(context, _reasonController.text.trim()),
+        child: const Text('Xác nhận bỏ qua'),
+      ),
+    ],
   );
 }

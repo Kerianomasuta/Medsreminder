@@ -27,7 +27,9 @@ export class OrdersController {
   }
 
   @MessagePattern({ cmd: 'reject_order' })
-  reject(@Payload() payload: Parameters<OrdersService['reject']>[1] & { id: string }) {
+  reject(
+    @Payload() payload: Parameters<OrdersService['reject']>[1] & { id: string },
+  ) {
     const { id, ...details } = payload;
     return this.ordersService.reject(id, details);
   }
@@ -38,7 +40,9 @@ export class OrdersController {
   }
 
   @MessagePattern({ cmd: 'ship_order' })
-  ship(@Payload() payload: Parameters<OrdersService['ship']>[1] & { id: string }) {
+  ship(
+    @Payload() payload: Parameters<OrdersService['ship']>[1] & { id: string },
+  ) {
     const { id, ...details } = payload;
     return this.ordersService.ship(id, details);
   }
@@ -49,7 +53,9 @@ export class OrdersController {
   }
 
   @MessagePattern({ cmd: 'cancel_order' })
-  cancel(@Payload() payload: Parameters<OrdersService['cancel']>[1] & { id: string }) {
+  cancel(
+    @Payload() payload: Parameters<OrdersService['cancel']>[1] & { id: string },
+  ) {
     const { id, ...details } = payload;
     return this.ordersService.cancel(id, details);
   }

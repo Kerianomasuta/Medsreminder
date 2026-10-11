@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsMongoId, IsOptional } from 'class-validator';
 
 export class ListScheduleRulesQueryDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @IsMongoId()
   patientId: string;
 
   @ApiPropertyOptional({ enum: ['true', 'false'] })

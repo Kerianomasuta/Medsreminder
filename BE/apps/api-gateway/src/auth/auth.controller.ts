@@ -7,6 +7,7 @@ import { ConfigService } from "@nestjs/config";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "./guards/jwt-auth.guards.js";
 import { RegisterDto } from "./dto/register.dto.js";
+import { PharmaciesService } from "../pharmacies/pharmacies.service.js";
 
 const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000
@@ -16,7 +17,8 @@ const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000
 export class AuthController {
     constructor(
         private readonly authService: AuthService,
-        private readonly configService: ConfigService
+        private readonly configService: ConfigService,
+        private readonly pharmaciesService: PharmaciesService,
     ) {}
 
     @Post('login')
@@ -176,7 +178,10 @@ export class AuthController {
     }
 
     @Post('register')
-    @ApiOperation({ summary: 'Register a new user' })
+    @ApiOperation({
+        summary: 'Register a new user',
+        description: 'A pharmacist must send pharmacyName, addressText, latitude, and longitude. pharmacyName is the shop name. The GPS fields become the pharmacy address. The pharmacist then only manages orders.',
+    })
     @ApiResponse({
         status: 201,
         description: 'User registered successfully.',
@@ -205,6 +210,17 @@ export class AuthController {
         )
 
         const user = tcpResponse?.data?.newUser;
+
+        if (registerDto.role === 'PHARMACIST') {
+            await this.pharmaciesService.createForRegistration({
+                pharmacistId: String(user._id),
+                name: registerDto.pharmacyName ?? '',
+                phoneNumber: registerDto.phone,
+                addressText: registerDto.addressText ?? '',
+                latitude: registerDto.latitude ?? Number.NaN,
+                longitude: registerDto.longitude ?? Number.NaN,
+            });
+        }
 
         const { password: _password, _id, __v, ...userWithoutPassword } = user
 

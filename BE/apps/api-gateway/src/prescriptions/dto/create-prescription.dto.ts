@@ -8,8 +8,8 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
+  IsMongoId,
   IsString,
-  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -89,12 +89,12 @@ export class CreatePrescriptionItemDto {
 }
 
 export class CreatePrescriptionDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439011', description: 'MongoDB ObjectId of the patient' })
+  @IsMongoId()
   patientId: string;
 
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
+  @ApiProperty({ example: '507f1f77bcf86cd799439012', description: 'MongoDB ObjectId of the caregiver' })
+  @IsMongoId()
   createdByCgId: string;
 
   @ApiProperty({ example: 'Đơn tháng 10' })
