@@ -125,18 +125,18 @@ describe('MedicationLogsService', () => {
     });
   });
 
-  it('rejects a miss before both 10-minute alarms have finished', async () => {
+  it('rejects a miss before both 3-minute alarms and the 2-minute gap have finished', async () => {
     logs.set(logId, dose());
 
     await expect(service.miss(logId, {
       userId: patientId,
-      actedAt: '2026-10-08T01:19:00.000Z',
+      actedAt: '2026-10-08T01:07:00.000Z',
     })).rejects.toMatchObject({
-      message: 'A dose can be marked missed only 20 minutes after the current reminder',
+      message: 'A dose can be marked missed only 8 minutes after the current reminder',
     });
   });
 
-  it('marks a snoozed dose missed 20 minutes after the snooze', async () => {
+  it('marks a snoozed dose missed 8 minutes after the snooze', async () => {
     logs.set(logId, dose({
       status: DoseStatus.SNOOZED,
       snoozeUntil: new Date('2026-10-08T01:10:00.000Z'),
@@ -144,7 +144,7 @@ describe('MedicationLogsService', () => {
 
     const missed = await service.miss(logId, {
       userId: patientId,
-      actedAt: '2026-10-08T01:30:00.000Z',
+      actedAt: '2026-10-08T01:18:00.000Z',
     });
 
     expect(missed).toMatchObject({
@@ -218,12 +218,12 @@ describe('MedicationLogsService', () => {
     });
   });
 
-  it('marks a dose missed at exactly 20 minutes', async () => {
+  it('marks a dose missed at exactly 8 minutes', async () => {
     logs.set(logId, dose());
 
     const missed = await service.miss(logId, {
       userId: patientId,
-      actedAt: '2026-10-08T01:20:00.000Z',
+      actedAt: '2026-10-08T01:08:00.000Z',
     });
 
     expect(missed.status).toBe(DoseStatus.MISSED);
@@ -237,9 +237,9 @@ describe('MedicationLogsService', () => {
 
     await expect(service.miss(logId, {
       userId: patientId,
-      actedAt: '2026-10-08T01:29:00.000Z',
+      actedAt: '2026-10-08T01:17:00.000Z',
     })).rejects.toMatchObject({
-      message: 'A dose can be marked missed only 20 minutes after the current reminder',
+      message: 'A dose can be marked missed only 8 minutes after the current reminder',
     });
   });
 });

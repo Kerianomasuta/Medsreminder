@@ -10,7 +10,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000;
-const MISSED_AFTER_MS = 20 * 60 * 1000;
+const MISSED_AFTER_MS = 8 * 60 * 1000;
 const CLOCK_SKEW_MS = 2 * 60 * 1000;
 const OPEN_STATUSES = new Set<DoseStatus>([DoseStatus.SCHEDULED, DoseStatus.SNOOZED]);
 
@@ -102,7 +102,7 @@ export class MedicationLogsService {
     return this.change(id, input.userId, (log) => {
       const dueAt = new Date(this.currentReminder(log).getTime() + MISSED_AFTER_MS);
       if (actedAt.getTime() < dueAt.getTime()) {
-        throw ErrorHandling.BadRequest('A dose can be marked missed only 20 minutes after the current reminder');
+        throw ErrorHandling.BadRequest('A dose can be marked missed only 8 minutes after the current reminder');
       }
       log.status = DoseStatus.MISSED;
       log.snoozeUntil = null;
