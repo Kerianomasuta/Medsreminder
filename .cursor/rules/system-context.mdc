@@ -11,8 +11,7 @@ Nền tảng nhắc tuân thủ thuốc cho người cao tuổi và chuỗi bổ
 
 - **PA (PATIENT):** app Flutter, thao tác tối giản (đã uống, hoãn, bỏ qua).
 - **CG (CAREGIVER):** app Flutter. Ghép cặp, nhập đơn và lịch, theo dõi tuân thủ, đặt thuốc khi sắp hết.
-- **P (PHARMACIST):** portal Next.js. Duyệt đơn, kiểm kho, đóng gói, dán QR kiện.
-- **DS (SHIPPER):** app mobile. Nhận cuốc, quét QR, giao, OTP hoặc ảnh bàn giao.
+- **P (PHARMACIST):** portal Next.js. Duyệt đơn, kiểm kho, đóng gói. Giao tận nơi thì nhà thuốc tự book đơn vị vận chuyển bên ngoài.
 - **ADMIN:** tài khoản, danh mục thuốc, vận hành.
 
 ## Client
