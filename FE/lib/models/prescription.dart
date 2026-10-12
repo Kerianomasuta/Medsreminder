@@ -132,7 +132,8 @@ class PrescriptionItem {
 
 class Prescription {
   final String? id;
-  final String patientId; // UUID
+  final String patientId; // Mongo ObjectId
+  final String? createdByCgId; // Mongo ObjectId
   final String title;
   final String? doctorName;
   final String? prescriptionCode;
@@ -144,6 +145,7 @@ class Prescription {
   const Prescription({
     this.id,
     required this.patientId,
+    this.createdByCgId,
     required this.title,
     this.doctorName,
     this.prescriptionCode,
@@ -153,9 +155,36 @@ class Prescription {
     this.items = const [],
   });
 
+  Prescription copyWith({
+    String? id,
+    String? patientId,
+    String? createdByCgId,
+    String? title,
+    String? doctorName,
+    String? prescriptionCode,
+    String? startDate,
+    String? endDate,
+    bool? isActive,
+    List<PrescriptionItem>? items,
+  }) {
+    return Prescription(
+      id: id ?? this.id,
+      patientId: patientId ?? this.patientId,
+      createdByCgId: createdByCgId ?? this.createdByCgId,
+      title: title ?? this.title,
+      doctorName: doctorName ?? this.doctorName,
+      prescriptionCode: prescriptionCode ?? this.prescriptionCode,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      isActive: isActive ?? this.isActive,
+      items: items ?? this.items,
+    );
+  }
+
   factory Prescription.fromJson(Map<String, dynamic> json) => Prescription(
     id: json['id'] as String?,
     patientId: json['patientId'] as String,
+    createdByCgId: json['createdByCgId'] as String?,
     title: json['title'] as String,
     doctorName: json['doctorName'] as String?,
     prescriptionCode: json['prescriptionCode'] as String?,
@@ -172,9 +201,11 @@ class Prescription {
   Map<String, dynamic> toCreateJson() {
     final map = <String, dynamic>{
       'patientId': patientId,
+      'createdByCgId': (createdByCgId != null && createdByCgId!.isNotEmpty)
+          ? createdByCgId!
+          : '6ac0cbf1ea185d34aa6f322a',
       'title': title,
       'startDate': startDate,
-      'isActive': isActive,
       'items': items.map((i) => i.toCreateJson()).toList(),
     };
     if (doctorName != null && doctorName!.isNotEmpty) {
