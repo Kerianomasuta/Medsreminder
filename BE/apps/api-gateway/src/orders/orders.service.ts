@@ -1,8 +1,20 @@
-import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { UserRole } from '../auth/guards/authorizedByRoles/roles.decorator.js';
-import { CancelOrderDto, CreateOrderDto, ListOrdersQueryDto, RejectOrderDto, ShipOrderDto } from './dto/create-order.dto.js';
+import {
+  CancelOrderDto,
+  CreateOrderDto,
+  ListOrdersQueryDto,
+  RejectOrderDto,
+  ShipOrderDto,
+} from './dto/create-order.dto.js';
 
 @Injectable()
 export class OrdersService {
@@ -11,8 +23,8 @@ export class OrdersService {
     private readonly pharmacyClient: ClientProxy,
   ) {}
 
-  create(dto: CreateOrderDto) {
-    return this.send({ cmd: 'create_order' }, dto);
+  create(dto: CreateOrderDto, caregiverId: string) {
+    return this.send({ cmd: 'create_order' }, { ...dto, caregiverId });
   }
 
   list(query: ListOrdersQueryDto) {
@@ -22,13 +34,22 @@ export class OrdersService {
   listMine(user: { userId: string; role: string }, status?: string) {
     const scope = status === undefined ? {} : { status };
     if (user.role === UserRole.PATIENT) {
-      return this.send({ cmd: 'list_orders' }, { patientId: user.userId, ...scope });
+      return this.send(
+        { cmd: 'list_orders' },
+        { patientId: user.userId, ...scope },
+      );
     }
     if (user.role === UserRole.CARE_GIVER) {
-      return this.send({ cmd: 'list_orders' }, { caregiverId: user.userId, ...scope });
+      return this.send(
+        { cmd: 'list_orders' },
+        { caregiverId: user.userId, ...scope },
+      );
     }
     if (user.role === UserRole.PHARMACIST) {
-      return this.send({ cmd: 'list_orders' }, { pharmacistId: user.userId, ...scope });
+      return this.send(
+        { cmd: 'list_orders' },
+        { pharmacistId: user.userId, ...scope },
+      );
     }
     throw new ForbiddenException('You do not have permission');
   }
@@ -57,16 +78,26 @@ export class OrdersService {
     return this.send({ cmd: 'complete_order' }, { id });
   }
 
-  cancel(id: string, dto: CancelOrderDto, user: { userId: string; role: string }) {
-    return this.send({ cmd: 'cancel_order' }, {
-      id,
-      rejectionReason: dto.rejectionReason,
-      userId: user.userId,
-      role: user.role,
-    });
+  cancel(
+    id: string,
+    dto: CancelOrderDto,
+    user: { userId: string; role: string },
+  ) {
+    return this.send(
+      { cmd: 'cancel_order' },
+      {
+        id,
+        rejectionReason: dto.rejectionReason,
+        userId: user.userId,
+        role: user.role,
+      },
+    );
   }
 
-  private async send<T>(pattern: { cmd: string }, payload: unknown): Promise<T> {
+  private async send<T>(
+    pattern: { cmd: string },
+    payload: unknown,
+  ): Promise<T> {
     try {
       return await lastValueFrom(this.pharmacyClient.send<T>(pattern, payload));
     } catch (error) {
@@ -80,10 +111,16 @@ export class OrdersService {
     }
     if (typeof error === 'object' && error !== null) {
       const record = error as { status?: number; message?: unknown };
-      if (typeof record.status === 'number' && typeof record.message === 'string') {
+      if (
+        typeof record.status === 'number' &&
+        typeof record.message === 'string'
+      ) {
         return new HttpException(record.message, record.status);
       }
     }
-    return new HttpException('Pharmacy order service is unavailable', HttpStatus.SERVICE_UNAVAILABLE);
+    return new HttpException(
+      'Pharmacy order service is unavailable',
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 }

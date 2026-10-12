@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsMongoId, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsMongoId,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { ORDER_STATUSES } from './list-orders.query.js';
 
 export class UpdateOrderStatusDto {
@@ -7,7 +14,10 @@ export class UpdateOrderStatusDto {
   @IsIn(ORDER_STATUSES)
   status: (typeof ORDER_STATUSES)[number];
 
-  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439014', description: 'MongoDB ObjectId of the shipper' })
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439014',
+    description: 'MongoDB ObjectId of the shipper',
+  })
   @IsOptional()
   @IsMongoId()
   shipperId?: string;

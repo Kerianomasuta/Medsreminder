@@ -6,6 +6,7 @@ import { MedicationLog } from './schema/medication-log.entity.js';
 
 const patientId = '507f1f77bcf86cd799439011';
 const otherPatientId = '507f1f77bcf86cd799439099';
+const caregiverId = '507f1f77bcf86cd799439022';
 const logId = '66666666-6666-4666-8666-666666666666';
 const ruleId = '77777777-7777-4777-8777-777777777777';
 const scheduledAt = new Date('2026-10-08T01:00:00.000Z');
@@ -170,6 +171,31 @@ describe('MedicationLogsService', () => {
     });
 
     expect(taken.status).toBe(DoseStatus.TAKEN);
+  });
+
+  it('allows a caregiver to list logs for a selected patient', async () => {
+    repository.find.mockResolvedValue([dose()]);
+
+    const result = await service.list({
+      patientId,
+      actorUserId: caregiverId,
+      actorRole: 'CARE_GIVER',
+      from: '2026-10-08',
+      to: '2026-10-08',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].patientId).toBe(patientId);
+  });
+
+  it('requires a caregiver to select a patient when listing logs', async () => {
+    await expect(service.list({
+      actorUserId: caregiverId,
+      actorRole: 'CARE_GIVER',
+      from: '2026-10-08',
+    })).rejects.toMatchObject({
+      message: 'patientId must be an ObjectId',
+    });
   });
 
   it('treats a null button time as the current server time', async () => {

@@ -16,7 +16,10 @@ export class MedicationStockClient {
 
   replenish(items: ReplenishItem[]) {
     return lastValueFrom(
-      this.medicationClient.send({ cmd: 'replenish_prescription_stock' }, { items }),
+      this.medicationClient.send(
+        { cmd: 'replenish_prescription_stock' },
+        { items },
+      ),
     );
   }
 }

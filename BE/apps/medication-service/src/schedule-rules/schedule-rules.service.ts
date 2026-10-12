@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
 import { DoseStatus } from '../enums/dose-status.enum.js';
 import { MedicationLog } from '../medication-logs/schema/medication-log.entity.js';
@@ -9,7 +14,8 @@ import { Prescription } from '../prescriptions/schema/prescription.entity.js';
 import { PrescriptionItem } from '../prescriptions/schema/prescription-item.entity.js';
 import { ScheduleRule } from './schema/schedule-rule.entity.js';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 const ALL_WEEK = [1, 2, 3, 4, 5, 6, 7];
@@ -47,7 +53,9 @@ export class ScheduleRulesService {
   ) {}
 
   async list(patientId?: string, isActive?: boolean, actor?: ScheduleActor) {
-    const id = this.patientOwnerId(actor) ?? this.requireObjectId(patientId, 'patientId');
+    const id =
+      this.patientOwnerId(actor) ??
+      this.requireObjectId(patientId, 'patientId');
     if (isActive !== undefined && typeof isActive !== 'boolean') {
       throw ErrorHandling.BadRequest('isActive must be true or false');
     }
@@ -70,7 +78,11 @@ export class ScheduleRulesService {
     return this.toResponse(rule);
   }
 
-  async create(prescriptionItemId: string | undefined, payload: CreateScheduleInput, actor?: ScheduleActor) {
+  async create(
+    prescriptionItemId: string | undefined,
+    payload: CreateScheduleInput,
+    actor?: ScheduleActor,
+  ) {
     const item = await this.findItem(prescriptionItemId);
     this.assertPatientOwns(item.prescription.patientId, actor);
     const saved = await this.dataSource.transaction(async (manager) => {
@@ -91,7 +103,11 @@ export class ScheduleRulesService {
     return this.toResponse(saved);
   }
 
-  async update(id: string, payload: UpdateScheduleInput, actor?: ScheduleActor) {
+  async update(
+    id: string,
+    payload: UpdateScheduleInput,
+    actor?: ScheduleActor,
+  ) {
     const hasChange = ['reminderTime', 'daysOfWeek', 'isActive'].some(
       (field) => payload[field as keyof UpdateScheduleInput] !== undefined,
     );
@@ -111,14 +127,89 @@ export class ScheduleRulesService {
       rule.isActive = this.requireBoolean(payload.isActive, 'isActive');
     }
 
-    const saved = await this.rules.save(rule);
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const updated = await manager.save(ScheduleRule, rule);
+      updated.prescriptionItem = rule.prescriptionItem;
+      await this.rescheduleOpenLogs(
+        manager,
+        updated,
+        rule.prescriptionItem.prescription,
+      );
+      return updated;
+    });
     saved.prescriptionItem = rule.prescriptionItem;
     return this.toResponse(saved);
   }
 
+  /**
+   * Medication logs are execution records, but future SCHEDULED rows must follow
+   * the current rule because they are also the source used by mobile alarms.
+   * Final rows are preserved as patient history. Snoozed rows are preserved
+   * while active, but removed when the rule is disabled so no alarm can fire.
+   */
+  private async rescheduleOpenLogs(
+    manager: EntityManager,
+    rule: ScheduleRule,
+    prescription: Prescription,
+    now = new Date(),
+  ) {
+    const todayStart = this.startOfVietnamDay(now);
+    const current = await manager.find(MedicationLog, {
+      where: {
+        scheduleRuleId: rule.id,
+        scheduledAt: MoreThanOrEqual(todayStart),
+      },
+    });
+    const disabled = !rule.isActive || !prescription.isActive;
+    const replaceable = current.filter(
+      (log) =>
+        log.status === DoseStatus.SCHEDULED ||
+        (disabled && log.status === DoseStatus.SNOOZED),
+    );
+    if (replaceable.length > 0) {
+      await manager.remove(MedicationLog, replaceable);
+    }
+
+    if (disabled) {
+      return;
+    }
+
+    const protectedDates = new Set(
+      current
+        .filter((log) => !replaceable.includes(log))
+        .map((log) => this.vietnamDate(log.scheduledAt)),
+    );
+    const instants = scheduledDoseInstants({
+      startDate: prescription.startDate,
+      endDate: prescription.endDate,
+      reminderTime: rule.reminderTime,
+      daysOfWeek: rule.daysOfWeek,
+    }).filter(
+      (scheduledAt) =>
+        scheduledAt.getTime() > now.getTime() &&
+        !protectedDates.has(this.vietnamDate(scheduledAt)),
+    );
+
+    for (const scheduledAt of instants) {
+      await manager.save(
+        MedicationLog,
+        manager.create(MedicationLog, {
+          scheduleRuleId: rule.id,
+          patientId: rule.patientId,
+          scheduledAt,
+          status: DoseStatus.SCHEDULED,
+          escalationLevel: 0,
+        }),
+      );
+    }
+  }
+
   private async saveScheduledLogs(
     manager: EntityManager,
-    rule: Pick<ScheduleRule, 'id' | 'patientId' | 'reminderTime' | 'daysOfWeek'>,
+    rule: Pick<
+      ScheduleRule,
+      'id' | 'patientId' | 'reminderTime' | 'daysOfWeek'
+    >,
     prescription: Pick<Prescription, 'startDate' | 'endDate'>,
   ) {
     const instants = scheduledDoseInstants({
@@ -173,10 +264,15 @@ export class ScheduleRulesService {
     return this.requireObjectId(actor.userId, 'userId');
   }
 
-  private assertPatientOwns(patientId: string | undefined, actor?: ScheduleActor) {
+  private assertPatientOwns(
+    patientId: string | undefined,
+    actor?: ScheduleActor,
+  ) {
     const userId = this.patientOwnerId(actor);
     if (userId !== undefined && patientId !== userId) {
-      throw ErrorHandling.Forbidden('A patient can only access their own prescription');
+      throw ErrorHandling.Forbidden(
+        'A patient can only access their own prescription',
+      );
     }
   }
 
@@ -207,7 +303,9 @@ export class ScheduleRulesService {
       return [...ALL_WEEK];
     }
     if (days.length === 0) {
-      throw ErrorHandling.BadRequest('daysOfWeek must contain at least one day');
+      throw ErrorHandling.BadRequest(
+        'daysOfWeek must contain at least one day',
+      );
     }
 
     const unique = [...new Set(days)];
@@ -222,6 +320,17 @@ export class ScheduleRulesService {
       throw ErrorHandling.BadRequest(`${label} must be true or false`);
     }
     return value;
+  }
+
+  private startOfVietnamDay(value: Date) {
+    return new Date(`${this.vietnamDate(value)}T00:00:00+07:00`);
+  }
+
+  private vietnamDate(value: Date | string) {
+    const date = value instanceof Date ? value : new Date(value);
+    return new Date(date.getTime() + 7 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
   }
 
   private toResponse(rule: ScheduleRule) {

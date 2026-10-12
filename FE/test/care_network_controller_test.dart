@@ -83,10 +83,7 @@ class _FakeScheduleApi extends ScheduleApi {
   int calls = 0;
 
   @override
-  Future<List<ScheduleRule>> list({
-    required String patientId,
-    bool? isActive,
-  }) async {
+  Future<List<ScheduleRule>> list({String? patientId, bool? isActive}) async {
     calls++;
     return const [];
   }

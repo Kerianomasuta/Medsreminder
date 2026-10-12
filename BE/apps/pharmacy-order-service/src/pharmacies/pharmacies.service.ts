@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
+import {
+  encodeGeohash,
+  geohashWithNeighbors,
+  SEARCH_GEOHASH_PRECISION,
+} from './geohash.js';
 import { Pharmacy } from './schema/pharmacy.entity.js';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 
 export type PharmacyInput = {
@@ -14,14 +20,16 @@ export type PharmacyInput = {
   addressText?: string;
   latitude?: number;
   longitude?: number;
-  isActive?: boolean;
 };
 
 export type ListPharmaciesInput = {
   latitude?: number;
   longitude?: number;
-  isActive?: boolean;
+  geohash?: string;
+  radiusKm?: number;
 };
+
+const MAX_SEARCH_RADIUS_KM = 10;
 
 @Injectable()
 export class PharmaciesService {
@@ -31,22 +39,40 @@ export class PharmaciesService {
   ) {}
 
   async create(payload: PharmacyInput) {
-    const pharmacistId = this.requireObjectId(payload.pharmacistId, 'pharmacistId');
+    const pharmacistId = this.requireObjectId(
+      payload.pharmacistId,
+      'pharmacistId',
+    );
     const existing = await this.pharmacies.findOne({ where: { pharmacistId } });
     if (existing) {
       throw ErrorHandling.Conflict('This pharmacist already has a pharmacy');
     }
-    const pharmacy = this.pharmacies.create(this.preparePharmacy({ ...payload, pharmacistId }, true));
+    const pharmacy = this.pharmacies.create(
+      this.preparePharmacy({ ...payload, pharmacistId }, true),
+    );
     return this.toPharmacy(await this.pharmacies.save(pharmacy));
   }
 
   async list(query: ListPharmaciesInput = {}) {
-    const isActive = query.isActive === undefined ? true : this.requireBoolean(query.isActive, 'isActive');
-    const rows = await this.pharmacies.find({
-      where: { isActive },
-      order: { name: 'ASC' },
-    });
     const located = this.hasCoordinates(query.latitude, query.longitude);
+    const radiusKm = located ? this.requireRadius(query.radiusKm) : undefined;
+    let rows: Pharmacy[];
+    if (located) {
+      const latitude = query.latitude as number;
+      const longitude = query.longitude as number;
+      this.validateClientGeohash(query.geohash, latitude, longitude);
+      const prefixes = geohashWithNeighbors(latitude, longitude);
+      rows = await this.pharmacies.find({
+        where: prefixes.map((geohash) => ({
+          geohash: Like(`${geohash}%`),
+        })),
+        order: { name: 'ASC' },
+      });
+    } else {
+      rows = await this.pharmacies.find({
+        order: { name: 'ASC' },
+      });
+    }
     return rows
       .map((row) => {
         const pharmacy = this.toPharmacy(row);
@@ -55,9 +81,18 @@ export class PharmaciesService {
         }
         return {
           ...pharmacy,
-          distanceKm: this.distanceKm(query.latitude as number, query.longitude as number, row.latitude, row.longitude),
+          distanceKm: this.distanceKm(
+            query.latitude as number,
+            query.longitude as number,
+            row.latitude,
+            row.longitude,
+          ),
         };
       })
+      .filter(
+        (pharmacy) =>
+          !located || (pharmacy.distanceKm ?? Infinity) <= (radiusKm as number),
+      )
       .sort((left, right) => {
         if (!located) {
           return left.name.localeCompare(right.name);
@@ -72,7 +107,9 @@ export class PharmaciesService {
 
   private async findPharmacy(id: string) {
     const pharmacyId = this.requireUuid(id, 'pharmacyId');
-    const pharmacy = await this.pharmacies.findOne({ where: { id: pharmacyId } });
+    const pharmacy = await this.pharmacies.findOne({
+      where: { id: pharmacyId },
+    });
     if (!pharmacy) {
       throw ErrorHandling.NotFound('Pharmacy not found');
     }
@@ -82,25 +119,46 @@ export class PharmaciesService {
   private preparePharmacy(payload: PharmacyInput, creating: boolean) {
     const changes: Partial<Pharmacy> = {};
     if (creating || payload.pharmacistId !== undefined) {
-      changes.pharmacistId = this.requireObjectId(payload.pharmacistId, 'pharmacistId');
+      changes.pharmacistId = this.requireObjectId(
+        payload.pharmacistId,
+        'pharmacistId',
+      );
     }
     if (creating || payload.name !== undefined) {
       changes.name = this.requireText(payload.name, 'name', 150);
     }
     if (creating || payload.phoneNumber !== undefined) {
-      changes.phoneNumber = this.requireText(payload.phoneNumber, 'phoneNumber', 15);
+      changes.phoneNumber = this.requireText(
+        payload.phoneNumber,
+        'phoneNumber',
+        15,
+      );
     }
     if (creating || payload.addressText !== undefined) {
-      changes.addressText = this.requireText(payload.addressText, 'addressText', 2000);
+      changes.addressText = this.requireText(
+        payload.addressText,
+        'addressText',
+        2000,
+      );
     }
-    if (creating || payload.latitude !== undefined || payload.longitude !== undefined) {
-      changes.latitude = this.requireCoordinate(payload.latitude, 'latitude', -90, 90);
-      changes.longitude = this.requireCoordinate(payload.longitude, 'longitude', -180, 180);
-    }
-    if (payload.isActive !== undefined) {
-      changes.isActive = this.requireBoolean(payload.isActive, 'isActive');
-    } else if (creating) {
-      changes.isActive = true;
+    if (
+      creating ||
+      payload.latitude !== undefined ||
+      payload.longitude !== undefined
+    ) {
+      changes.latitude = this.requireCoordinate(
+        payload.latitude,
+        'latitude',
+        -90,
+        90,
+      );
+      changes.longitude = this.requireCoordinate(
+        payload.longitude,
+        'longitude',
+        -180,
+        180,
+      );
+      changes.geohash = encodeGeohash(changes.latitude, changes.longitude);
     }
     return changes;
   }
@@ -114,14 +172,17 @@ export class PharmaciesService {
       addressText: pharmacy.addressText,
       latitude: pharmacy.latitude,
       longitude: pharmacy.longitude,
-      isActive: pharmacy.isActive,
+      geohash: pharmacy.geohash,
       createdAt: pharmacy.createdAt,
       updatedAt: pharmacy.updatedAt,
       distanceKm: undefined as number | undefined,
     };
   }
 
-  private hasCoordinates(latitude: number | undefined, longitude: number | undefined) {
+  private hasCoordinates(
+    latitude: number | undefined,
+    longitude: number | undefined,
+  ) {
     if (latitude === undefined && longitude === undefined) {
       return false;
     }
@@ -130,12 +191,61 @@ export class PharmaciesService {
     return true;
   }
 
-  private distanceKm(fromLat: number, fromLng: number, toLat: number, toLng: number) {
+  private requireRadius(value: number | undefined) {
+    const radius = value ?? MAX_SEARCH_RADIUS_KM;
+    if (
+      !Number.isFinite(radius) ||
+      radius <= 0 ||
+      radius > MAX_SEARCH_RADIUS_KM
+    ) {
+      throw ErrorHandling.BadRequest(
+        `radiusKm must be greater than 0 and at most ${MAX_SEARCH_RADIUS_KM}`,
+      );
+    }
+    return radius;
+  }
+
+  private validateClientGeohash(
+    value: string | undefined,
+    latitude: number,
+    longitude: number,
+  ) {
+    if (value === undefined) return;
+    const normalized = value.trim().toLowerCase();
+    if (!/^[0-9bcdefghjkmnpqrstuvwxyz]{4,12}$/.test(normalized)) {
+      throw ErrorHandling.BadRequest('geohash is invalid');
+    }
+    const expected = encodeGeohash(latitude, longitude, normalized.length);
+    if (expected !== normalized) {
+      throw ErrorHandling.BadRequest(
+        'geohash does not match latitude and longitude',
+      );
+    }
+    if (
+      !geohashWithNeighbors(
+        latitude,
+        longitude,
+        SEARCH_GEOHASH_PRECISION,
+      ).includes(expected.slice(0, SEARCH_GEOHASH_PRECISION))
+    ) {
+      throw ErrorHandling.BadRequest('geohash is outside the requested area');
+    }
+  }
+
+  private distanceKm(
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number,
+  ) {
     const earthRadiusKm = 6371;
     const latDelta = this.toRadians(toLat - fromLat);
     const lngDelta = this.toRadians(toLng - fromLng);
-    const a = Math.sin(latDelta / 2) ** 2
-      + Math.cos(this.toRadians(fromLat)) * Math.cos(this.toRadians(toLat)) * Math.sin(lngDelta / 2) ** 2;
+    const a =
+      Math.sin(latDelta / 2) ** 2 +
+      Math.cos(this.toRadians(fromLat)) *
+        Math.cos(this.toRadians(toLat)) *
+        Math.sin(lngDelta / 2) ** 2;
     return Math.round(earthRadiusKm * 2 * Math.asin(Math.sqrt(a)) * 100) / 100;
   }
 
@@ -157,27 +267,38 @@ export class PharmaciesService {
     return value;
   }
 
-  private requireText(value: string | undefined, label: string, maxLength: number) {
+  private requireText(
+    value: string | undefined,
+    label: string,
+    maxLength: number,
+  ) {
     const trimmed = value?.trim() ?? '';
     if (!trimmed) {
       throw ErrorHandling.BadRequest(`${label} is required`);
     }
     if (trimmed.length > maxLength) {
-      throw ErrorHandling.BadRequest(`${label} must be at most ${maxLength} characters`);
+      throw ErrorHandling.BadRequest(
+        `${label} must be at most ${maxLength} characters`,
+      );
     }
     return trimmed;
   }
 
-  private requireCoordinate(value: number | undefined, label: string, min: number, max: number) {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
-      throw ErrorHandling.BadRequest(`${label} must be between ${min} and ${max}`);
-    }
-    return value;
-  }
-
-  private requireBoolean(value: boolean, label: string) {
-    if (typeof value !== 'boolean') {
-      throw ErrorHandling.BadRequest(`${label} must be true or false`);
+  private requireCoordinate(
+    value: number | undefined,
+    label: string,
+    min: number,
+    max: number,
+  ) {
+    if (
+      typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      value < min ||
+      value > max
+    ) {
+      throw ErrorHandling.BadRequest(
+        `${label} must be between ${min} and ${max}`,
+      );
     }
     return value;
   }

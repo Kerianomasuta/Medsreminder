@@ -37,8 +37,7 @@ class Schedule {
 
 class PrescriptionItem {
   final String? id;
-  final String medicineId; // UUID
-  final String medicineName; // display only
+  final String medicineName;
   final String? genericName;
   final String unit;
   final String? imageUrl;
@@ -50,7 +49,6 @@ class PrescriptionItem {
 
   const PrescriptionItem({
     this.id,
-    required this.medicineId,
     required this.medicineName,
     this.genericName,
     this.unit = 'VIEN',
@@ -67,7 +65,6 @@ class PrescriptionItem {
   factory PrescriptionItem.fromJson(Map<String, dynamic> json) =>
       PrescriptionItem(
         id: json['id'] as String?,
-        medicineId: (json['medicineId'] ?? json['id'] ?? '').toString(),
         medicineName:
             (json['name'] ??
                     (json['medicine'] as Map<String, dynamic>?)?['name'] ??
@@ -223,7 +220,6 @@ class ScheduleDraft {
 }
 
 class PrescriptionItemDraft {
-  String medicineId;
   String medicineName;
   String? genericName;
   String unit;
@@ -235,7 +231,6 @@ class PrescriptionItemDraft {
   List<ScheduleDraft> schedules;
 
   PrescriptionItemDraft({
-    this.medicineId = '',
     this.medicineName = '',
     this.genericName,
     this.unit = 'VIEN',
@@ -248,7 +243,6 @@ class PrescriptionItemDraft {
   }) : schedules = schedules ?? [ScheduleDraft()];
 
   PrescriptionItem toPrescriptionItem() => PrescriptionItem(
-    medicineId: medicineId,
     medicineName: medicineName,
     genericName: genericName,
     unit: unit,
