@@ -183,10 +183,12 @@ class PrescriptionService {
       return created;
     }
     // ─────────────────────────────────────────────────────────────────────────
+    final payload = prescription.toCreateJson();
+    payload['createdByCgId'] ??= '6ac0cbf1ea185d34aa6f322a';
     final raw = await _request(
       'POST',
       '/api/v1/prescriptions',
-      body: prescription.toCreateJson(),
+      body: payload,
     );
     return Prescription.fromJson(raw);
   }

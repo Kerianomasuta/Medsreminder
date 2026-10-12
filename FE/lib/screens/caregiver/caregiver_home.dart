@@ -5,6 +5,8 @@ import '../../models/care_network.dart';
 import '../../models/prescription.dart';
 import '../../models/schedule_rule.dart';
 import '../patient/schedule_timeline_page.dart';
+import 'prescriptions/create_prescription_screen.dart';
+import 'prescriptions/prescription_detail_screen.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverHome extends StatelessWidget {
@@ -392,12 +394,43 @@ class _PrescriptionPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageIntro('Đơn thuốc', 'Đơn và thuốc của ${bundle.detail.fullName}'),
+          Row(
+            children: [
+              Expanded(
+                child: PageIntro('Đơn thuốc', 'Đơn và thuốc của ${bundle.detail.fullName}'),
+              ),
+              FilledButton.icon(
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Tạo đơn'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF5267F4),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                onPressed: () async {
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreatePrescriptionScreen(
+                        patientId: bundle.detail.id,
+                        patientName: bundle.detail.fullName,
+                      ),
+                    ),
+                  );
+                  if (created == true) {
+                    controller.loadPatient(bundle.detail.id, force: true);
+                  }
+                },
+              ),
+            ],
+          ),
           if (bundle.prescriptions.isEmpty)
             const _EmptyCard(message: 'Bệnh nhân chưa có đơn thuốc.')
           else
             ...bundle.prescriptions.map(
-              (prescription) => _PrescriptionCard(prescription: prescription),
+              (prescription) => _PrescriptionCard(
+                prescription: prescription,
+                onRefresh: () => controller.loadPatient(bundle.detail.id, force: true),
+              ),
             ),
         ],
       ),
@@ -691,8 +724,9 @@ class _ScheduleTile extends StatelessWidget {
 }
 
 class _PrescriptionCard extends StatelessWidget {
-  const _PrescriptionCard({required this.prescription});
+  const _PrescriptionCard({required this.prescription, this.onRefresh});
   final Prescription prescription;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -719,14 +753,36 @@ class _PrescriptionCard extends StatelessWidget {
               ? const Color(0xFF249D76)
               : const Color(0xFF9BA3BF),
         ),
-        children: prescription.items.isEmpty
-            ? const [
-                Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text('Đơn chưa có thuốc.'),
-                ),
-              ]
-            : prescription.items.map(_MedicineLine.new).toList(),
+        children: [
+          if (prescription.items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('Đơn chưa có thuốc.'),
+            )
+          else
+            ...prescription.items.map(_MedicineLine.new),
+          if (prescription.id != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: const Text('Xem chi tiết / Thêm thuốc'),
+                onPressed: () async {
+                  await Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PrescriptionDetailScreen(
+                        prescriptionId: prescription.id!,
+                      ),
+                    ),
+                  );
+                  onRefresh?.call();
+                },
+              ),
+            ),
+          ],
+        ],
       ),
     ),
   );
