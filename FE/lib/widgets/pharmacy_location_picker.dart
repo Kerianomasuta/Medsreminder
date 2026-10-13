@@ -217,11 +217,6 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                         '${_selection!.latitude.toStringAsFixed(6)}, '
                         '${_selection!.longitude.toStringAsFixed(6)}',
                       ),
-                      Text(
-                        'Geohash: ${_selection!.geohash}',
-                        key: const Key('confirmed-pharmacy-geohash'),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
                     ],
                   ),
                 ),
