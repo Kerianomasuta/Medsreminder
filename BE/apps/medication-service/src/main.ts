@@ -21,6 +21,7 @@ async function bootstrap() {
   });
 
   await app.startAllMicroservices();
+  await app.init();
   console.log(`MEDICATION SERVICE is listening TCP at ${host}:${port}`);
 }
 await bootstrap();

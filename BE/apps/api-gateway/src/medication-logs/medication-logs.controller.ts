@@ -83,11 +83,11 @@ export class MedicationLogsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Mark a dose missed after two 3-minute alarms',
-    description: `${openDose} The phone rings for 3 minutes, waits 2 minutes, then rings again for 3 minutes. It calls this endpoint when the second alarm ends. For SCHEDULED, the server time must be at least 8 minutes after scheduledAt. For SNOOZED, it must be at least 8 minutes after snoozeUntil. Sets status to MISSED and escalationLevel to 1. Allowed role: PATIENT.`,
+    description: `${openDose} The phone rings for 3 minutes, waits 5 minutes, then rings again for 3 minutes. It calls this endpoint when the second alarm ends. For SCHEDULED, the server time must be at least 11 minutes after scheduledAt. For SNOOZED, it must be at least 11 minutes after snoozeUntil. Sets status to MISSED and escalationLevel to 1. Allowed role: PATIENT.`,
   })
   @ApiParam({ name: 'id', format: 'uuid', description: 'Medication log id' })
   @ApiOkResponse({ type: MedicationLogResponseDto })
-  @ApiBadRequestResponse({ description: '8 minutes have not passed since the current reminder, or the dose is already final.' })
+  @ApiBadRequestResponse({ description: '11 minutes have not passed since the current reminder, or the dose is already final.' })
   @ApiNotFoundResponse({ description: 'Dose log not found.' })
   miss(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RecordDoseDto, @Req() request: Request) {
     return this.medicationLogsService.miss(id, dto ?? {}, this.user(request));
