@@ -64,7 +64,12 @@ enum PharmacyOrderStatus {
 
   static PharmacyOrderStatus fromApi(String? value) => values.firstWhere(
     (item) => item.apiValue == value,
-    orElse: () => PharmacyOrderStatus.pendingReview,
+    orElse: () => switch (value) {
+      'READY' => PharmacyOrderStatus.readyForPickup,
+      'DELIVERING' => PharmacyOrderStatus.shipped,
+      'REJECTED' => PharmacyOrderStatus.cancelled,
+      _ => PharmacyOrderStatus.pendingReview,
+    },
   );
 }
 

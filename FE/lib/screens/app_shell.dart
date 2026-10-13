@@ -179,32 +179,37 @@ class TopBar extends StatelessWidget {
     child: Row(
       children: [
         const BrandMark(),
-        const Spacer(),
-        GestureDetector(
-          key: const Key('account-information-button'),
-          onTap: () => _showAccount(context),
-          child: Glass(
-            radius: 18,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                  radius: 13,
-                  backgroundColor: const Color(0xFF4D63E9),
-                  child: Icon(role.icon, color: Colors.white, size: 15),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              key: const Key('account-information-button'),
+              onTap: () => _showAccount(context),
+              child: Glass(
+                radius: 18,
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: const Color(0xFF4D63E9),
+                      child: Icon(role.icon, color: Colors.white, size: 15),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        userName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 145),
-                  child: Text(
-                    userName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-              ],
+              ),
             ),
           ),
         ),

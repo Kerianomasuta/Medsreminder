@@ -47,6 +47,46 @@ class PharmacistDashboardController extends ChangeNotifier {
     });
   }
 
+  String? currentStatus;
+
+  Future<void> fetchOrdersByStatus(String? status) async {
+    currentStatus = status;
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      if (status == 'READY/DELIVERING') {
+        try {
+          orders = await _orderApi.getOrders(status: status);
+        } catch (_) {
+          try {
+            final readyOrders = await _orderApi.getOrders(status: 'READY');
+            final deliveringOrders =
+                await _orderApi.getOrders(status: 'DELIVERING');
+            orders = [...readyOrders, ...deliveringOrders];
+          } catch (_) {
+            final all = await _orderApi.getOrders();
+            orders = all
+                .where((o) =>
+                    o.status == PharmacyOrderStatus.readyForPickup ||
+                    o.status == PharmacyOrderStatus.shipped)
+                .toList();
+          }
+        }
+      } else {
+        orders = await _orderApi.getOrders(status: status);
+      }
+      _initialized = true;
+    } catch (exception) {
+      error = exception.toString();
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshOrders() => fetchOrdersByStatus(currentStatus);
+
   Future<void> _loadAll({required bool force}) async {
     loading = true;
     error = null;
@@ -60,6 +100,18 @@ class PharmacistDashboardController extends ChangeNotifier {
       loading = false;
       notifyListeners();
     }
+  }
+
+  Future<PharmacyOrder> getOrderDetail(String id) async {
+    final order = await _orderApi.getById(id);
+    final rows = [...orders];
+    final index = rows.indexWhere((item) => item.id == order.id);
+    if (index >= 0) {
+      rows[index] = order;
+      orders = rows;
+      notifyListeners();
+    }
+    return order;
   }
 
   Future<void> acceptOrder(String id) =>
