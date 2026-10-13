@@ -70,6 +70,8 @@ services:
       NODE_ENV: development
       MEDICATION_SERVICE_HOST: 0.0.0.0
       MEDICATION_SERVICE_PORT: 3530
+      USER_SERVICE_HOST: user-service
+      USER_SERVICE_PORT: 3529
     expose:
       - "3530"
     volumes:

@@ -31,6 +31,21 @@ export class UserController {
         }
     }
 
+    @MessagePattern({ cmd: 'save_fcm_token' })
+    saveFcmToken(@Payload() data: { userId?: string; token?: string }) {
+        return this.userService.saveFcmToken(data);
+    }
+
+    @MessagePattern({ cmd: 'clear_fcm_token' })
+    clearFcmToken(@Payload() data: { token?: string }) {
+        return this.userService.clearFcmToken(data);
+    }
+
+    @MessagePattern({ cmd: 'list_patient_caregivers' })
+    listPatientCaregivers(@Payload() data: { patientId?: string }) {
+        return this.userService.listPatientCaregivers(data);
+    }
+
     @MessagePattern({ cmd: "handle_get_linked_informations" })
     async handleGetLinkedInformations(@Payload() data: { userId: string, role: string }) {
         const linkedAccounts = await this.userService.handleGetLinkedInformations(data)
