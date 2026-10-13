@@ -197,18 +197,6 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
                   _loading ? 'Đang xác định vị trí...' : 'Dùng vị trí hiện tại',
                 ),
               ),
-              if (_geohash != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'Geohash: $_geohash',
-                  key: const Key('caregiver-geohash'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF5267F4),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
               if (_error != null) ...[
                 const SizedBox(height: 10),
                 Text(

@@ -149,7 +149,8 @@ void main() {
       find.byKey(const Key('confirmed-pharmacy-location')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('confirmed-pharmacy-geohash')), findsOneWidget);
+    expect(find.byKey(const Key('confirmed-pharmacy-geohash')), findsNothing);
+    expect(find.textContaining('Geohash:'), findsNothing);
 
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'Dược sĩ Demo');

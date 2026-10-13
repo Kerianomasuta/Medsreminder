@@ -87,15 +87,25 @@ class PharmacyApi {
       decoded = null;
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = decoded is Map<String, dynamic>
-          ? decoded['message']?.toString()
-          : null;
+      final message = _friendlyErrorMessage(decoded);
       throw PharmacyApiException(
         message ?? 'Yêu cầu thất bại (${response.statusCode}).',
         statusCode: response.statusCode,
       );
     }
     return decoded;
+  }
+
+  String? _friendlyErrorMessage(dynamic decoded) {
+    if (decoded is! Map<String, dynamic>) return null;
+    final rawMessage = decoded['message'];
+    final messages = rawMessage is List
+        ? rawMessage.map((item) => item.toString()).toList(growable: false)
+        : [if (rawMessage != null) rawMessage.toString()];
+    if (messages.any((message) => message.contains('should not exist'))) {
+      return 'Dịch vụ tìm nhà thuốc chưa đồng bộ. Vui lòng thử lại sau.';
+    }
+    return messages.isEmpty ? null : messages.join('\n');
   }
 
   void close() => _client.close();
