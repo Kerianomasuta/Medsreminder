@@ -57,6 +57,56 @@ class PharmacyOrderApi {
     },
   );
 
+  Future<List<PharmacyOrder>> getOrders({
+    String? status,
+    String? pharmacyId,
+  }) async {
+    final query = <String, String>{
+      if (pharmacyId != null && pharmacyId.isNotEmpty) 'pharmacyId': pharmacyId,
+      if (status != null && status.isNotEmpty) 'status': status,
+    };
+    final uri = Uri.parse('$apiBaseUrl/api/v1/orders').replace(
+      queryParameters: query.isEmpty ? null : query,
+    );
+    try {
+      final payload = await _request('GET', uri);
+      return (payload as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(PharmacyOrder.fromJson)
+          .toList(growable: false);
+    } catch (e) {
+      if (e is PharmacyOrderApiException && e.statusCode == 403) {
+        final fallbackStatus = switch (status) {
+          'READY' => PharmacyOrderStatus.readyForPickup,
+          'DELIVERING' => PharmacyOrderStatus.shipped,
+          'REJECTED' => PharmacyOrderStatus.cancelled,
+          null => null,
+          _ => PharmacyOrderStatus.fromApi(status),
+        };
+        return listMine(status: fallbackStatus);
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<PharmacyOrder>> list({
+    String? pharmacyId,
+    PharmacyOrderStatus? status,
+  }) async {
+    final query = <String, String>{
+      if (pharmacyId != null && pharmacyId.isNotEmpty) 'pharmacyId': pharmacyId,
+      if (status != null) 'status': status.apiValue,
+    };
+    final uri = Uri.parse('$apiBaseUrl/api/v1/orders').replace(
+      queryParameters: query.isEmpty ? null : query,
+    );
+    final payload = await _request('GET', uri);
+    return (payload as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(PharmacyOrder.fromJson)
+        .toList(growable: false);
+  }
+
   Future<List<PharmacyOrder>> listMine({PharmacyOrderStatus? status}) async {
     final uri = Uri.parse('$apiBaseUrl/api/v1/orders/mine').replace(
       queryParameters: status == null ? null : {'status': status.apiValue},

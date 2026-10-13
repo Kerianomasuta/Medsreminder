@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Schema chuẩn
 
-Role DB: `PATIENT`, `CAREGIVER`, `PHARMACIST`, `SHIPPER`, `ADMIN`. Code cũ trong `user.schema.ts` đang dùng `CARE_GIVER` và `DRUGSHIPPER`; khi sửa user thì đổi về tên DB.
+Role DB: `PATIENT`, `CAREGIVER`, `PHARMACIST`, `ADMIN`. Không có role shipper. Giao tận nơi do nhà thuốc book Grab, AhaMove hoặc GHTK bên ngoài. Code user đang dùng `CARE_GIVER`; khi sửa user thì đổi về `CAREGIVER`.
 
 ## user-service
 

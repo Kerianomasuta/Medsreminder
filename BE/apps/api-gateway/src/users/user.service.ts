@@ -22,4 +22,8 @@ export class UserService {
     getLinkedInformations(payload: any) {
         return this.userClient.send({ cmd: 'handle_get_linked_informations' }, payload)
     }
+
+    saveFcmToken(userId: string, token: string) {
+        return this.userClient.send({ cmd: 'save_fcm_token' }, { userId, token })
+    }
 }

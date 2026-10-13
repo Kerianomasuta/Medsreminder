@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { And, DataSource, EntityManager, LessThan, MoreThanOrEqual, Raw, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
@@ -10,7 +10,32 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000;
-const MISSED_AFTER_MS = 20 * 60 * 1000;
+export const MISSED_AFTER_MS = 11 * 60 * 1000;
+export const DOSE_CLOSED_ALERT = Symbol('DOSE_CLOSED_ALERT');
+
+export type DoseClosedAlert = {
+  notifyClosed(log: DoseLogResponse, status: 'MISSED' | 'SKIPPED'): Promise<void>;
+};
+
+export type DoseLogResponse = {
+  id: string;
+  scheduleRuleId: string;
+  patientId: string;
+  scheduledAt: Date;
+  actualTakenAt: Date | null;
+  status: DoseStatus;
+  snoozeUntil: Date | null;
+  escalationLevel: number;
+  skipReason: string | null;
+  dosagePerTime: number | null;
+  instructions: string | null;
+  medicine: {
+    name: string;
+    genericName: string | null;
+    unit: string;
+    imageUrl: string | null;
+  } | null;
+};
 const CLOCK_SKEW_MS = 2 * 60 * 1000;
 const OPEN_STATUSES = new Set<DoseStatus>([DoseStatus.SCHEDULED, DoseStatus.SNOOZED]);
 
@@ -35,6 +60,7 @@ export class MedicationLogsService {
     private readonly dataSource: DataSource,
     @InjectRepository(MedicationLog)
     private readonly logs: Repository<MedicationLog>,
+    @Optional() @Inject(DOSE_CLOSED_ALERT) private readonly alerts?: DoseClosedAlert,
   ) {}
 
   async list(input: ListLogsInput = {}) {
@@ -88,28 +114,65 @@ export class MedicationLogsService {
   async skip(id: string, input: DoseActionInput = {}) {
     const reason = this.optionalReason(input.skipReason);
     this.resolveActedAt(input.actedAt);
-    return this.change(id, input.userId, (log) => {
+    const saved = await this.change(id, input.userId, (log) => {
       log.status = DoseStatus.SKIPPED;
       log.skipReason = reason;
       log.snoozeUntil = null;
       log.actualTakenAt = null;
       log.escalationLevel = 1;
     });
+    await this.notify(saved, 'SKIPPED');
+    return saved;
   }
 
   async miss(id: string, input: DoseActionInput = {}) {
     const actedAt = this.resolveActedAt(input.actedAt);
-    return this.change(id, input.userId, (log) => {
+    const saved = await this.change(id, input.userId, (log) => {
       const dueAt = new Date(this.currentReminder(log).getTime() + MISSED_AFTER_MS);
       if (actedAt.getTime() < dueAt.getTime()) {
-        throw ErrorHandling.BadRequest('A dose can be marked missed only 20 minutes after the current reminder');
+        throw ErrorHandling.BadRequest('A dose can be marked missed only 11 minutes after the current reminder');
       }
-      log.status = DoseStatus.MISSED;
-      log.snoozeUntil = null;
-      log.actualTakenAt = null;
-      log.skipReason = null;
-      log.escalationLevel = 1;
+      this.applyMissed(log);
     });
+    await this.notify(saved, 'MISSED');
+    return saved;
+  }
+
+  async markMissedBySystem(id: string) {
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const log = await this.lockLog(manager, id);
+      if (!OPEN_STATUSES.has(log.status)) {
+        return null;
+      }
+      if (Date.now() < this.currentReminder(log).getTime() + MISSED_AFTER_MS) {
+        return null;
+      }
+      this.applyMissed(log);
+      const savedLog = await manager.save(MedicationLog, log);
+      savedLog.scheduleRule = log.scheduleRule;
+      return this.toResponse(savedLog);
+    });
+    if (!saved) {
+      return null;
+    }
+    await this.notify(saved, 'MISSED');
+    return saved;
+  }
+
+  private applyMissed(log: MedicationLog) {
+    log.status = DoseStatus.MISSED;
+    log.snoozeUntil = null;
+    log.actualTakenAt = null;
+    log.skipReason = null;
+    log.escalationLevel = 1;
+  }
+
+  private async notify(log: DoseLogResponse, status: 'MISSED' | 'SKIPPED') {
+    try {
+      await this.alerts?.notifyClosed(log, status);
+    } catch (error) {
+      console.error(`Could not alert caregivers for dose ${log.id}`, error);
+    }
   }
 
   private async change(id: string, userId: string | undefined, apply: (log: MedicationLog) => void) {
@@ -173,7 +236,7 @@ export class MedicationLogsService {
     return date;
   }
 
-  private toResponse(log: MedicationLog) {
+  private toResponse(log: MedicationLog): DoseLogResponse {
     const item = log.scheduleRule?.prescriptionItem;
     return {
       id: log.id,
