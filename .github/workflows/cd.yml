@@ -67,13 +67,13 @@ jobs:
     steps:
       - name: Check deploy secrets
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          test -n "$VPS_HOST" || { echo "Missing repository secret VPS_HOST"; exit 1; }
-          test -n "$VPS_USER" || { echo "Missing repository secret VPS_USER"; exit 1; }
-          test -n "$VPS_SSH_KEY" || { echo "Missing repository secret VPS_SSH_KEY"; exit 1; }
+          test -n "$EC2_HOST" || { echo "Missing repository secret EC2_HOST"; exit 1; }
+          test -n "$EC2_USER" || { echo "Missing repository secret EC2_USER"; exit 1; }
+          test -n "$EC2_SSH_KEY" || { echo "Missing repository secret EC2_SSH_KEY"; exit 1; }
 
       - name: Image prefix
         id: image
@@ -88,10 +88,10 @@ jobs:
           IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22 
           command_timeout: 20m
           envs: GHCR_TOKEN,GHCR_USER,REGISTRY,IMAGE_TAG,DEPLOY_PATH
           script: |
