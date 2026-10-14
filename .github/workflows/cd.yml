@@ -57,7 +57,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.app }},mode=max
 
   deploy:
-    name: Deploy on VPS
+    name: Deploy on EC2
     needs: push
     if: ${{ github.event.workflow_run.conclusion == 'success' && needs.push.result == 'success' }}
     runs-on: ubuntu-latest
@@ -91,7 +91,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22 
+          port: 22
           command_timeout: 20m
           envs: GHCR_TOKEN,GHCR_USER,REGISTRY,IMAGE_TAG,DEPLOY_PATH
           script: |
@@ -102,7 +102,18 @@ jobs:
             cd "${DEPLOY_PATH}"
             git pull --ff-only origin main
             cd BE
-            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            docker image prune -f
+            test -n "${REGISTRY}" || { echo "REGISTRY was not passed to EC2"; exit 1; }
+            test -n "${IMAGE_TAG}" || { echo "IMAGE_TAG was not passed to EC2"; exit 1; }
+            test -n "${GHCR_TOKEN}" || { echo "GHCR_TOKEN was not passed to EC2"; exit 1; }
+            if docker info >/dev/null 2>&1; then
+              DOCKER=(docker)
+            elif sudo docker info >/dev/null 2>&1; then
+              DOCKER=(sudo docker)
+            else
+              echo "Docker is not available for this SSH user on EC2"
+              exit 1
+            fi
+            echo "${GHCR_TOKEN}" | "${DOCKER[@]}" login ghcr.io -u "${GHCR_USER}" --password-stdin
+            "${DOCKER[@]}" compose -f docker-compose.prod.yml pull
+            "${DOCKER[@]}" compose -f docker-compose.prod.yml up -d --remove-orphans
+            "${DOCKER[@]}" image prune -f
