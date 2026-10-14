@@ -49,6 +49,12 @@ export class AuthService {
             data: {
                 accessToken: accessToken,
                 refreshToken: refreshToken,
+                user: {
+                    id: existingUser._id.toString(),
+                    email: existingUser.email,
+                    fullName: existingUser.fullName,
+                    role: existingUser.role,
+                },
             }
         }
     }
@@ -105,6 +111,12 @@ export class AuthService {
             data: {
                 accessToken: accessToken,
                 refreshToken: refreshToken,
+                user: {
+                    id: existingUser._id.toString(),
+                    email: existingUser.email,
+                    fullName: existingUser.fullName,
+                    role: existingUser.role,
+                },
             }
         }
     }

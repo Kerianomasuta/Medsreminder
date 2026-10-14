@@ -30,6 +30,14 @@ export class AuthController {
             example: {
                 status: 'success',
                 message: 'Login successfully!',
+                data: {
+                    user: {
+                        id: '67f000000000000000000001',
+                        email: 'user@example.com',
+                        fullName: 'Nguyen Van A',
+                        role: 'PATIENT',
+                    },
+                },
             },
         },
         headers: {
@@ -54,22 +62,23 @@ export class AuthController {
             res.cookie('accessToken', tcpResponse?.data?.accessToken, {
                 httpOnly: true,
                 secure: this.configService.get<string>('NODE_ENV') === 'production',
-                sameSite: 'strict',
+                sameSite: this.configService.get<string>('NODE_ENV') === 'production' ? 'none' : 'lax',
                 maxAge: ACCESS_TOKEN_MAX_AGE,
             })
 
             res.cookie('refreshToken', tcpResponse?.data?.refreshToken, {
                 httpOnly: true,
                 secure: this.configService.get<string>("NODE_ENV") === 'production',
-                sameSite: 'strict',
+                sameSite: this.configService.get<string>('NODE_ENV') === 'production' ? 'none' : 'lax',
                 maxAge: REFRESH_TOKEN_MAX_AGE,
             })
         }
 
-        delete tcpResponse?.data
+        const user = tcpResponse?.data?.user;
         return {
             status: 'success',
             message: 'Login successfully!',
+            data: { user },
         }
     }
 
@@ -108,8 +117,17 @@ export class AuthController {
         );
 
         if (tcpResponse?.status === 200) {
-            res.clearCookie('accessToken')
-            res.clearCookie('refreshToken')
+            const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+            res.clearCookie('accessToken', {
+                httpOnly: true,
+                secure: isProduction,
+                sameSite: isProduction ? 'none' : 'lax',
+            })
+            res.clearCookie('refreshToken', {
+                httpOnly: true,
+                secure: isProduction,
+                sameSite: isProduction ? 'none' : 'lax',
+            })
         }
 
         return {
@@ -128,6 +146,14 @@ export class AuthController {
             example: {
                 status: 200,
                 message: 'refresh token successfully!',
+                data: {
+                    user: {
+                        id: '67f000000000000000000001',
+                        email: 'user@example.com',
+                        fullName: 'Nguyen Van A',
+                        role: 'PATIENT',
+                    },
+                },
             },
         },
         headers: {
@@ -157,23 +183,24 @@ export class AuthController {
             res.cookie('accessToken', tcpResponse?.data?.accessToken, {
                 httpOnly: true,
                 secure: this.configService.get<string>('NODE_ENV') === 'production',
-                sameSite: 'strict',
+                sameSite: this.configService.get<string>('NODE_ENV') === 'production' ? 'none' : 'lax',
                 maxAge: ACCESS_TOKEN_MAX_AGE,
             })
 
             res.cookie('refreshToken', tcpResponse?.data?.refreshToken, {
                 httpOnly: true,
                 secure: this.configService.get<string>('NODE_ENV') === 'production',
-                sameSite: 'strict',
+                sameSite: this.configService.get<string>('NODE_ENV') === 'production' ? 'none' : 'lax',
                 maxAge: REFRESH_TOKEN_MAX_AGE,
             })
         }
 
-        delete tcpResponse?.data
+        const user = tcpResponse?.data?.user;
 
         return {
             status: 200,
-            message: 'refresh token successfully!'
+            message: 'refresh token successfully!',
+            data: { user },
         }
     }
 

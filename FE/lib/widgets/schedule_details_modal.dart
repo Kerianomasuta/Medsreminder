@@ -930,7 +930,7 @@ class _ScheduleEditModalSheetState extends State<ScheduleEditModalSheet> {
     }
   }
 
-  /// Gọi API PATCH http://localhost:3000/api/v1/schedule-rules/:id
+  /// Gọi API PATCH /api/v1/schedule-rules/:id
   Future<void> _save() async {
     if (_daysOfWeek.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1340,7 +1340,7 @@ class _AddScheduleModalSheetState extends State<AddScheduleModalSheet> {
     }
   }
 
-  /// Gọi POST http://localhost:3000/api/v1/prescription-items/:id/schedules
+  /// Gọi POST /api/v1/prescription-items/:id/schedules
   Future<void> _submitCreate() async {
     setState(() => _isCreating = true);
     try {
