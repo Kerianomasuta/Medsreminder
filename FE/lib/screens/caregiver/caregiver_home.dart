@@ -16,12 +16,33 @@ class CaregiverHome extends StatelessWidget {
     required this.controller,
     required this.userName,
     required this.userEmail,
+    this.onTabChange,
   });
 
   final int tab;
   final CareNetworkController controller;
   final String userName;
   final String userEmail;
+  final ValueChanged<int>? onTabChange;
+
+  void _openAllSchedules(BuildContext context, String patientId) {
+    if (onTabChange != null) {
+      onTabChange!(1);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Lịch uống thuốc')),
+            body: ScheduleTimelinePage(
+              key: ValueKey(patientId),
+              patientId: patientId,
+            ),
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -92,7 +113,11 @@ class CaregiverHome extends StatelessWidget {
           userName: userName,
           userEmail: userEmail,
         ),
-        _ => _OverviewPage(controller: controller, bundle: bundle),
+        _ => _OverviewPage(
+          controller: controller,
+          bundle: bundle,
+          onViewAllSchedules: () => _openAllSchedules(context, patientId),
+        ),
       };
     },
   );
@@ -267,9 +292,14 @@ class _PatientSelector extends StatelessWidget {
 }
 
 class _OverviewPage extends StatelessWidget {
-  const _OverviewPage({required this.controller, required this.bundle});
+  const _OverviewPage({
+    required this.controller,
+    required this.bundle,
+    this.onViewAllSchedules,
+  });
   final CareNetworkController controller;
   final PatientBundle bundle;
+  final VoidCallback? onViewAllSchedules;
 
   @override
   Widget build(BuildContext context) {
@@ -277,6 +307,7 @@ class _OverviewPage extends StatelessWidget {
     final todaySchedules = bundle.schedules
         .where((item) => item.isActive && item.daysOfWeek.contains(today))
         .toList();
+    final overviewSchedules = selectOverviewSchedules(todaySchedules);
     return _PatientFrame(
       controller: controller,
       child: AppScroll(
@@ -348,15 +379,34 @@ class _OverviewPage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Lịch uống hôm nay',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Lịch uống hôm nay',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                ),
+                if (todaySchedules.isNotEmpty && onViewAllSchedules != null)
+                  TextButton.icon(
+                    onPressed: onViewAllSchedules,
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                    label: const Text('Xem tất cả'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF5267F4),
+                      visualDensity: VisualDensity.compact,
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
-            if (todaySchedules.isEmpty)
+            if (overviewSchedules.isEmpty)
               const _EmptyCard(message: 'Hôm nay không có cữ thuốc nào.')
             else
-              ...todaySchedules.take(4).map(_ScheduleTile.new),
+              ...overviewSchedules.map(_ScheduleTile.new),
             if (bundle.lowStockCount > 0) ...[
               const SizedBox(height: 14),
               const Glass(
@@ -397,14 +447,20 @@ class _PrescriptionPage extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: PageIntro('Đơn thuốc', 'Đơn và thuốc của ${bundle.detail.fullName}'),
+                child: PageIntro(
+                  'Đơn thuốc',
+                  'Đơn và thuốc của ${bundle.detail.fullName}',
+                ),
               ),
               FilledButton.icon(
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Tạo đơn'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF5267F4),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                 ),
                 onPressed: () async {
                   final created = await Navigator.push<bool>(
@@ -429,7 +485,8 @@ class _PrescriptionPage extends StatelessWidget {
             ...bundle.prescriptions.map(
               (prescription) => _PrescriptionCard(
                 prescription: prescription,
-                onRefresh: () => controller.loadPatient(bundle.detail.id, force: true),
+                onRefresh: () =>
+                    controller.loadPatient(bundle.detail.id, force: true),
               ),
             ),
         ],
@@ -846,4 +903,56 @@ class _EmptyCard extends StatelessWidget {
       child: Text(message, style: const TextStyle(color: Color(0xFF687195))),
     ),
   );
+}
+
+/// Chọn tối đa [limit] cữ hiển thị trên Tổng quan:
+/// - Sắp xếp tăng dần theo reminderTime.
+/// - Lấy mốc thời gian tham chiếu là now - [gracePeriod] (mặc định 15 phút).
+/// - Ưu tiên lấy [limit] cữ có reminderTime >= (now - gracePeriod).
+/// - Fallback cuối ngày: nếu số cữ sắp tới ít hơn [limit], lấy bù các cữ gần nhất
+///   trước đó để luôn hiển thị đủ tối đa [limit] cữ (hoặc toàn bộ nếu tổng số cữ < limit).
+List<ScheduleRule> selectOverviewSchedules(
+  List<ScheduleRule> rules, {
+  DateTime? now,
+  int limit = 4,
+  Duration gracePeriod = const Duration(minutes: 15),
+}) {
+  if (rules.isEmpty) return const [];
+  final sorted = List<ScheduleRule>.from(rules)
+    ..sort((a, b) {
+      final ma = _parseReminderMinutes(a.reminderTime);
+      final mb = _parseReminderMinutes(b.reminderTime);
+      final cmp = ma.compareTo(mb);
+      return cmp != 0 ? cmp : a.id.compareTo(b.id);
+    });
+
+  if (sorted.length <= limit) return sorted;
+
+  final currentTime = now ?? DateTime.now();
+  final threshold = currentTime.subtract(gracePeriod);
+  final thresholdMinutes = threshold.day == currentTime.day
+      ? threshold.hour * 60 + threshold.minute
+      : 0;
+
+  final firstUpcoming = sorted.indexWhere(
+    (r) => _parseReminderMinutes(r.reminderTime) >= thresholdMinutes,
+  );
+
+  var startIndex = firstUpcoming == -1
+      ? (sorted.length - limit)
+      : firstUpcoming;
+  if (startIndex + limit > sorted.length) {
+    startIndex = sorted.length - limit;
+  }
+  if (startIndex < 0) startIndex = 0;
+
+  return sorted.sublist(startIndex, startIndex + limit);
+}
+
+int _parseReminderMinutes(String reminderTime) {
+  final parts = reminderTime.split(':');
+  if (parts.length < 2) return 0;
+  final h = int.tryParse(parts[0]) ?? 0;
+  final m = int.tryParse(parts[1]) ?? 0;
+  return h * 60 + m;
 }

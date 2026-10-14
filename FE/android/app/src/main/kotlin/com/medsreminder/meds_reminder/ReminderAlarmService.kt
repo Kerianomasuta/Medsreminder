@@ -317,8 +317,7 @@ class ReminderAlarmService : Service() {
                 alarmManager?.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
             }
         } else {
-            DoseActionQueue.enqueue(this, currentMedicationLogId, "missed")
-            notifyFlutterOfQueuedAction()
+            // Backend tự đánh dấu MISSED sau 11 phút và gửi FCM cho người chăm sóc.
             showMissedNotification(currentNotifId, currentMedicineName, currentTime)
         }
         stopSelf()

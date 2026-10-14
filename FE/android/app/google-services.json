@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "30944171095",
+    "project_id": "medsrimnder",
+    "storage_bucket": "medsrimnder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:30944171095:android:c13dc35baf8f8c9fe9bf12",
+        "android_client_info": {
+          "package_name": "com.medsreminder.meds_reminder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALqZEXOEbrlP_Xjawzt1XXmc_Smpx8GLs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
