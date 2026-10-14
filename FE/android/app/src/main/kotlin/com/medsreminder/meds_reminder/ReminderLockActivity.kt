@@ -68,7 +68,6 @@ class ReminderLockActivity : Activity() {
 
         val btnTaken = findViewById<Button>(R.id.btnTaken)
         val btnSnooze = findViewById<Button>(R.id.btnSnooze)
-        val btnSnooze10 = findViewById<Button>(R.id.btnSnooze10)
         val btnDismiss = findViewById<TextView>(R.id.btnDismiss)
 
         // 4. Nút "✓ ĐÃ UỐNG" — Tắt hẳn chuông và dừng mọi nhắc lại
@@ -78,16 +77,10 @@ class ReminderLockActivity : Activity() {
             finish()
         }
 
-        // 5. Nút "⏰ Nhắc lại (5p)" — Tắt chuông hiện tại, hẹn 5 phút sau reo lại
+        // 5. Nút "⏰ Nhắc lại" — Tắt chuông hiện tại, hẹn 5 phút sau reo lại
         btnSnooze.setOnClickListener {
             sendSnoozeService(5)
             Toast.makeText(this, "⏰ Sẽ nhắc lại sau 5 phút!", Toast.LENGTH_SHORT).show()
-            finish()
-        }
-
-        btnSnooze10.setOnClickListener {
-            sendSnoozeService(10)
-            Toast.makeText(this, "⏰ Sẽ nhắc lại sau 10 phút!", Toast.LENGTH_SHORT).show()
             finish()
         }
 
