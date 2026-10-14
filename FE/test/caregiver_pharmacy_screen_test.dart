@@ -11,6 +11,7 @@ import 'package:meds_reminder/models/care_network.dart';
 import 'package:meds_reminder/models/prescription.dart';
 import 'package:meds_reminder/screens/caregiver/caregiver_pharmacy_screen.dart';
 import 'package:meds_reminder/services/device_location_service.dart';
+import 'package:meds_reminder/services/geocoding_api.dart';
 import 'package:meds_reminder/services/pharmacy_api.dart';
 import 'package:meds_reminder/services/pharmacy_order_api.dart';
 import 'package:meds_reminder/utils/geohash.dart';
@@ -77,6 +78,31 @@ void main() {
         );
       }),
     );
+    final geocodingApi = GeocodingApi(
+      client: MockClient((request) async {
+        if (request.url.path == '/reverse') {
+          return http.Response(
+            jsonEncode({
+              'display_name': '12 Nguyễn Huệ, Phường Sài Gòn, TP. Hồ Chí Minh',
+            }),
+            200,
+            headers: const {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response(
+          jsonEncode([
+            {
+              'display_name':
+                  '22 Lê Thánh Tôn, Phường Sài Gòn, TP. Hồ Chí Minh',
+              'lat': '10.7791',
+              'lon': '106.6992',
+            },
+          ]),
+          200,
+          headers: const {'content-type': 'application/json; charset=utf-8'},
+        );
+      }),
+    );
     final orderApi = PharmacyOrderApi(
       client: MockClient((request) async {
         if (request.method == 'GET') {
@@ -130,6 +156,7 @@ void main() {
     addTearDown(controller.dispose);
     addTearDown(pharmacyApi.close);
     addTearDown(orderApi.close);
+    addTearDown(geocodingApi.close);
     await tester.binding.setSurfaceSize(const Size(1000, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -141,6 +168,8 @@ void main() {
             pharmacyApi: pharmacyApi,
             orderApi: orderApi,
             locationProvider: const _FixedLocationProvider(),
+            geocodingApi: geocodingApi,
+            showLocationMap: false,
           ),
         ),
       ),
@@ -149,10 +178,38 @@ void main() {
     await tester.tap(find.byKey(const Key('find-nearby-pharmacies')));
     await tester.pumpAndSettle();
 
+    expect(pharmacyRequest, isNull);
+    expect(find.byKey(const Key('caregiver-current-location')), findsOneWidget);
+    expect(
+      find.text('12 Nguyễn Huệ, Phường Sài Gòn, TP. Hồ Chí Minh'),
+      findsWidgets,
+    );
+    expect(find.text('10.776900, 106.700900'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('caregiver-location-address-input')),
+      '22 Lê Thánh Tôn',
+    );
+    await tester.tap(
+      find.byKey(const Key('search-caregiver-location-address')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('caregiver-address-result-0')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('22 Lê Thánh Tôn, Phường Sài Gòn, TP. Hồ Chí Minh'),
+      findsWidgets,
+    );
+    expect(find.text('10.779100, 106.699200'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('confirm-nearby-pharmacy-search')));
+    await tester.pumpAndSettle();
+
     expect(pharmacyRequest?.queryParameters['radiusKm'], '10.0');
     expect(
       pharmacyRequest?.queryParameters['geohash'],
-      encodeGeohash(10.7769, 106.7009),
+      encodeGeohash(10.7791, 106.6992),
     );
     expect(find.text('Nhà thuốc An Tâm', skipOffstage: false), findsOneWidget);
     expect(find.text('0.36 km', skipOffstage: false), findsOneWidget);
