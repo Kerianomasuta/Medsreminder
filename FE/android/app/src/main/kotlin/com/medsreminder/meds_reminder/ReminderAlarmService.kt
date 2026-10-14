@@ -321,8 +321,7 @@ class ReminderAlarmService : Service() {
             // Tạm ẩn thẻ thông báo hoãn chuông (mở lại nếu sau này cần dùng đến):
             // showSnoozedNotification(currentNotifId, currentMedicineName, (RETRY_INTERVAL_MS / 60000L).toInt())
         } else {
-            DoseActionQueue.enqueue(this, currentMedicationLogId, "missed")
-            notifyFlutterOfQueuedAction()
+            // Backend tự đánh dấu MISSED sau 11 phút và gửi FCM cho người chăm sóc.
             showMissedNotification(currentNotifId, currentMedicineName, currentTime)
         }
         stopSelf()

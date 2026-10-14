@@ -1,6 +1,9 @@
 package com.medsreminder.meds_reminder
 
 import android.app.AlarmManager
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -17,8 +20,24 @@ class MainActivity : FlutterActivity() {
     private val AUTH_CHANNEL = "com.medsreminder/auth_session"
     private var methodChannel: MethodChannel? = null
 
+    private fun createCaregiverAlertChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        val channel = NotificationChannel(
+            "caregiver_alerts",
+            "Cảnh báo người chăm sóc",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Thông báo khi bệnh nhân quên hoặc bỏ qua cữ thuốc"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            enableVibration(true)
+        }
+        manager.createNotificationChannel(channel)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        createCaregiverAlertChannel()
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {

@@ -27,12 +27,27 @@ bool shouldScheduleMedicationLog(MedicationLog log, DateTime now) =>
 DateTime medicationAlarmTriggerAt(MedicationLog log) => log.effectiveReminderAt;
 
 class NotificationService {
-  NotificationService._();
-  static final NotificationService instance = NotificationService._();
+  NotificationService({
+    FlutterLocalNotificationsPlugin? plugin,
+    MedicationLogsApi? medicationLogsApi,
+    bool? isSupported,
+  }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+       _medicationLogsApi = medicationLogsApi ?? MedicationLogsApi(),
+       _overrideSupported = isSupported;
 
-  final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
-  final MedicationLogsApi _medicationLogsApi = MedicationLogsApi();
+  static NotificationService _instance = NotificationService();
+  static NotificationService get instance => _instance;
+
+  @visibleForTesting
+  static set instance(NotificationService customInstance) =>
+      _instance = customInstance;
+
+  @visibleForTesting
+  static void resetInstance() => _instance = NotificationService();
+
+  final FlutterLocalNotificationsPlugin _plugin;
+  final MedicationLogsApi _medicationLogsApi;
+  final bool? _overrideSupported;
   static const MethodChannel _wakeChannel = MethodChannel(
     'com.medsreminder/wake_lock',
   );
@@ -48,8 +63,14 @@ class NotificationService {
   static const String channelDesc =
       'Thông báo nhắc uống thuốc đúng cữ trên màn hình khóa';
 
+  static const String caregiverChannelId = 'caregiver_alerts';
+  static const String caregiverChannelName = 'Cảnh báo người chăm sóc';
+  static const String caregiverChannelDesc =
+      'Cảnh báo khi bệnh nhân quên hoặc bỏ qua cữ thuốc';
+
   bool get _isSupported =>
-      !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST');
+      _overrideSupported ??
+      (!kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST'));
 
   /// Bật sáng màn hình điện thoại (Đánh thức màn hình khóa)
   Future<void> turnScreenOn() async {
@@ -165,7 +186,6 @@ class NotificationService {
             AndroidFlutterLocalNotificationsPlugin
           >();
       if (androidPlugin != null) {
-        // Tạo notification channel với độ ưu tiên cao nhất cho màn hình khóa
         const channel = AndroidNotificationChannel(
           channelId,
           channelName,
@@ -176,6 +196,18 @@ class NotificationService {
           showBadge: true,
         );
         await androidPlugin.createNotificationChannel(channel);
+
+        // Kênh cảnh báo người chăm sóc (FCM)
+        const caregiverChannel = AndroidNotificationChannel(
+          caregiverChannelId,
+          caregiverChannelName,
+          description: caregiverChannelDesc,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          showBadge: true,
+        );
+        await androidPlugin.createNotificationChannel(caregiverChannel);
         await androidPlugin.requestNotificationsPermission();
         try {
           await androidPlugin.requestExactAlarmsPermission();
@@ -202,6 +234,13 @@ class NotificationService {
         final logId = action['logId']?.toString();
         final type = action['action']?.toString();
         if (actionId == null || logId == null || type == null) continue;
+        if (type == 'missed') {
+          // Backend đánh dấu MISSED tự động; bỏ action cũ còn sót trong queue.
+          await _wakeChannel.invokeMethod<void>('ackPendingDoseAction', {
+            'actionId': actionId,
+          });
+          continue;
+        }
         try {
           final MedicationLog? updated = switch (type) {
             'taken' => await _medicationLogsApi.markTaken(logId),
@@ -213,7 +252,6 @@ class NotificationService {
               logId,
               reason: action['reason']?.toString(),
             ),
-            'missed' => await _medicationLogsApi.markMissed(logId),
             _ => null,
           };
           if (updated == null) continue;
@@ -227,22 +265,11 @@ class NotificationService {
           });
         } on MedicationLogsApiException catch (error) {
           // A final dose returns 400 for duplicate notification taps. Reconcile
-          // by dropping that stale action; early MISSED stays queued to retry.
-          final tooEarlyMiss =
-              type == 'missed' &&
-              error.statusCode == 400 &&
-              error.message.contains('20 minutes');
-          if (error.statusCode == 400 && !tooEarlyMiss) {
+          // by dropping that stale action.
+          if (error.statusCode == 400) {
             await _wakeChannel.invokeMethod<void>('ackPendingDoseAction', {
               'actionId': actionId,
             });
-          }
-          if (tooEarlyMiss) {
-            Future<void>.delayed(
-              const Duration(minutes: 1),
-              processPendingDoseActions,
-            );
-            break;
           }
         } catch (error) {
           debugPrint('Pending medication action failed: $error');
@@ -450,6 +477,52 @@ class NotificationService {
       title: title,
       body: body,
       notificationDetails: _notificationDetails(),
+    );
+  }
+
+  /// Cấu hình AndroidNotificationDetails cho cảnh báo người chăm sóc
+  static AndroidNotificationDetails caregiverAndroidNotificationDetails() =>
+      const AndroidNotificationDetails(
+        caregiverChannelId,
+        caregiverChannelName,
+        channelDescription: caregiverChannelDesc,
+        importance: Importance.max,
+        priority: Priority.max,
+        visibility: NotificationVisibility.public,
+        fullScreenIntent: true,
+        playSound: true,
+        enableVibration: true,
+        category: AndroidNotificationCategory.alarm,
+        styleInformation: BigTextStyleInformation(''),
+      );
+
+  /// Hiển thị thông báo đẩy cảnh báo người chăm sóc (khi nhận FCM)
+  Future<void> showCaregiverAlert({
+    required String title,
+    required String body,
+    int? id,
+    String? payload,
+  }) async {
+    if (!_isSupported) return;
+    await init();
+    final notifId =
+        id ?? DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    final androidDetails = caregiverAndroidNotificationDetails();
+    const darwinDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+    await _plugin.show(
+      id: notifId,
+      title: title,
+      body: body,
+      payload: payload,
+      notificationDetails: NotificationDetails(
+        android: androidDetails,
+        iOS: darwinDetails,
+      ),
     );
   }
 

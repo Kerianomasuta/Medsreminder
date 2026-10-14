@@ -12,12 +12,14 @@ import 'screens/auth/splash_screen.dart';
 import 'screens/invitation/invitation_screen.dart';
 import 'services/auth_api.dart';
 import 'services/auth_cookie_adapter.dart';
+import 'services/fcm_service.dart';
 import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configureUrlStrategy();
   await AuthCookieAdapter().restore();
+  await FcmService.initializeFirebase();
   await NotificationService.instance.init();
   // Đặt thanh trạng thái iOS / Android trong suốt như yêu cầu
   SystemChrome.setSystemUIOverlayStyle(
@@ -30,9 +32,10 @@ void main() async {
 }
 
 class MedsReminderApp extends StatefulWidget {
-  const MedsReminderApp({super.key, this.authApi});
+  const MedsReminderApp({super.key, this.authApi, this.fcmService});
 
   final AuthApi? authApi;
+  final FcmService? fcmService;
 
   @override
   State<MedsReminderApp> createState() => _MedsReminderAppState();
@@ -42,6 +45,7 @@ class _MedsReminderAppState extends State<MedsReminderApp>
     with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final AuthApi _authApi;
+  late final FcmService _fcmService;
   AuthUser? _currentUser;
   CareNetworkController? _networkController;
   PharmacistDashboardController? _pharmacistController;
@@ -59,6 +63,7 @@ class _MedsReminderAppState extends State<MedsReminderApp>
       _onSkipReasonRequested,
     );
     _authApi = widget.authApi ?? AuthApi();
+    _fcmService = widget.fcmService ?? FcmService();
     _pendingInvitationUuid = Uri.base.queryParameters['invitationUUID'];
     _restoreSession();
   }
@@ -82,6 +87,7 @@ class _MedsReminderAppState extends State<MedsReminderApp>
     if (restoredUser?.role == AppRole.patient) {
       NotificationService.instance.refreshUpcomingMedicationLogs();
     }
+    _syncFcm(restoredUser);
     _replaceRoute(_routeFor(restoredUser));
     _scheduleSkipReasonDialog();
   }
@@ -98,6 +104,7 @@ class _MedsReminderAppState extends State<MedsReminderApp>
     if (user.role == AppRole.patient) {
       NotificationService.instance.refreshUpcomingMedicationLogs();
     }
+    _syncFcm(user);
     _replaceRoute(_routeFor(user));
     _scheduleSkipReasonDialog();
   }
@@ -113,6 +120,7 @@ class _MedsReminderAppState extends State<MedsReminderApp>
     } catch (_) {
       // The server session may already be expired; still clear local UI state.
     } finally {
+      _syncFcm(null);
       AuthCookieAdapter().clear();
       await NotificationService.instance.clearMedicationState();
       if (mounted) {
@@ -124,6 +132,15 @@ class _MedsReminderAppState extends State<MedsReminderApp>
         _replaceNetworkController(null);
       }
       _replaceRoute('/login');
+    }
+  }
+
+  /// Chỉ Người chăm sóc nhận cảnh báo FCM; các role khác/đăng xuất thì dừng.
+  void _syncFcm(AuthUser? user) {
+    if (user?.role == AppRole.caregiver) {
+      _fcmService.start();
+    } else {
+      _fcmService.stop();
     }
   }
 
@@ -169,6 +186,7 @@ class _MedsReminderAppState extends State<MedsReminderApp>
       _onSkipReasonRequested,
     );
     _authApi.close();
+    _fcmService.stop();
     _networkController?.dispose();
     _pharmacistController?.dispose();
     super.dispose();
