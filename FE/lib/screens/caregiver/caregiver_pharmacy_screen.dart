@@ -42,7 +42,9 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
   List<PharmacyOrder> _orders = const [];
   String? _geohash;
   bool _loading = false;
+  bool _locating = false;
   String? _error;
+  String? _locationNotice;
 
   @override
   void initState() {
@@ -72,15 +74,28 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
   Future<void> _findNearby() async {
     setState(() {
       _loading = true;
+      _locating = true;
       _error = null;
+      _locationNotice = null;
     });
     try {
       final location = await _locationProvider.currentLocation();
+      if (mounted) {
+        setState(() {
+          _locating = false;
+          _locationNotice = location.notice;
+        });
+      }
       await _searchWithCoordinates(location.latitude, location.longitude);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _locating = false;
+        });
+      }
     }
   }
 
@@ -194,19 +209,19 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
                       )
                     : const Icon(Icons.my_location_rounded),
                 label: Text(
-                  _loading ? 'Đang xác định vị trí...' : 'Dùng vị trí hiện tại',
+                  _loading
+                      ? _locating
+                            ? 'Đang xác định vị trí...'
+                            : 'Đang tìm nhà thuốc...'
+                      : 'Dùng vị trí hiện tại',
                 ),
               ),
-              if (_geohash != null) ...[
+              if (_locationNotice != null) ...[
                 const SizedBox(height: 10),
                 Text(
-                  'Geohash: $_geohash',
-                  key: const Key('caregiver-geohash'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF5267F4),
-                    fontWeight: FontWeight.w800,
-                  ),
+                  _locationNotice!,
+                  key: const Key('nearby-pharmacy-location-notice'),
+                  style: const TextStyle(color: Color(0xFF9A6700)),
                 ),
               ],
               if (_error != null) ...[
@@ -1351,4 +1366,3 @@ class _OrderCard extends StatelessWidget {
     );
   }
 }
-

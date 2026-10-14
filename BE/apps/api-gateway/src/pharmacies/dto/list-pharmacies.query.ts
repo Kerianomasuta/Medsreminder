@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsNumber,
   IsOptional,
   IsString,
@@ -10,6 +11,20 @@ import {
 } from 'class-validator';
 
 export class ListPharmaciesQueryDto {
+  @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      'Legacy compatibility flag. Pharmacy availability is no longer filtered by this field.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean()
+  isActive?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))

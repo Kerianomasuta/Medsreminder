@@ -53,11 +53,14 @@ class AuthApi {
     Map<String, Object> body, {
     String email = '',
   }) async {
-    await _post(path, body);
+    final response = await _post(path, body);
+    final responseUser = _userFrom(response, fallbackEmail: email);
+    if (responseUser != null) return responseUser;
+
     final token = _cookies.accessToken;
     if (token == null) {
       throw const AuthApiException(
-        'Không đọc được access token từ cookie HttpOnly.',
+        'Máy chủ không trả về thông tin phiên đăng nhập.',
       );
     }
 
@@ -74,6 +77,27 @@ class AuthApi {
     }
   }
 
+  AuthUser? _userFrom(http.Response response, {required String fallbackEmail}) {
+    try {
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = payload['data'];
+      if (data is! Map<String, dynamic>) return null;
+
+      final rawUser = data['user'] ?? data['userWithoutPassword'];
+      if (rawUser is! Map<String, dynamic>) return null;
+
+      return AuthUser.fromJson({
+        ...rawUser,
+        'id': rawUser['id'] ?? rawUser['_id'],
+        'email': rawUser['email']?.toString().isNotEmpty == true
+            ? rawUser['email']
+            : fallbackEmail,
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<http.Response> _post(String path, Map<String, Object> body) async {
     late http.Response response;
     try {
@@ -87,7 +111,7 @@ class AuthApi {
       );
     } catch (_) {
       throw const AuthApiException(
-        'Không thể kết nối máy chủ. Hãy kiểm tra Docker backend đang chạy.',
+        'Không thể kết nối máy chủ. Hãy kiểm tra kết nối mạng và thử lại.',
       );
     }
 

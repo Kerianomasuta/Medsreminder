@@ -8,11 +8,20 @@ import { RpcExceptionFilter } from './filter/rpc-exception.filter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(ApiGatewayModule);
+  const configService = app.get(ConfigService);
+  const configuredCorsOrigins = (configService.get<string>('CORS_ORIGINS') ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   app.use(cookieParser())
 
   app.enableCors({
-    origin: true,
+    origin: [
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+      'https://medsreminder.duckdns.org',
+      ...configuredCorsOrigins,
+    ],
     credentials: true
   })
 
@@ -34,8 +43,6 @@ async function bootstrap() {
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, swaggerDocument);
-
-  const configService = app.get(ConfigService);
 
   const port = configService.get<number>('GATEWAY_PORT') || 3000
 

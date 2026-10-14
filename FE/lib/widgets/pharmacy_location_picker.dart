@@ -37,7 +37,9 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
   PharmacyLocationSelection? _selection;
   LatLng? _markerPoint;
   bool _usingDeviceLocation = false;
+  bool _resolvingAddress = false;
   String? _error;
+  String? _locationNotice;
 
   @override
   void initState() {
@@ -66,10 +68,12 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
     setState(() {
       _usingDeviceLocation = true;
       _error = null;
+      _locationNotice = null;
     });
     try {
       final deviceLocation = await _locationProvider.currentLocation();
       if (!mounted) return;
+      setState(() => _resolvingAddress = true);
       final location = await _geocodingApi.reverseGeocode(
         deviceLocation.latitude,
         deviceLocation.longitude,
@@ -79,6 +83,7 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
       setState(() {
         _selection = location;
         _markerPoint = point;
+        _locationNotice = deviceLocation.notice;
       });
       widget.onChanged(location);
       if (widget.showMap) {
@@ -89,7 +94,12 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
-      if (mounted) setState(() => _usingDeviceLocation = false);
+      if (mounted) {
+        setState(() {
+          _usingDeviceLocation = false;
+          _resolvingAddress = false;
+        });
+      }
     }
   }
 
@@ -117,11 +127,21 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                 : const Icon(Icons.my_location_rounded),
             label: Text(
               _usingDeviceLocation
-                  ? 'Đang lấy vị trí...'
+                  ? _resolvingAddress
+                        ? 'Đang xác định địa chỉ...'
+                        : 'Đang lấy vị trí...'
                   : 'Dùng vị trí hiện tại',
             ),
           ),
         ),
+        if (_locationNotice != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _locationNotice!,
+            key: const Key('pharmacy-location-notice'),
+            style: const TextStyle(color: Color(0xFF9A6700)),
+          ),
+        ],
         if (widget.showMap && _markerPoint != null) ...[
           const SizedBox(height: 12),
           Text(
@@ -216,11 +236,6 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                       Text(
                         '${_selection!.latitude.toStringAsFixed(6)}, '
                         '${_selection!.longitude.toStringAsFixed(6)}',
-                      ),
-                      Text(
-                        'Geohash: ${_selection!.geohash}',
-                        key: const Key('confirmed-pharmacy-geohash'),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
