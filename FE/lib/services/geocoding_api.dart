@@ -23,6 +23,7 @@ class GeocodingApi {
 
   static const _baseUrl = 'https://nominatim.openstreetmap.org';
   static const _minimumRequestInterval = Duration(seconds: 1);
+  static const _requestTimeout = Duration(seconds: 8);
 
   final http.Client _client;
   final bool _ownsClient;
@@ -115,12 +116,18 @@ class GeocodingApi {
     await _waitForRequestSlot();
     late http.Response response;
     try {
-      response = await _client.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          if (!kIsWeb) 'User-Agent': 'MedsReminder/1.0',
-        },
+      response = await _client
+          .get(
+            uri,
+            headers: {
+              'Accept': 'application/json',
+              if (!kIsWeb) 'User-Agent': 'MedsReminder/1.0',
+            },
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const GeocodingApiException(
+        'Dịch vụ bản đồ phản hồi quá lâu. Vui lòng thử lại.',
       );
     } catch (_) {
       throw const GeocodingApiException(

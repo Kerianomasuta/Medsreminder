@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -19,6 +20,7 @@ class PharmacyApi {
   PharmacyApi({http.Client? client}) : _client = client ?? createHttpClient();
 
   final http.Client _client;
+  static const _requestTimeout = Duration(seconds: 10);
 
   Future<List<Pharmacy>> list({
     double? latitude,
@@ -70,9 +72,13 @@ class PharmacyApi {
     late http.Response response;
     try {
       response = switch (method) {
-        'GET' => await _client.get(uri),
+        'GET' => await _client.get(uri).timeout(_requestTimeout),
         _ => throw UnsupportedError('Unsupported HTTP method: $method'),
       };
+    } on TimeoutException {
+      throw const PharmacyApiException(
+        'Dịch vụ nhà thuốc phản hồi quá lâu. Vui lòng thử lại.',
+      );
     } catch (error) {
       if (error is PharmacyApiException) rethrow;
       throw const PharmacyApiException(

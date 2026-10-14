@@ -8,6 +8,32 @@ import 'package:meds_reminder/models/registration_input.dart';
 import 'package:meds_reminder/services/auth_api.dart';
 
 void main() {
+  test('login accepts user data supplied by the API', () async {
+    final client = MockClient(
+      (request) async => http.Response(
+        jsonEncode({
+          'status': 'success',
+          'data': {
+            'user': {
+              'id': 'patient-1',
+              'fullName': 'Nguyen Van An',
+              'role': 'PATIENT',
+            },
+          },
+        }),
+        200,
+      ),
+    );
+
+    final user = await AuthApi(client: client)
+        .login(email: 'patient@example.com', password: 'password123');
+
+    expect(user.id, 'patient-1');
+    expect(user.email, 'patient@example.com');
+    expect(user.fullName, 'Nguyen Van An');
+    expect(user.role, AppRole.patient);
+  });
+
   test('login reads the role from the access token cookie', () async {
     final client = MockClient(
       (request) async => http.Response(

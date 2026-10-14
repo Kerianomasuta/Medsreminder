@@ -1,1 +1,1 @@
-String defaultApiBaseUrl() => 'http://localhost:3000';
+String defaultApiBaseUrl() => 'https://medsreminder.duckdns.org';
