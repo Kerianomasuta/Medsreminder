@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/pharmacist_dashboard.dart';
-import 'http_client_factory.dart';
 
 class GeocodingApiException implements Exception {
   const GeocodingApiException(this.message);
@@ -18,7 +17,10 @@ class GeocodingApiException implements Exception {
 
 class GeocodingApi {
   GeocodingApi({http.Client? client})
-    : _client = client ?? createHttpClient(),
+    // Nominatim is a public, cross-origin service. It must not use the app's
+    // authenticated web client because that client sends requests with
+    // credentials, while Nominatim allows CORS with a wildcard origin.
+    : _client = client ?? http.Client(),
       _ownsClient = client == null;
 
   static const _baseUrl = 'https://nominatim.openstreetmap.org';
