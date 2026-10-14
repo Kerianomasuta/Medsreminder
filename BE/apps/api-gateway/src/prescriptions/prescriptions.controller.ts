@@ -44,7 +44,7 @@ export class PrescriptionsController {
   @Get('prescriptions')
   @Role(...readers)
   @ApiOperation({
-    summary: 'List prescriptions for one patient',
+    summary: 'List prescriptions for one patient hehe',
     description: 'A patient always receives their own prescriptions. The patientId query is ignored for that role. Pharmacists can read a prescription while reviewing an order. Allowed roles: PATIENT, CARE_GIVER, PHARMACIST, ADMIN.',
   })
   @ApiOkResponse({ type: PrescriptionResponseDto, isArray: true, description: 'Prescriptions for the patient, newest first.' })

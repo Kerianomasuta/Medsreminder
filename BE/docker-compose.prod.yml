@@ -15,8 +15,8 @@ services:
       USER_SERVICE_PORT: 3529
       MEDICATION_SERVICE_HOST: medication-service
       MEDICATION_SERVICE_PORT: 3530
-      PHARMACY_SERVICE_SERVICE_HOST: pharmacy-order-service
-      PHARMACY_SERVICE_SERVICE_PORT: 3531
+      PHARMACY_ORDER_SERVICE_HOST: pharmacy-order-service
+      PHARMACY_ORDER_SERVICE_PORT: 3531
     depends_on:
       - user-service
       - medication-service
@@ -64,8 +64,10 @@ services:
       - ./apps/pharmacy-order-service/.env
     environment:
       NODE_ENV: production
-      PHARMACY_SERVICE_SERVICE_HOST: 0.0.0.0
-      PHARMACY_SERVICE_SERVICE_PORT: 3531
+      PHARMACY_ORDER_SERVICE_HOST: 0.0.0.0
+      PHARMACY_ORDER_SERVICE_PORT: 3531
+      MEDICATION_SERVICE_HOST: medication-service
+      MEDICATION_SERVICE_PORT: 3530
     expose:
       - "3531"
     networks:
