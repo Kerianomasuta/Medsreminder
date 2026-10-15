@@ -1,27 +1,31 @@
 ---
-description: Những gì đã làm trên repo và việc chưa làm
+description: Tình hình repo và EC2 để làm tiếp khi đổi máy
 alwaysApply: true
 ---
 
-# Trạng thái repo (2026-09-29)
+# Trạng thái (2026-10-15)
 
-Chỉ mới có khung backend và UI Flutter. Chưa có pairing, đơn thuốc, log, đơn hàng, Docker hay CI.
+Nhánh làm việc `BE/features/medication`, commit mới `a30ff29` (`fix billing`). Không sửa `FE/` trừ khi được yêu cầu rõ. Không commit `.env` và không in secret.
 
-## Đã có
+## Đang chạy trên EC2
 
-- `BE/apps/api-gateway`: HTTP, cookie-parser, ValidationPipe. `AuthModule` (TCP client tới user-service, `POST /api/v1/auth/login`) đã viết nhưng chưa import trong `ApiGatewayModule`.
-- `BE/apps/user-service`: TCP microservice. Schema user Mongo chỉ có email, password, role. `findByEmail` và login so khớp bcrypt. `AuthModule` chưa import trong `UserServiceModule`. Chưa `MongooseModule.forRoot`.
-- `BE/libs/error-handling`: helper lỗi dùng trong login.
-- `FE/`: Flutter, `lib/main.dart` là prototype giao diện theo role. `flutter pub get` đã chạy, analyzer sạch.
-- Đã `npm install` trong `BE`. Đã gỡ package sai `class-transform`, cài `class-transformer` (peer của ValidationPipe).
+- Domain `https://medsreminder.duckdns.org`. Swagger ở `/docs`. Mã nguồn `/opt/medsreminder`, compose trong `BE/`.
+- CD chỉ chạy khi CI xanh trên `main` (`.github/workflows/cd.yml`). Ảnh GHCR `ghcr.io/kerianomasuta/medsreminder/<app>:<sha>`. Bản CD đã lên là `51bd5679d667de422ce81d557b49635e02c30630`.
+- Trên EC2 chỉ dùng `docker-compose.prod.yml`. `docker compose up` không kèm `-f` là bản dev: trùng tên container production và tạo ảnh local `be-user-service`, `be-api-gateway`.
+- `sudo -E` không giữ biến. Gán thẳng: `sudo REGISTRY=ghcr.io/kerianomasuta/medsreminder IMAGE_TAG=<sha> docker compose -f docker-compose.prod.yml ...`. `IMAGE_TAG` phải là sha GHCR, không phải `be-user-service`.
+- Sửa env xong phải `--force-recreate` đúng service. `docker restart` không nạp lại env.
 
-## Chưa làm
+## Premium / PayOS
 
-- Chưa có app `prescription-reminder-service` và `pharmacy-delivery-service`.
-- Chưa có portal Next.js.
-- Chưa có Dockerfile, docker-compose, `.github/workflows`.
-- Script `BE/package.json` chưa khớp monorepo: `start:prod` trỏ `dist/apps/meds-backend/main`, `lint` quét `src/` và `test/` không tồn tại, `test:e2e` là lệnh hỏng. E2e gateway còn kỳ vọng `GET /` trả `Hello World!`.
+- Giá: tháng 49.000, năm 470.400. Mongo `users.isPremium`, `users.premiumExpiresAt`, collection `premium_payments`. Không có migration SQL.
+- Webhook PayOS đã lưu: `https://medsreminder.duckdns.org/api/v1/billing/payos-webhook`.
+- `BillingModule` của gateway phải import `AuthModule`. Thiếu thì `JwtAuthGuard` không có `JwtService`, gateway restart, site 502.
+- `PAYMENT_ENABLED` chỉ chặn `POST /api/v1/billing/create-payment-link`. Webhook không đọc cờ này. Trả HTTP 200 cho PayOS kể cả gói test hoặc chữ ký sai. Chỉ bật Premium khi chữ ký khớp, đúng số tiền và `code` là `00`.
+- Env PayOS nằm ở `BE/apps/user-service/.env`: `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, `PAYOS_RETURN_URL`, `PAYOS_CANCEL_URL`, `PAYMENT_ENABLED`. Checksum đúng dài 64 ký tự (`printenv | wc -c` ra khoảng 65).
+- Việc kế tiếp: `PAYMENT_ENABLED=true`, tạo lại `user-service`, gọi create-payment-link gói `MONTH`, trả tiền, rồi `GET /api/v1/users/profile` phải có `isPremium: true`.
 
-## Hướng triển khai đã chốt
+## Chưa đưa lên production
 
-Làm Docker (một Dockerfile nhận tên app, compose cho mongo hoặc Postgres, user-service, gateway) trước, rồi CI (lint, test, build, `flutter analyze`), rồi CD (push image, VPS `compose pull`). Không commit `.env`. Biến gateway và user-service đang dùng: `GATEWAY_PORT`, `USER_SERVICE_HOST`, `USER_SERVICE_PORT`, `UPSTASH_REDIS_URL`, `ACCESS_JWT_SECRET`, `REFRESH_JWT_SECRET`.
+- `ai-service` không có trong `docker-compose.prod.yml` và không có trong ma trận CD. Gateway production chưa trỏ `AI_SERVICE_HOST`.
+- Quét đơn gọi OpenRouter, không kéo model về máy. Biến: `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`, `AI_SERVICE_HOST`, `AI_SERVICE_PORT` (3532).
+- FCM người chăm sóc cần `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` trong env medication-service. Thiếu thì bỏ qua alert, service vẫn chạy.
