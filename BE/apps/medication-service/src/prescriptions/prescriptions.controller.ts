@@ -31,6 +31,8 @@ type CreatePrescriptionMessage = ActorMessage & {
   doctorName?: string | null;
   prescriptionCode?: string | null;
   imagePrescriptionUrl?: string | null;
+  imageBase64?: string;
+  imageContentType?: string;
   startDate?: string;
   endDate?: string | null;
   items?: ItemMessage[];
@@ -64,6 +66,11 @@ export class PrescriptionsController {
   @MessagePattern({ cmd: 'get_prescription' })
   getById(@Payload() payload: ActorMessage & { id: string }) {
     return this.prescriptionsService.getById(payload.id, this.actor(payload));
+  }
+
+  @MessagePattern({ cmd: 'get_prescription_photo' })
+  getPhoto(@Payload() payload: ActorMessage & { id: string }) {
+    return this.prescriptionsService.getPhoto(payload.id, this.actor(payload));
   }
 
   @MessagePattern({ cmd: 'update_prescription' })

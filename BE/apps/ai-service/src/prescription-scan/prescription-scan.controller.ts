@@ -7,7 +7,7 @@ export class PrescriptionScanController {
   constructor(private readonly prescriptionScanService: PrescriptionScanService) {}
 
   @MessagePattern({ cmd: 'scan_prescription' })
-  scan(@Payload() payload: { imageUrl?: string }) {
-    return this.prescriptionScanService.scan(payload?.imageUrl);
+  scan(@Payload() payload: { imageBase64?: string; mimeType?: string }) {
+    return this.prescriptionScanService.scan(payload);
   }
 }

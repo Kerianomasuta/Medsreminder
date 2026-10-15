@@ -25,6 +25,27 @@ export class Prescription {
   @Column({ type: 'text', name: 'image_prescription_url', nullable: true })
   imagePrescriptionUrl: string | null;
 
+  @Column({
+    type: 'bytea',
+    name: 'image_data',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  imageData: Buffer | null;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    name: 'image_content_type',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  imageContentType: string | null;
+
   @Column({ type: 'date', name: 'start_date' })
   startDate: string;
 
