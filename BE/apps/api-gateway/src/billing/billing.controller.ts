@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards.js';
@@ -34,6 +34,7 @@ export class BillingController {
   }
 
   @Post('payos-webhook')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'PayOS payment webhook. Activates premium after a verified transfer.' })
   payosWebhook(@Body() body: Record<string, unknown>) {
     return this.billingService.confirmPayos(body);
