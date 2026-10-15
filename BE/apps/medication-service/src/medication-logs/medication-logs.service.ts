@@ -2,6 +2,14 @@ import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { And, DataSource, EntityManager, LessThan, MoreThanOrEqual, Raw, Repository } from 'typeorm';
 import { ErrorHandling } from '@lib/error-handling';
+import {
+  buildComplianceReport,
+  renderComplianceHtml,
+  renderCompliancePdf,
+  REPORT_DAYS,
+  type ComplianceDose,
+  type ComplianceMedicineLine,
+} from './compliance-report.js';
 import { DoseStatus } from '../enums/dose-status.enum.js';
 import { ScheduleRule } from '../schedule-rules/schema/schedule-rule.entity.js';
 import { MedicationLog } from './schema/medication-log.entity.js';
@@ -85,6 +93,63 @@ export class MedicationLogsService {
       order: { scheduledAt: 'ASC' },
     });
     return rows.map((row) => this.toResponse(row));
+  }
+
+  async complianceReport(input: ListLogsInput & { patientName?: string } = {}) {
+    const patientId = this.reportPatientId(input);
+    const today = this.today();
+    const from = this.addDays(today, -(REPORT_DAYS - 1));
+    const fromInstant = this.startOfVietnamDay(from);
+    const toInstant = this.startOfVietnamDay(this.addDays(today, 1));
+    const doses = await this.dataSource.query(
+      `SELECT l.status AS status,
+              l.scheduled_at AS scheduled_at,
+              l.actual_taken_at AS actual_taken_at,
+              l.snooze_until AS snooze_until,
+              i.name AS medicine_name
+       FROM medication.medication_logs l
+       INNER JOIN medication.schedule_rules r ON r.id = l.schedule_rule_id
+       INNER JOIN medication.prescription_items i ON i.id = r.prescription_item_id
+       WHERE LOWER(l.patient_id) = $1
+         AND l.scheduled_at >= $2
+         AND l.scheduled_at < $3
+       ORDER BY l.scheduled_at ASC`,
+      [patientId, fromInstant, toInstant],
+    ) as Array<Record<string, unknown>>;
+    const lines = await this.dataSource.query(
+      `SELECT p.id AS prescription_id,
+              p.title AS title,
+              p.doctor_name AS doctor_name,
+              p.start_date AS start_date,
+              p.end_date AS end_date,
+              i.name AS medicine_name,
+              i.dosage_per_time AS dosage_per_time,
+              i.unit AS unit,
+              r.reminder_time AS reminder_time
+       FROM medication.prescriptions p
+       INNER JOIN medication.prescription_items i ON i.prescription_id = p.id
+       LEFT JOIN medication.schedule_rules r
+         ON r.prescription_item_id = i.id AND r.is_active = true
+       WHERE LOWER(p.patient_id) = $1
+         AND p.is_active = true
+         AND p.start_date <= $2::date
+         AND (p.end_date IS NULL OR p.end_date >= $2::date)
+       ORDER BY p.created_at ASC, i.created_at ASC, r.reminder_time ASC`,
+      [patientId, today],
+    ) as Array<Record<string, unknown>>;
+    const report = buildComplianceReport({
+      patientName: input.patientName ?? '',
+      from,
+      to: today,
+      now: new Date(),
+      doses: doses.map((row) => this.toComplianceDose(row)),
+      lines: lines.map((row) => this.toComplianceLine(row)),
+    });
+    const pdf = await renderCompliancePdf(renderComplianceHtml(report));
+    return {
+      filename: `bao-cao-tuan-thu-${from}-den-${today}.pdf`,
+      pdfBase64: pdf.toString('base64'),
+    };
   }
 
   async take(id: string, input: DoseActionInput = {}) {
@@ -190,6 +255,40 @@ export class MedicationLogsService {
       saved.scheduleRule = log.scheduleRule;
       return this.toResponse(saved);
     });
+  }
+
+  private reportPatientId(actor: ListLogsInput) {
+    if (actor.actorRole === 'PATIENT') {
+      return this.requireObjectId(actor.actorUserId, 'actorUserId');
+    }
+    if (actor.actorRole === 'CARE_GIVER' || actor.actorRole === 'ADMIN') {
+      return this.requireObjectId(actor.patientId, 'patientId');
+    }
+    throw ErrorHandling.Forbidden('Only patients, caregivers, and admins can export a compliance report');
+  }
+
+  private toComplianceDose(row: Record<string, unknown>): ComplianceDose {
+    return {
+      medicineName: textValue(row.medicine_name),
+      status: textValue(row.status),
+      scheduledAt: instantValue(row.scheduled_at),
+      actualTakenAt: optionalInstant(row.actual_taken_at),
+      snoozeUntil: optionalInstant(row.snooze_until),
+    };
+  }
+
+  private toComplianceLine(row: Record<string, unknown>): ComplianceMedicineLine {
+    return {
+      prescriptionId: textValue(row.prescription_id),
+      title: textValue(row.title),
+      doctorName: textValue(row.doctor_name) || null,
+      startDate: dateValue(row.start_date),
+      endDate: dateValue(row.end_date) || null,
+      medicineName: textValue(row.medicine_name),
+      dosage: textValue(row.dosage_per_time),
+      unit: textValue(row.unit),
+      reminderTime: textValue(row.reminder_time) || null,
+    };
   }
 
   private listPatientId(actor: ListLogsInput) {
@@ -332,4 +431,34 @@ export class MedicationLogsService {
     }
     return value.toLowerCase();
   }
+}
+
+function textValue(value: unknown) {
+  if (value == null) {
+    return '';
+  }
+  return String(value);
+}
+
+function instantValue(value: unknown) {
+  const instant = optionalInstant(value);
+  return instant ?? new Date(0);
+}
+
+function optionalInstant(value: unknown) {
+  if (value == null || value === '') {
+    return null;
+  }
+  const instant = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(instant.getTime()) ? null : instant;
+}
+
+function dateValue(value: unknown) {
+  if (value instanceof Date) {
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    return `${value.getUTCFullYear()}-${month}-${day}`;
+  }
+  const match = String(value ?? '').match(/^(\d{4}-\d{2}-\d{2})/);
+  return match?.[1] ?? '';
 }

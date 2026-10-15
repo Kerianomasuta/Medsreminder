@@ -176,6 +176,44 @@ export class PrescriptionsService {
     };
   }
 
+  async listActiveMedicineNames(patientId: string | undefined, actor?: PrescriptionActor) {
+    const id = this.patientOwnerId(actor) ?? this.requireObjectId(patientId, 'patientId');
+    const today = todayInVietnam();
+    const rows = await this.dataSource.query(
+      `SELECT i.name AS name, i.generic_name AS "genericName"
+       FROM medication.prescription_items i
+       INNER JOIN medication.prescriptions p ON p.id = i.prescription_id
+       WHERE p.patient_id = $1
+         AND p.is_active = true
+         AND p.start_date <= $2::date
+         AND (p.end_date IS NULL OR p.end_date >= $2::date)
+       ORDER BY i.created_at ASC`,
+      [id, today],
+    ) as Array<{ name?: string | null; genericName?: string | null; genericname?: string | null }>;
+    return rows.flatMap((row) => {
+      const name = row.name?.trim();
+      if (!name) {
+        return [];
+      }
+      const genericName = (row.genericName ?? row.genericname)?.trim() || null;
+      return [{ name, genericName }];
+    });
+  }
+
+  async itemBrief(id: string | undefined, actor?: PrescriptionActor) {
+    const item = await this.findItem(id);
+    const patientId = item.prescription?.patientId;
+    if (!patientId) {
+      throw ErrorHandling.NotFound('Prescription not found');
+    }
+    this.assertPatientOwns(patientId, actor);
+    return {
+      patientId,
+      name: item.name,
+      genericName: item.genericName,
+    };
+  }
+
   async getById(id: string, actor?: PrescriptionActor) {
     const prescription = await this.findPrescription(id);
     this.assertPatientOwns(prescription.patientId, actor);
@@ -428,7 +466,7 @@ export class PrescriptionsService {
     return prescription;
   }
 
-  private async findItem(id: string) {
+  private async findItem(id: string | undefined) {
     this.requireUuid(id, 'prescription item id');
     const item = await this.prescriptionItems.findOne({
       where: { id },
@@ -636,6 +674,10 @@ export class PrescriptionsService {
       isActive: rule.isActive,
     };
   }
+}
+
+function todayInVietnam() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 }
 
 function imageBytes(value: unknown) {
