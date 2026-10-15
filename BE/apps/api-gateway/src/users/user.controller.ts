@@ -14,6 +14,21 @@ export class UserController {
         private readonly userService: UserService,
     ) {}
 
+    @Get('profile')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Current user premium status' })
+    @ApiCookieAuth('accessToken')
+    async profile(@Req() req: Request) {
+        const { userId } = (req as Request & { user: { userId: string } }).user;
+        const premium = await lastValueFrom(this.userService.getPremium(userId));
+        const isPremium = premium?.isPremium === true;
+        return {
+            isPremium,
+            is_premium: isPremium,
+            premiumExpiresAt: premium?.premiumExpiresAt ?? null,
+        };
+    }
+
     @Get('patient-detail/:patientId')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Role(UserRole.ADMIN, UserRole.CARE_GIVER)

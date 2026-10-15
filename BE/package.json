@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
-    "build:ci": "nest build api-gateway && nest build user-service && nest build medication-service && nest build pharmacy-order-service",
+    "build:ci": "nest build api-gateway && nest build user-service && nest build medication-service && nest build pharmacy-order-service && nest build ai-service",
     "deploy": "nest deploy",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "start": "nest start",
@@ -34,6 +34,7 @@
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/swagger": "^12.0.2",
     "@nestjs/typeorm": "^12.0.2",
+    "@payos/node": "^2.0.5",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",

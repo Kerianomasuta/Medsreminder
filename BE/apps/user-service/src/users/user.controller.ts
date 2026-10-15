@@ -1,7 +1,6 @@
 import { Controller } from "@nestjs/common";
 import { UserService } from "./user.service.js";
 import { MessagePattern, Payload } from "@nestjs/microservices";
-import { ErrorHandling } from "@lib/error-handling";
 
 @Controller()
 export class UserController {
@@ -29,6 +28,11 @@ export class UserController {
                 invitationLink,
             }
         }
+    }
+
+    @MessagePattern({ cmd: "handle_get_premium" })
+    handleGetPremium(@Payload() data: { userId?: string }) {
+        return this.userService.getPremium(data?.userId ?? '');
     }
 
     @MessagePattern({ cmd: "handle_get_linked_informations" })
