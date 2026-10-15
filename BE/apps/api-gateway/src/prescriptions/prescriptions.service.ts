@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { toRpcHttpException } from '../rpc-http-exception.js';
@@ -33,7 +33,11 @@ export class PrescriptionsService {
     private readonly userClient: ClientProxy,
   ) {}
 
-  async scan(dto: ScanPrescriptionDto, user: AccessUser) {
+  async scan(dto: ScanPrescriptionDto, image: Buffer, mimeType: string, user: AccessUser) {
+    const normalizedType = imageContentType(image, mimeType);
+    if (!normalizedType) {
+      throw new BadRequestException('Ảnh đơn thuốc phải là JPEG, PNG hoặc WebP');
+    }
     if (user.role !== 'ADMIN') {
       const access = await this.sendTo<{ isPremium?: boolean }>(
         this.userClient,
@@ -49,22 +53,34 @@ export class PrescriptionsService {
     const draft = await this.sendTo<ScannedDraft>(
       this.aiClient,
       { cmd: 'scan_prescription' },
-      { imageUrl: dto.imagePrescriptionUrl },
+      { imageBase64: image.toString('base64'), mimeType: normalizedType },
       'AI service is unavailable',
     );
     const startDate = dto.startDate ?? draft.startDate ?? todayInVietnam();
-    const endDate = dto.endDate ?? draft.endDate ?? undefined;
-    return this.create({
+    const proposedEnd = dto.endDate ?? draft.endDate ?? undefined;
+    const endDate = dto.endDate == null && proposedEnd != null && proposedEnd < startDate
+      ? undefined
+      : proposedEnd;
+    return this.send({ cmd: 'create_prescription' }, {
       patientId: dto.patientId,
-      createdByCgId: dto.createdByCgId,
+      createdByCgId: dto.createdByCgId || user.userId,
       title: draft.title,
       doctorName: draft.doctorName ?? undefined,
       prescriptionCode: draft.prescriptionCode ?? undefined,
-      imagePrescriptionUrl: dto.imagePrescriptionUrl,
+      imageBase64: image.toString('base64'),
+      imageContentType: normalizedType,
       startDate,
       endDate,
       items: draft.items,
-    }, user);
+      ...this.actor(user),
+    });
+  }
+
+  photo(id: string, user: AccessUser) {
+    return this.send<{ contentType: string; imageBase64: string }>(
+      { cmd: 'get_prescription_photo' },
+      { id, ...this.actor(user) },
+    );
   }
 
   create(dto: CreatePrescriptionDto, user: AccessUser) {
@@ -111,6 +127,23 @@ export class PrescriptionsService {
       throw toRpcHttpException(error, unavailableMessage);
     }
   }
+}
+
+function imageContentType(image: Buffer, declared: string) {
+  const mime = declared.split(';')[0].trim().toLowerCase();
+  if (mime === 'image/jpg' || mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp') {
+    return mime === 'image/jpg' ? 'image/jpeg' : mime;
+  }
+  if (image.length >= 3 && image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (image.length >= 4 && image[0] === 0x89 && image[1] === 0x50 && image[2] === 0x4e && image[3] === 0x47) {
+    return 'image/png';
+  }
+  if (image.length >= 12 && image.toString('ascii', 0, 4) === 'RIFF' && image.toString('ascii', 8, 12) === 'WEBP') {
+    return 'image/webp';
+  }
+  return '';
 }
 
 function todayInVietnam() {
