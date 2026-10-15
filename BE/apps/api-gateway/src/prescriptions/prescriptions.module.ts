@@ -20,6 +20,28 @@ import { PrescriptionsService } from './prescriptions.service.js';
           },
         }),
       },
+      {
+        name: 'AI_SERVICE',
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: configService.get<string>('AI_SERVICE_HOST'),
+            port: configService.get<number>('AI_SERVICE_PORT'),
+          },
+        }),
+      },
+      {
+        name: 'USER_SERVICE',
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: configService.get<string>('USER_SERVICE_HOST'),
+            port: configService.get<number>('USER_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
   controllers: [PrescriptionsController],

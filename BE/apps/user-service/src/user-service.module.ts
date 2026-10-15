@@ -4,6 +4,7 @@ import { UserModule } from './users/user.module.js';
 import { RedisModule } from '../utils/redis.module.js'
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module.js';
+import { BillingModule } from './billing/billing.module.js';
 
 
 @Module({
@@ -36,6 +37,7 @@ import { AuthModule } from './auth/auth.module.js';
 
     UserModule,
     AuthModule,
+    BillingModule,
     RedisModule,
   ],
 })
