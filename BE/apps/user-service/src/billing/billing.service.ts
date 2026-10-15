@@ -79,14 +79,15 @@ export class BillingService {
   }
 
   async confirmPayos(body: unknown) {
-    if (!isPayosWebhook(body)) {
-      throw ErrorHandling.BadRequest('Invalid webhook');
+    const webhook = asPayosWebhook(body);
+    if (!webhook) {
+      return { success: true };
     }
     let data;
     try {
-      data = await this.payos().webhooks.verify(body);
+      data = await this.payos().webhooks.verify(webhook);
     } catch {
-      throw ErrorHandling.BadRequest('Invalid signature');
+      return { success: true };
     }
 
     const payment = await this.payments.findOne({ orderCode: data.orderCode }).exec();
@@ -96,7 +97,7 @@ export class BillingService {
     if (data.amount !== payment.amount) {
       return { success: true };
     }
-    const paid = body.success === true && data.code === '00';
+    const paid = webhook.success !== false && data.code === '00';
     if (!paid) {
       await this.payments.updateOne({ orderCode: data.orderCode, status: 'PENDING' }, { status: 'FAILED' }).exec();
       return { success: true };
@@ -262,16 +263,21 @@ export class BillingService {
   }
 }
 
-function isPayosWebhook(body: unknown): body is Webhook {
+function asPayosWebhook(body: unknown): Webhook | undefined {
   if (!body || typeof body !== 'object') {
-    return false;
+    return undefined;
   }
   const value = body as Partial<Webhook>;
-  return typeof value.signature === 'string'
-    && typeof value.code === 'string'
-    && typeof value.success === 'boolean'
-    && !!value.data
-    && typeof value.data === 'object';
+  if (typeof value.signature !== 'string' || !value.data || typeof value.data !== 'object') {
+    return undefined;
+  }
+  return {
+    code: typeof value.code === 'string' ? value.code : '00',
+    desc: typeof value.desc === 'string' ? value.desc : '',
+    success: value.success !== false,
+    data: value.data,
+    signature: value.signature,
+  };
 }
 
 function normalizeIp(ipAddr: string | undefined) {
