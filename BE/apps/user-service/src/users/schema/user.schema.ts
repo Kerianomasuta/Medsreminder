@@ -31,6 +31,9 @@ export class User {
 
     @Prop({ required: false })
     fcmToken?: string;
+
+    @Prop({ default: true })
+    isActive: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User)
