@@ -36,7 +36,7 @@ export class PrescriptionsController {
   @Role(...writers)
   @ApiOperation({
     summary: 'Create a prescription with its medicine lines and dose times',
-    description: 'Each line stores its own name, unit, and optional image. It does not reference the pharmacy catalog. Every line needs at least one reminder time. Omitted daysOfWeek means every day. A patient is stored as the owner from the access token. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+    description: 'Each line stores its own name, unit, and optional image. It does not reference the pharmacy catalog. Every line needs at least one reminder time. Omitted daysOfWeek means every day. A patient is stored as the owner from the access token. Premium accounts also receive an interaction check against the patient\'s other active medicines. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
   @ApiCreatedResponse({ type: PrescriptionResponseDto, description: 'The prescription, its lines, and their dose times.' })
   @ApiBadRequestResponse({ description: 'A required field is missing, a date or time is invalid, or a line has no schedule.' })
@@ -63,7 +63,7 @@ export class PrescriptionsController {
   })
   @ApiOperation({
     summary: 'Upload a prescription photo, read it with AI, and create it',
-    description: 'Premium accounts only. Accepts a JPEG, PNG, or WebP file up to 8 MB from a web upload, phone library, or camera. The model reads the photo, then the server stores the prescription, medicine lines, dose times, and the photo. A patient is stored as the owner from the access token. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+    description: 'Premium accounts only. Accepts a JPEG, PNG, or WebP file up to 8 MB from a web upload, phone library, or camera. The model reads the photo, then the server stores the prescription, medicine lines, dose times, and the photo. The response also includes an interaction check against the patient\'s other active medicines. A patient is stored as the owner from the access token. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
   @ApiCreatedResponse({ type: PrescriptionResponseDto, description: 'The prescription created from the photo.' })
   @ApiBadRequestResponse({ description: 'The photo is missing or not JPEG, PNG, or WebP, or the model could not read a medicine line.' })
@@ -146,7 +146,7 @@ export class PrescriptionsController {
   @Role(...writers)
   @ApiOperation({
     summary: 'Add one medicine line and its dose times to a prescription',
-    description: 'The line carries the medicine name, unit, dose, and home stock. It needs at least one reminder time. A patient can add a line only to their own prescription. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+    description: 'The line carries the medicine name, unit, dose, and home stock. It needs at least one reminder time. A patient can add a line only to their own prescription. Premium accounts also receive an interaction check against the patient\'s other active medicines. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
   @ApiParam({ name: 'id', format: 'uuid', description: 'Prescription id' })
   @ApiCreatedResponse({ type: PrescriptionItemResponseDto, description: 'The new medicine line and its dose times.' })
@@ -160,7 +160,7 @@ export class PrescriptionsController {
   @Role(...writers)
   @ApiOperation({
     summary: 'Update one medicine line',
-    description: 'Changes the name, unit, image, dose, home stock, reorder threshold, or instructions of a single line. Dose times stay on the schedule routes. A patient can update only a line on their own prescription. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+    description: 'Changes the name, unit, image, dose, home stock, reorder threshold, or instructions of a single line. Dose times stay on the schedule routes. A patient can update only a line on their own prescription. Changing the medicine name runs the premium interaction check. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
   @ApiParam({ name: 'id', format: 'uuid', description: 'Prescription item id' })
   @ApiOkResponse({ type: PrescriptionItemResponseDto, description: 'The medicine line after the update.' })

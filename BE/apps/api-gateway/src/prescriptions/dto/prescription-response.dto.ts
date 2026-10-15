@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export class DrugInteractionDto {
+  @ApiProperty({ example: true, description: 'False when the check was skipped or the model could not be reached.' })
+  checked: boolean;
+
+  @ApiProperty({ example: false })
+  hasWarning: boolean;
+
+  @ApiProperty({ example: 'Không thấy tương tác nguy hiểm giữa các thuốc này.' })
+  summary: string;
+}
+
 export class PrescriptionScheduleResponseDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
@@ -53,6 +64,9 @@ export class PrescriptionItemResponseDto {
 
   @ApiProperty({ type: [PrescriptionScheduleResponseDto] })
   schedules: PrescriptionScheduleResponseDto[];
+
+  @ApiPropertyOptional({ type: DrugInteractionDto })
+  interaction?: DrugInteractionDto;
 }
 
 export class PrescriptionResponseDto {
@@ -94,4 +108,7 @@ export class PrescriptionResponseDto {
 
   @ApiProperty({ type: [PrescriptionItemResponseDto] })
   items: PrescriptionItemResponseDto[];
+
+  @ApiPropertyOptional({ type: DrugInteractionDto })
+  interaction?: DrugInteractionDto;
 }

@@ -12,6 +12,11 @@ export class MedicationLogsController {
     return this.medicationLogsService.list(payload);
   }
 
+  @MessagePattern({ cmd: 'compliance_report' })
+  complianceReport(@Payload() payload: ListLogsInput & { patientName?: string }) {
+    return this.medicationLogsService.complianceReport(payload);
+  }
+
   @MessagePattern({ cmd: 'take_medication_log' })
   take(@Payload() payload: DoseActionInput & { id: string }) {
     const { id, ...action } = payload;
