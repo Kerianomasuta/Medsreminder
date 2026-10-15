@@ -35,7 +35,8 @@ class ReminderAlarmService : Service() {
         const val ACTION_SKIP = "SKIP_ALARM"
         const val ACTION_OPEN_SKIP_REASON = "OPEN_SKIP_REASON"
         const val ALARM_ROUNDS = 2
-        private const val ALARM_WINDOW_MS = 10 * 60 * 1000L
+        private const val ALARM_WINDOW_MS = 3 * 60 * 1000L
+        private const val RETRY_INTERVAL_MS = 5 * 60 * 1000L
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -51,7 +52,7 @@ class ReminderAlarmService : Service() {
     private var currentMedicationLogId: String = ""
     private var currentAlarmRound: Int = 1
 
-    // Mỗi đợt reo 10 phút. Hết đợt hai mà không có phản hồi thì ghi nhận MISSED.
+    // Mỗi đợt reo 3 phút. Nếu không phản hồi, 5 phút sau reo đợt 2 (tối đa 2 đợt). Hết đợt 2 thì ghi nhận MISSED.
     private val autoStopRunnable = Runnable {
         handleNoResponse()
     }
@@ -276,7 +277,8 @@ class ReminderAlarmService : Service() {
                 Log.e(TAG, "Failed to schedule snooze alarm", e)
             }
 
-        showSnoozedNotification(currentNotifId, currentMedicineName, minutes)
+        // Tạm ẩn thẻ thông báo hoãn chuông (mở lại nếu sau này cần dùng đến):
+        // showSnoozedNotification(currentNotifId, currentMedicineName, minutes)
 
         stopSelf()
     }
@@ -306,7 +308,7 @@ class ReminderAlarmService : Service() {
                 nextIntent,
                 flags
             )
-            val triggerAt = System.currentTimeMillis() + 1_000L
+            val triggerAt = System.currentTimeMillis() + RETRY_INTERVAL_MS
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager?.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -316,9 +318,10 @@ class ReminderAlarmService : Service() {
             } else {
                 alarmManager?.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
             }
+            // Tạm ẩn thẻ thông báo hoãn chuông (mở lại nếu sau này cần dùng đến):
+            // showSnoozedNotification(currentNotifId, currentMedicineName, (RETRY_INTERVAL_MS / 60000L).toInt())
         } else {
-            DoseActionQueue.enqueue(this, currentMedicationLogId, "missed")
-            notifyFlutterOfQueuedAction()
+            // Backend tự đánh dấu MISSED sau 11 phút và gửi FCM cho người chăm sóc.
             showMissedNotification(currentNotifId, currentMedicineName, currentTime)
         }
         stopSelf()
@@ -366,25 +369,12 @@ class ReminderAlarmService : Service() {
         try {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            val takenIntent = Intent(this, ReminderAlarmService::class.java).apply {
-                setAction(ACTION_TAKEN)
-                putExtra("notification_id", notifId)
-                putExtra("medication_log_id", currentMedicationLogId)
-            }
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-            val takenPendingIntent = PendingIntent.getService(this, notifId + 10, takenIntent, flags)
-
             val notification = NotificationCompat.Builder(this, SNOOZE_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
                 .setContentTitle("⏰ Đã hoãn: Nhắc lại sau $minutes phút")
                 .setContentText("$medicineName · Chuông sẽ tự động reo lại")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
-                .addAction(android.R.drawable.ic_input_add, "✓ Đã uống", takenPendingIntent)
                 .build()
 
             nm.notify(notifId, notification)
@@ -400,7 +390,7 @@ class ReminderAlarmService : Service() {
             val notification = NotificationCompat.Builder(this, SNOOZE_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_notify_error)
                 .setContentTitle("⚠️ Đã bỏ lỡ cữ thuốc: $medicineName")
-                .setContentText("Đã nhắc hai đợt, mỗi đợt 10 phút$timeText nhưng chưa có phản hồi.")
+                .setContentText("Đã nhắc hai đợt, mỗi đợt 3 phút$timeText nhưng chưa có phản hồi.")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build()

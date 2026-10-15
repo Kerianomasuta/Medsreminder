@@ -146,6 +146,7 @@ class _AppShellState extends State<AppShell>
               userName: widget.userName,
               userEmail: widget.userEmail,
               controller: widget.networkController,
+              onTabChange: (newTab) => setState(() => tab = newTab),
             ),
 
     AppRole.pharmacist => PharmacistHome(
@@ -188,7 +189,10 @@ class TopBar extends StatelessWidget {
               onTap: () => _showAccount(context),
               child: Glass(
                 radius: 18,
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

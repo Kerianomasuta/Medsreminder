@@ -55,3 +55,4 @@ jobs:
           docker build --build-arg APP_NAME=user-service -t test-user .
           docker build --build-arg APP_NAME=medication-service -t test-medication .
           docker build --build-arg APP_NAME=pharmacy-order-service -t test-pharmacy .
+          docker build --build-arg APP_NAME=ai-service -t test-ai .

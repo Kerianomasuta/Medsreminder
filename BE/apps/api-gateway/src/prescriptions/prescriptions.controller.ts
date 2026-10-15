@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards.js';
 import { Role, UserRole } from '../auth/guards/authorizedByRoles/roles.decorator.js';
 import { RolesGuard } from '../auth/guards/authorizedByRoles/roles.guard.js';
 import { CreatePrescriptionItemDto, CreatePrescriptionDto } from './dto/create-prescription.dto.js';
+import { ScanPrescriptionDto } from './dto/scan-prescription.dto.js';
 import { ListPrescriptionsQueryDto } from './dto/list-prescriptions.query.js';
 import { PrescriptionItemResponseDto, PrescriptionResponseDto } from './dto/prescription-response.dto.js';
 import { UpdatePrescriptionItemDto } from './dto/update-prescription-item.dto.js';
@@ -39,6 +40,19 @@ export class PrescriptionsController {
   @ApiBadRequestResponse({ description: 'A required field is missing, a date or time is invalid, or a line has no schedule.' })
   create(@Body() dto: CreatePrescriptionDto, @Req() request: Request) {
     return this.prescriptionsService.create(dto, this.user(request));
+  }
+
+  @Post('prescriptions/scan')
+  @Role(...writers)
+  @ApiOperation({
+    summary: 'Read a paper prescription with AI and create it',
+    description: 'Premium accounts only. Sends the public photo URL to Qwen2.5-VL, then stores the prescription, medicine lines, and dose times. A patient is stored as the owner from the access token. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+  })
+  @ApiCreatedResponse({ type: PrescriptionResponseDto, description: 'The prescription created from the photo.' })
+  @ApiBadRequestResponse({ description: 'The photo URL is invalid, or the model could not read a medicine line.' })
+  @ApiForbiddenResponse({ description: 'The account is not premium.' })
+  scan(@Body() dto: ScanPrescriptionDto, @Req() request: Request) {
+    return this.prescriptionsService.scan(dto, this.user(request));
   }
 
   @Get('prescriptions')

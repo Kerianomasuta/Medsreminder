@@ -1,11 +1,21 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { toRpcHttpException } from '../rpc-http-exception.js';
 import { CreatePrescriptionItemDto, CreatePrescriptionDto } from './dto/create-prescription.dto.js';
 import { ListPrescriptionsQueryDto } from './dto/list-prescriptions.query.js';
+import { ScanPrescriptionDto } from './dto/scan-prescription.dto.js';
 import { UpdatePrescriptionItemDto } from './dto/update-prescription-item.dto.js';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto.js';
+
+type ScannedDraft = {
+  title: string;
+  doctorName: string | null;
+  prescriptionCode: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  items: CreatePrescriptionDto['items'];
+};
 
 type AccessUser = {
   userId: string;
@@ -17,7 +27,45 @@ export class PrescriptionsService {
   constructor(
     @Inject('MEDICATION_SERVICE')
     private readonly medicationClient: ClientProxy,
+    @Inject('AI_SERVICE')
+    private readonly aiClient: ClientProxy,
+    @Inject('USER_SERVICE')
+    private readonly userClient: ClientProxy,
   ) {}
+
+  async scan(dto: ScanPrescriptionDto, user: AccessUser) {
+    if (user.role !== 'ADMIN') {
+      const access = await this.sendTo<{ isPremium?: boolean }>(
+        this.userClient,
+        { cmd: 'handle_get_premium' },
+        { userId: user.userId },
+        'User service is unavailable',
+      );
+      if (access?.isPremium !== true) {
+        throw new ForbiddenException('Scanning a paper prescription requires a premium account');
+      }
+    }
+
+    const draft = await this.sendTo<ScannedDraft>(
+      this.aiClient,
+      { cmd: 'scan_prescription' },
+      { imageUrl: dto.imagePrescriptionUrl },
+      'AI service is unavailable',
+    );
+    const startDate = dto.startDate ?? draft.startDate ?? todayInVietnam();
+    const endDate = dto.endDate ?? draft.endDate ?? undefined;
+    return this.create({
+      patientId: dto.patientId,
+      createdByCgId: dto.createdByCgId,
+      title: draft.title,
+      doctorName: draft.doctorName ?? undefined,
+      prescriptionCode: draft.prescriptionCode ?? undefined,
+      imagePrescriptionUrl: dto.imagePrescriptionUrl,
+      startDate,
+      endDate,
+      items: draft.items,
+    }, user);
+  }
 
   create(dto: CreatePrescriptionDto, user: AccessUser) {
     return this.send({ cmd: 'create_prescription' }, { ...dto, ...this.actor(user) });
@@ -47,15 +95,24 @@ export class PrescriptionsService {
     return { actorUserId: user.userId, actorRole: user.role };
   }
 
-  private async send<T>(pattern: { cmd: string }, payload: unknown): Promise<T> {
-    try {
-      return await lastValueFrom(this.medicationClient.send<T>(pattern, payload));
-    } catch (error) {
-      throw this.toHttpException(error);
-    }
+  private send<T>(pattern: { cmd: string }, payload: unknown) {
+    return this.sendTo<T>(this.medicationClient, pattern, payload, 'Medication service is unavailable');
   }
 
-  private toHttpException(error: unknown) {
-    return toRpcHttpException(error, 'Medication service is unavailable');
+  private async sendTo<T>(
+    client: ClientProxy,
+    pattern: { cmd: string },
+    payload: unknown,
+    unavailableMessage: string,
+  ): Promise<T> {
+    try {
+      return await lastValueFrom(client.send<T>(pattern, payload));
+    } catch (error) {
+      throw toRpcHttpException(error, unavailableMessage);
+    }
   }
+}
+
+function todayInVietnam() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 }
