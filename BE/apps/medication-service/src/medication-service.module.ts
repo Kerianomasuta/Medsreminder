@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AdminMedicationModule } from './admin/admin-medication.module.js';
 import { MedicationLogsModule } from './medication-logs/medication-logs.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
+import { AddPrescriptionImage1791600000000 } from './migrations/1791600000000-add-prescription-image.js';
 import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
 
 @Module({
@@ -19,9 +21,13 @@ import { ScheduleRulesModule } from './schedule-rules/schedule-rules.module.js';
         schema: config.get<string>('MEDICATION_DB_SCHEMA', 'medication'),
         autoLoadEntities: true,
         synchronize: false,
+        migrations: [AddPrescriptionImage1791600000000],
+        migrationsRun: true,
+        migrationsTableName: 'medication_migrations',
         ssl: { rejectUnauthorized: false },
       }),
     }),
+    AdminMedicationModule,
     PrescriptionsModule,
     ScheduleRulesModule,
     MedicationLogsModule,

@@ -6,6 +6,9 @@
     "paths": {
       "@lib/error-handling": [
         "./libs/error-handling/src/error-handling.ts"
+      ],
+      "@lib/admin-query": [
+        "./libs/admin-query/src/admin-query.ts"
       ]
     },
     "ignoreDeprecations": "6.0",
@@ -42,6 +45,9 @@
     },
     {
       "path": "./apps/pharmacy-order-service/tsconfig.app.json"
+    },
+    {
+      "path": "./apps/ai-service/tsconfig.app.json"
     }
   ]
 }

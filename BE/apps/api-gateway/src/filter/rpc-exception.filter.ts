@@ -6,6 +6,13 @@ export class RpcExceptionFilter implements ExceptionFilter {
     catch(exception: any, host: ArgumentsHost) {
         const response = host.switchToHttp().getResponse<Response>()
 
+        if (exception?.code === 'LIMIT_FILE_SIZE') {
+            return response.status(HttpStatus.BAD_REQUEST).json({
+                statusCode: HttpStatus.BAD_REQUEST,
+                message: 'Ảnh đơn thuốc tối đa 8 MB',
+            });
+        }
+
         if (exception instanceof HttpException) {
             const status = exception.getStatus()
             const body = exception.getResponse()
