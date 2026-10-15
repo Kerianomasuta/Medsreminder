@@ -21,6 +21,10 @@ export function nextOrderCode(now = Date.now(), digit = Math.floor(Math.random()
   return now * 10 + (Math.abs(digit) % 10);
 }
 
+export function monthPlanStillActive(latestPaidPlan: PremiumPlan | null, expiresAt: Date | null, now: Date) {
+  return latestPaidPlan === 'MONTH' && expiresAt !== null && expiresAt.getTime() > now.getTime();
+}
+
 export function extendPremium(currentExpiry: Date | null, plan: PremiumPlan, now: Date) {
   const base = currentExpiry && currentExpiry.getTime() > now.getTime()
     ? new Date(currentExpiry)

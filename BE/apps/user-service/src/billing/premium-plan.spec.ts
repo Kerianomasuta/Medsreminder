@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extendPremium, nextOrderCode, payosDescription, premiumPrice } from './premium-plan.js';
-import { paymentUrl, verifyVnpay } from './vnpay.js';
+import { extendPremium, monthPlanStillActive, nextOrderCode, payosDescription, premiumPrice } from './premium-plan.js';
 
 describe('premium pricing', () => {
   it('charges 49000 for a month and 20 percent off a year', () => {
@@ -22,25 +21,17 @@ describe('premium pricing', () => {
     expect(expiry.toISOString()).toBe('2026-11-15T03:00:00.000Z');
   });
 
+  it('blocks another plan while a paid month is still active', () => {
+    const now = new Date('2026-10-15T03:00:00.000Z');
+    expect(monthPlanStillActive('MONTH', new Date('2026-11-15T03:00:00.000Z'), now)).toBe(true);
+    expect(monthPlanStillActive('MONTH', new Date('2026-10-15T03:00:00.000Z'), now)).toBe(false);
+    expect(monthPlanStillActive('YEAR', new Date('2027-10-15T03:00:00.000Z'), now)).toBe(false);
+    expect(monthPlanStillActive(null, new Date('2026-11-15T03:00:00.000Z'), now)).toBe(false);
+  });
+
   it('extends a year from the current expiry when it is still active', () => {
     const now = new Date('2026-10-15T03:00:00.000Z');
     const expiry = extendPremium(new Date('2026-12-01T03:00:00.000Z'), 'YEAR', now);
     expect(expiry.toISOString()).toBe('2027-12-01T03:00:00.000Z');
-  });
-});
-
-describe('vnpay signature', () => {
-  it('accepts the query string that was signed and rejects a changed amount', () => {
-    const secret = 'TESTSECRET';
-    const params = {
-      vnp_Amount: '4900000',
-      vnp_TxnRef: 'PR1',
-      vnp_OrderInfo: 'MedsReminder Premium MONTH',
-    };
-    const url = new URL(paymentUrl('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html', params, secret));
-    const query = Object.fromEntries(url.searchParams.entries());
-
-    expect(verifyVnpay(query, secret)).toBe(true);
-    expect(verifyVnpay({ ...query, vnp_Amount: '100' }, secret)).toBe(false);
   });
 });

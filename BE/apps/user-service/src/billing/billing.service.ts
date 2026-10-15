@@ -5,11 +5,8 @@ import { Model } from 'mongoose';
 import { ErrorHandling } from '@lib/error-handling';
 import { User, UserDocument } from '../users/schema/user.schema.js';
 import { PayOS, type Webhook } from '@payos/node';
-import { extendPremium, isPremiumPlan, nextOrderCode, payosDescription, premiumPrice, type PremiumPlan } from './premium-plan.js';
+import { extendPremium, isPremiumPlan, monthPlanStillActive, nextOrderCode, payosDescription, premiumPrice, type PremiumPlan } from './premium-plan.js';
 import { PremiumPayment, PremiumPaymentDocument } from './schema/premium-payment.schema.js';
-import { paymentUrl, verifyVnpay } from './vnpay.js';
-
-const PAYMENT_MINUTES = 15;
 
 @Injectable()
 export class BillingService {
@@ -44,10 +41,11 @@ export class BillingService {
     if (!isPremiumPlan(input.plan)) {
       throw ErrorHandling.BadRequest('plan must be MONTH or YEAR');
     }
-    const user = await this.users.findById(input.userId).select('_id').exec();
+    const user = await this.users.findById(input.userId).select('_id premiumExpiresAt').exec();
     if (!user) {
       throw ErrorHandling.NotFound('User not found');
     }
+    await this.assertMonthPlanOpen(input.userId, user.premiumExpiresAt ?? null);
 
     const plan: PremiumPlan = input.plan;
     const amount = premiumPrice(plan);
@@ -118,86 +116,15 @@ export class BillingService {
     return { success: true };
   }
 
-  async checkout(input: { userId?: string; plan?: string; ipAddr?: string }) {
-    if (!input.userId) {
-      throw ErrorHandling.AuthenticationFailed('User is unauthenticated');
+  private async assertMonthPlanOpen(userId: string, expiresAt: Date | null) {
+    const latestPaid = await this.payments
+      .findOne({ userId, status: 'PAID' })
+      .sort({ paidAt: -1, createdAt: -1 })
+      .select('plan')
+      .exec();
+    if (monthPlanStillActive(latestPaid?.plan ?? null, expiresAt, new Date())) {
+      throw ErrorHandling.Conflict('Gói VIP 1 tháng vẫn còn hạn. Không thể mua thêm gói cho đến khi hết hạn.');
     }
-    if (!isPremiumPlan(input.plan)) {
-      throw ErrorHandling.BadRequest('plan must be MONTH or YEAR');
-    }
-    const user = await this.users.findById(input.userId).select('_id').exec();
-    if (!user) {
-      throw ErrorHandling.NotFound('User not found');
-    }
-
-    const plan: PremiumPlan = input.plan;
-    const amount = premiumPrice(plan);
-    const txnRef = `PR${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-    await this.payments.create({ userId: input.userId, plan, amount, txnRef, status: 'PENDING' });
-
-    const createdAt = new Date();
-    const params = {
-      vnp_Version: '2.1.0',
-      vnp_Command: 'pay',
-      vnp_TmnCode: this.requiredConfig('VNPAY_TMN_CODE'),
-      vnp_Amount: String(amount * 100),
-      vnp_CurrCode: 'VND',
-      vnp_TxnRef: txnRef,
-      vnp_OrderInfo: `MedsReminder Premium ${plan}`,
-      vnp_OrderType: 'other',
-      vnp_Locale: 'vn',
-      vnp_ReturnUrl: this.publicUrl('/api/v1/billing/vnpay/return'),
-      vnp_IpnUrl: this.publicUrl('/api/v1/billing/vnpay/ipn'),
-      vnp_IpAddr: normalizeIp(input.ipAddr),
-      vnp_CreateDate: formatVnpayDate(createdAt),
-      vnp_ExpireDate: formatVnpayDate(new Date(createdAt.getTime() + PAYMENT_MINUTES * 60_000)),
-    };
-
-    return {
-      txnRef,
-      plan,
-      amount,
-      paymentUrl: paymentUrl(this.paymentEndpoint(), params, this.requiredConfig('VNPAY_HASH_SECRET')),
-    };
-  }
-
-  async confirm(query: Record<string, string>) {
-    if (!verifyVnpay(query, this.requiredConfig('VNPAY_HASH_SECRET'))) {
-      return { RspCode: '97', Message: 'Invalid signature' };
-    }
-
-    const payment = await this.payments.findOne({ txnRef: query.vnp_TxnRef }).exec();
-    if (!payment) {
-      return { RspCode: '01', Message: 'Order not found' };
-    }
-    if (Number(query.vnp_Amount) !== payment.amount * 100) {
-      return { RspCode: '04', Message: 'Invalid amount' };
-    }
-    if (payment.status !== 'PENDING') {
-      return { RspCode: '02', Message: 'Order already confirmed' };
-    }
-
-    const paid = query.vnp_ResponseCode === '00' && query.vnp_TransactionStatus === '00';
-    if (!paid) {
-      await this.payments.updateOne({ txnRef: payment.txnRef, status: 'PENDING' }, { status: 'FAILED' }).exec();
-      return { RspCode: '00', Message: 'Confirm Success', paid: false };
-    }
-
-    const updated = await this.payments.findOneAndUpdate(
-      { txnRef: payment.txnRef, status: 'PENDING' },
-      {
-        status: 'PAID',
-        paidAt: new Date(),
-        providerTransactionNo: query.vnp_TransactionNo,
-      },
-      { new: true },
-    ).exec();
-    if (!updated) {
-      return { RspCode: '02', Message: 'Order already confirmed' };
-    }
-
-    const premiumExpiresAt = await this.activate(updated.userId, updated.plan);
-    return { RspCode: '00', Message: 'Confirm Success', paid: true, plan: updated.plan, premiumExpiresAt };
   }
 
   private async activate(userId: string, plan: PremiumPlan) {
@@ -234,26 +161,6 @@ export class BillingService {
     return this.configService.get<string>(name)?.trim() || fallback;
   }
 
-  private paymentEndpoint() {
-    return this.configService.get<string>('VNPAY_PAYMENT_URL')?.trim()
-      || 'https://pay.vnpayment.vn/paymentv2/vpcpay.html';
-  }
-
-  private publicUrl(path: string) {
-    const base = this.requiredConfig('PUBLIC_API_BASE_URL').replace(/\/$/, '');
-    let url: URL;
-    try {
-      url = new URL(base);
-    } catch {
-      throw ErrorHandling.BadRequest('PUBLIC_API_BASE_URL must be a public https address');
-    }
-    const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    if (url.protocol !== 'https:' || local) {
-      throw ErrorHandling.BadRequest('PUBLIC_API_BASE_URL must be a public https address');
-    }
-    return `${base}${path}`;
-  }
-
   private requiredConfig(name: string) {
     const value = this.configService.get<string>(name)?.trim();
     if (!value) {
@@ -278,27 +185,4 @@ function asPayosWebhook(body: unknown): Webhook | undefined {
     data: value.data,
     signature: value.signature,
   };
-}
-
-function normalizeIp(ipAddr: string | undefined) {
-  const ip = ipAddr?.split(',')[0]?.trim();
-  if (!ip || ip === '::1' || ip.startsWith('::ffff:')) {
-    return ip?.startsWith('::ffff:') ? ip.slice('::ffff:'.length) : '127.0.0.1';
-  }
-  return ip;
-}
-
-function formatVnpayDate(date: Date) {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date);
-  const read = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
-  return `${read('year')}${read('month')}${read('day')}${read('hour')}${read('minute')}${read('second')}`;
 }

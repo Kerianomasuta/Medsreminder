@@ -123,6 +123,8 @@ services:
       NODE_ENV: development
       AI_SERVICE_HOST: 0.0.0.0
       AI_SERVICE_PORT: 3532
+      AI_BASE_URL: https://openrouter.ai/api/v1
+      AI_MODEL: qwen/qwen2.5-vl-72b-instruct
     expose:
       - "3532"
     volumes:

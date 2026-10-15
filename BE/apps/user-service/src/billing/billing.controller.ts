@@ -11,16 +11,6 @@ export class BillingController {
     return this.billingService.plans();
   }
 
-  @MessagePattern({ cmd: 'handle_checkout_premium' })
-  checkout(@Payload() payload: { userId?: string; plan?: string; ipAddr?: string }) {
-    return this.billingService.checkout(payload ?? {});
-  }
-
-  @MessagePattern({ cmd: 'handle_confirm_vnpay' })
-  confirm(@Payload() payload: { query?: Record<string, string> }) {
-    return this.billingService.confirm(payload?.query ?? {});
-  }
-
   @MessagePattern({ cmd: 'handle_billing_config' })
   config() {
     return this.billingService.config();
