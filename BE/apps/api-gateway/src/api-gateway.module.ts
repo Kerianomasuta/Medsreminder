@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config'
+import { AdminModule } from './admin/admin.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { MedicationLogsModule } from './medication-logs/medication-logs.module.js';
@@ -16,6 +17,7 @@ import { UserModule } from './users/user.module.js';
       envFilePath: 'apps/api-gateway/.env'
     }),
 
+    AdminModule,
     AuthModule,
     BillingModule,
     MedicationLogsModule,

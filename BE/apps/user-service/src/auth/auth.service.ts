@@ -24,6 +24,9 @@ export class AuthService {
         if (!existingUser) {
             throw ErrorHandling.BadRequest('This user is not exist')
         }
+        if (existingUser.isActive === false) {
+            throw ErrorHandling.Forbidden('This account is locked')
+        }
 
         const isMatchedPassword = await bcrypt.compare(password, existingUser.password);
 
@@ -85,6 +88,9 @@ export class AuthService {
         const existingUser = await this.userService.findById(userId)
         if (!existingUser) {
             throw ErrorHandling.Unauthorized(`This user from refresh token is not exist in the system!`)
+        }
+        if (existingUser.isActive === false) {
+            throw ErrorHandling.Forbidden('This account is locked')
         }
 
         const { accessToken, refreshToken } = await this.tokenService.generateToken({
