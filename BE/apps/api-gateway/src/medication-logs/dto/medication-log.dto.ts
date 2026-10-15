@@ -1,6 +1,16 @@
 import { ApiHideProperty, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsISO8601, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
+export class ComplianceReportQueryDto {
+  @ApiPropertyOptional({
+    example: '507f1f77bcf86cd799439011',
+    description: 'Required for CARE_GIVER and ADMIN. PATIENT always uses the patient id from the access token.',
+  })
+  @IsOptional()
+  @Matches(/^[0-9a-fA-F]{24}$/)
+  patientId?: string;
+}
+
 export class ListMedicationLogsQueryDto {
   @ApiPropertyOptional({
     example: '507f1f77bcf86cd799439011',

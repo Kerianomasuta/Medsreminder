@@ -73,6 +73,16 @@ export class PrescriptionsController {
     return this.prescriptionsService.getPhoto(payload.id, this.actor(payload));
   }
 
+  @MessagePattern({ cmd: 'list_active_medicine_names' })
+  listActiveMedicineNames(@Payload() payload: ActorMessage & { patientId?: string }) {
+    return this.prescriptionsService.listActiveMedicineNames(payload?.patientId, this.actor(payload));
+  }
+
+  @MessagePattern({ cmd: 'get_prescription_item_brief' })
+  itemBrief(@Payload() payload: ActorMessage & { id?: string }) {
+    return this.prescriptionsService.itemBrief(payload?.id, this.actor(payload));
+  }
+
   @MessagePattern({ cmd: 'update_prescription' })
   update(@Payload() payload: UpdatePrescriptionMessage) {
     const { id, actorUserId, actorRole, ...changes } = payload;

@@ -10,6 +10,17 @@ import { MedicationLogsService } from './medication-logs.service.js';
     AuthModule,
     ClientsModule.registerAsync([
       {
+        name: 'USER_SERVICE',
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: configService.get<string>('USER_SERVICE_HOST'),
+            port: configService.get<number>('USER_SERVICE_PORT'),
+          },
+        }),
+      },
+      {
         name: 'MEDICATION_SERVICE',
         inject: [ConfigService],
         useFactory: (configService: ConfigService) => ({
