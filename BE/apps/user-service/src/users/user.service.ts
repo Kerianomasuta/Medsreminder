@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { User, UserDocument } from "./schema/user.schema.js";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import { ErrorHandling } from "@lib/error-handling";
 import { PatientCaregiverLink, PatientCaregiverLinkDocument } from "./schema/patient-caregiver-link.schema.js";
 import { Redis } from "ioredis";
@@ -242,5 +242,70 @@ export class UserService {
 
             throw ErrorHandling.ServiceUnavailableError(`Cannot get linked information at the moment.`);
         }
+    }
+
+    async saveFcmToken(input: { userId?: string; token?: string }) {
+        const userId = this.requireObjectId(input.userId, 'userId');
+        const token = input.token?.trim() ?? '';
+        if (!token || token.length > 4096) {
+            throw ErrorHandling.BadRequest('token must be a non-empty string of at most 4096 characters');
+        }
+        const user = await this.userModel.findByIdAndUpdate(userId, { fcmToken: token }, { new: true }).exec();
+        if (!user) {
+            throw ErrorHandling.NotFound('User not found');
+        }
+        return { status: 200 };
+    }
+
+    async clearFcmToken(input: { token?: string }) {
+        const token = input.token?.trim() ?? '';
+        if (!token) {
+            throw ErrorHandling.BadRequest('token is required');
+        }
+        await this.userModel.updateMany({ fcmToken: token }, { $unset: { fcmToken: 1 } }).exec();
+        return { status: 200 };
+    }
+
+    async listPatientCaregivers(input: { patientId?: string }) {
+        const patientId = this.requireObjectId(input.patientId, 'patientId');
+        const patient = await this.userModel.findById(patientId).select('fullName').exec();
+        if (!patient) {
+            throw ErrorHandling.NotFound('Patient not found');
+        }
+        const links = await this.linkModel.find({
+            patient: patientId,
+            status: 'ACTIVE',
+        }).populate('caregiver', 'fullName fcmToken role').exec();
+
+        const caregivers = links.flatMap((link) => {
+            const caregiver = link.caregiver;
+            if (!caregiver || caregiver instanceof Types.ObjectId) {
+                return [];
+            }
+            const record = caregiver as UserDocument;
+            if (record.role !== 'CARE_GIVER' || !record.fcmToken) {
+                return [];
+            }
+            return [{
+                userId: String(record._id),
+                fullName: record.fullName,
+                fcmToken: record.fcmToken,
+            }];
+        });
+
+        return {
+            status: 200,
+            data: {
+                patientName: patient.fullName,
+                caregivers,
+            },
+        };
+    }
+
+    private requireObjectId(value: string | undefined, label: string) {
+        if (!value || !/^[0-9a-f]{24}$/i.test(value)) {
+            throw ErrorHandling.BadRequest(`${label} must be an ObjectId`);
+        }
+        return value;
     }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Req, UseGuards } from "@nestjs/common";
 import { UserService } from "./user.service.js";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guards.js";
 import { Role, UserRole } from "../auth/guards/authorizedByRoles/roles.decorator.js";
@@ -6,6 +6,7 @@ import { lastValueFrom } from "rxjs";
 import { ApiCookieAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 import { RolesGuard } from "../auth/guards/authorizedByRoles/roles.guard.js";
+import { SaveFcmTokenDto } from "./dto/save-fcm-token.dto.js";
 
 @Controller('api/v1/users')
 @ApiTags('Users')
@@ -27,6 +28,23 @@ export class UserController {
             is_premium: isPremium,
             premiumExpiresAt: premium?.premiumExpiresAt ?? null,
         };
+    }
+
+    @Put('me/fcm-token')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Save the Firebase token for the signed-in device' })
+    @ApiCookieAuth('accessToken')
+    @ApiResponse({ status: 200, description: 'Device token saved.' })
+    @ApiResponse({ status: 400, description: 'Token is missing or too long.' })
+    @ApiResponse({ status: 401, description: 'Access token is missing or invalid.' })
+    async saveFcmToken(
+        @Body() dto: SaveFcmTokenDto,
+        @Req() req: Request,
+    ) {
+        const { userId } = (req as Request & { user: { userId: string } }).user;
+        await lastValueFrom(this.userService.saveFcmToken(userId, dto.token));
+        return { status: 'success' };
     }
 
     @Get('patient-detail/:patientId')

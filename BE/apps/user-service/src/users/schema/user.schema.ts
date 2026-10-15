@@ -28,6 +28,9 @@ export class User {
 
     @Prop()
     premiumExpiresAt?: Date;
+
+    @Prop({ required: false })
+    fcmToken?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User)

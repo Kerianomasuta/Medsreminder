@@ -29,4 +29,8 @@ export class UserService {
             { userId },
         )
     }
+
+    saveFcmToken(userId: string, token: string) {
+        return this.userClient.send({ cmd: 'save_fcm_token' }, { userId, token })
+    }
 }
