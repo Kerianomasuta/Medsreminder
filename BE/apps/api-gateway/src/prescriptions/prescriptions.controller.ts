@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBadRequestResponse, ApiBody, ApiConsumes, ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import type { Response } from 'express';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards.js';
 import { Role, UserRole } from '../auth/guards/authorizedByRoles/roles.decorator.js';
@@ -44,15 +46,37 @@ export class PrescriptionsController {
 
   @Post('prescriptions/scan')
   @Role(...writers)
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 8 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['image', 'patientId'],
+      properties: {
+        image: { type: 'string', format: 'binary', description: 'JPEG, PNG, or WebP photo from a file picker or camera' },
+        patientId: { type: 'string' },
+        createdByCgId: { type: 'string' },
+        startDate: { type: 'string', example: '2026-10-15' },
+        endDate: { type: 'string', example: '2026-11-15' },
+      },
+    },
+  })
   @ApiOperation({
-    summary: 'Read a paper prescription with AI and create it',
-    description: 'Premium accounts only. Sends the public photo URL to Qwen2.5-VL, then stores the prescription, medicine lines, and dose times. A patient is stored as the owner from the access token. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+    summary: 'Upload a prescription photo, read it with AI, and create it',
+    description: 'Premium accounts only. Accepts a JPEG, PNG, or WebP file up to 8 MB from a web upload, phone library, or camera. The model reads the photo, then the server stores the prescription, medicine lines, dose times, and the photo. A patient is stored as the owner from the access token. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
   @ApiCreatedResponse({ type: PrescriptionResponseDto, description: 'The prescription created from the photo.' })
-  @ApiBadRequestResponse({ description: 'The photo URL is invalid, or the model could not read a medicine line.' })
+  @ApiBadRequestResponse({ description: 'The photo is missing or not JPEG, PNG, or WebP, or the model could not read a medicine line.' })
   @ApiForbiddenResponse({ description: 'The account is not premium.' })
-  scan(@Body() dto: ScanPrescriptionDto, @Req() request: Request) {
-    return this.prescriptionsService.scan(dto, this.user(request));
+  scan(
+    @UploadedFile() file: { buffer?: Buffer; mimetype?: string; size?: number } | undefined,
+    @Body() dto: ScanPrescriptionDto,
+    @Req() request: Request,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Hãy chọn ảnh đơn thuốc');
+    }
+    return this.prescriptionsService.scan(dto, file.buffer, file.mimetype ?? '', this.user(request));
   }
 
   @Get('prescriptions')
@@ -79,6 +103,29 @@ export class PrescriptionsController {
   @ApiNotFoundResponse({ description: 'Prescription not found.' })
   getById(@Param('id', ParseUUIDPipe) id: string, @Req() request: Request) {
     return this.prescriptionsService.getById(id, this.user(request));
+  }
+
+  @Get('prescriptions/:id/photo')
+  @Role(...readers)
+  @ApiOperation({ summary: 'Download the prescription photo stored from a scan' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ description: 'The stored JPEG, PNG, or WebP bytes.' })
+  @ApiNotFoundResponse({ description: 'Prescription or photo not found.' })
+  async photo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const photo = await this.prescriptionsService.photo(id, this.user(request));
+    const contentType = photo.contentType === 'image/jpeg'
+      || photo.contentType === 'image/png'
+      || photo.contentType === 'image/webp'
+      ? photo.contentType
+      : 'application/octet-stream';
+    response.setHeader('Content-Type', contentType);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cache-Control', 'private, no-store');
+    return new StreamableFile(Buffer.from(photo.imageBase64, 'base64'));
   }
 
   @Patch('prescriptions/:id')

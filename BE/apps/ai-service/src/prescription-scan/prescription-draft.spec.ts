@@ -51,6 +51,19 @@ describe('parsePrescriptionDraft', () => {
     });
   });
 
+  it('drops a calendar date the model invented', () => {
+    const draft = parsePrescriptionDraft(`{
+      "title": "Đơn",
+      "startDate": "2026-02-31",
+      "endDate": "not-a-date",
+      "items": [{ "name": "Amlodipine", "dosagePerTime": 1, "schedules": [{ "reminderTime": "08:00" }] }]
+    }`);
+
+    expect(draft.startDate).toBeNull();
+    expect(draft.endDate).toBeNull();
+    expect(draft.items[0]?.schedules[0]?.reminderTime).toBe('08:00');
+  });
+
   it('rejects a reply that has no medicine line', () => {
     expect(() => parsePrescriptionDraft('{"title":"Trống","items":[]}')).toThrow(
       'No medicine line could be read from the prescription photo',

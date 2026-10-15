@@ -47,6 +47,8 @@ export type CreatePrescriptionInput = {
   doctorName?: string | null;
   prescriptionCode?: string | null;
   imagePrescriptionUrl?: string | null;
+  imageBase64?: string;
+  imageContentType?: string;
   startDate?: string;
   endDate?: string | null;
   items?: PrescriptionItemInput[];
@@ -121,6 +123,21 @@ export class PrescriptionsService {
           isActive: true,
         }),
       );
+      if (payload.imageBase64) {
+        const imagePrescriptionUrl = `/api/v1/prescriptions/${saved.id}/photo`;
+        await manager.query(
+          `UPDATE medication.prescriptions
+           SET image_data = $1, image_content_type = $2, image_prescription_url = $3
+           WHERE id = $4`,
+          [
+            Buffer.from(payload.imageBase64, 'base64'),
+            (payload.imageContentType ?? 'image/jpeg').slice(0, 100),
+            imagePrescriptionUrl,
+            saved.id,
+          ],
+        );
+        saved.imagePrescriptionUrl = imagePrescriptionUrl;
+      }
 
       const savedItems = [];
       for (const item of items) {
@@ -140,6 +157,23 @@ export class PrescriptionsService {
     });
 
     return rows.map((row) => this.toPrescriptionFromEntity(row));
+  }
+
+  async getPhoto(id: string, actor?: PrescriptionActor) {
+    const prescription = await this.findPrescription(id);
+    this.assertPatientOwns(prescription.patientId, actor);
+    const rows = await this.dataSource.query(
+      `SELECT image_data, image_content_type FROM medication.prescriptions WHERE id = $1`,
+      [id],
+    ) as Array<{ image_data?: Buffer | null; image_content_type?: string | null }>;
+    const bytes = imageBytes(rows[0]?.image_data);
+    if (!bytes?.length) {
+      throw ErrorHandling.NotFound('Prescription photo not found');
+    }
+    return {
+      contentType: safeImageType(rows[0]?.image_content_type),
+      imageBase64: bytes.toString('base64'),
+    };
   }
 
   async getById(id: string, actor?: PrescriptionActor) {
@@ -602,4 +636,29 @@ export class PrescriptionsService {
       isActive: rule.isActive,
     };
   }
+}
+
+function imageBytes(value: unknown) {
+  if (Buffer.isBuffer(value)) {
+    return value;
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value);
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const hex = value.startsWith('\\x') ? value.slice(2) : '';
+  if (hex.length > 0 && hex.length % 2 === 0 && /^[0-9a-f]+$/i.test(hex)) {
+    return Buffer.from(hex, 'hex');
+  }
+  return null;
+}
+
+function safeImageType(value: string | null | undefined) {
+  const mime = (value ?? '').split(';')[0].trim().toLowerCase();
+  if (mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp') {
+    return mime;
+  }
+  return 'application/octet-stream';
 }

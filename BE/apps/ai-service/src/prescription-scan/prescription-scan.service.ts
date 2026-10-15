@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { ErrorHandling } from '@lib/error-handling';
 import { parsePrescriptionDraft } from './prescription-draft.js';
 
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 const PROMPT = `You read a photo of a Vietnamese paper prescription.
 Reply with one JSON object and no other text.
 Use this shape:
@@ -20,12 +22,13 @@ Rules:
 export class PrescriptionScanService {
   constructor(private readonly configService: ConfigService) {}
 
-  async scan(imageUrl: string | undefined) {
-    const url = imageUrl?.trim() ?? '';
-    if (!/^https?:\/\//i.test(url)) {
-      throw ErrorHandling.BadRequest('imagePrescriptionUrl must be an http or https URL');
+  async scan(input: { imageBase64?: string; mimeType?: string } | undefined) {
+    const mimeType = input?.mimeType?.trim().toLowerCase() ?? '';
+    const imageBase64 = input?.imageBase64?.trim() ?? '';
+    if (!IMAGE_TYPES.has(mimeType) || imageBase64.length === 0) {
+      throw ErrorHandling.BadRequest('Ảnh đơn thuốc phải là JPEG, PNG hoặc WebP');
     }
-    const content = await this.complete(url);
+    const content = await this.complete(`data:${mimeType};base64,${imageBase64}`);
     try {
       return parsePrescriptionDraft(content);
     } catch (error) {
