@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AdminPharmacyModule } from './admin/admin-pharmacy.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PharmaciesModule } from './pharmacies/pharmacies.module.js';
 import { AddPharmacyGeohash1791510000000 } from './migrations/1791510000000-add-pharmacy-geohash.js';
@@ -29,6 +30,7 @@ import { RemovePharmacyActive1791520000000 } from './migrations/1791520000000-re
         ssl: { rejectUnauthorized: false },
       }),
     }),
+    AdminPharmacyModule,
     PharmaciesModule,
     OrdersModule,
   ],
