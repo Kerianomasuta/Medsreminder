@@ -14,14 +14,6 @@ export class BillingService {
     return this.send({ cmd: 'handle_list_premium_plans' }, {});
   }
 
-  checkout(userId: string, plan: 'MONTH' | 'YEAR', ipAddr: string) {
-    return this.send({ cmd: 'handle_checkout_premium' }, { userId, plan, ipAddr });
-  }
-
-  confirm(query: Record<string, string>) {
-    return this.send<{ RspCode: string; Message: string }>({ cmd: 'handle_confirm_vnpay' }, { query });
-  }
-
   config() {
     return this.send({ cmd: 'handle_billing_config' }, {});
   }

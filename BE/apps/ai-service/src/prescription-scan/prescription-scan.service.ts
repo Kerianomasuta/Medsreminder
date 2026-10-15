@@ -37,7 +37,7 @@ export class PrescriptionScanService {
   private async complete(imageUrl: string) {
     const apiKey = this.configService.get<string>('AI_API_KEY')?.trim();
     const baseUrl = (this.configService.get<string>('AI_BASE_URL') ?? 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-    const model = this.configService.get<string>('AI_MODEL') ?? 'qwen/qwen2.5-vl-72b-instruct:free';
+    const model = this.configService.get<string>('AI_MODEL') ?? 'qwen/qwen2.5-vl-72b-instruct';
     if (!apiKey) {
       throw ErrorHandling.BadRequest('AI_API_KEY is not set');
     }
