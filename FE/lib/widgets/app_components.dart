@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'glass.dart';
 import 'pressable.dart';
 
@@ -135,17 +136,17 @@ class GlassBottomNav extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 gradient: active
                     ? const LinearGradient(
-                  colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
-                )
+                        colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
+                      )
                     : null,
                 boxShadow: active
                     ? [
-                  BoxShadow(
-                    color: const Color(0xFF586FF3).withValues(alpha: .22),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
+                        BoxShadow(
+                          color: const Color(0xFF586FF3).withValues(alpha: .22),
+                          blurRadius: 12,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
                     : null,
               ),
               child: Column(
@@ -273,8 +274,8 @@ class DoseCard extends StatelessWidget {
                     : const Color(0xFF299B73),
                 elevation: 9,
                 shadowColor:
-                (missed ? const Color(0xFFD65E4A) : const Color(0xFF299B73))
-                    .withValues(alpha: .42),
+                    (missed ? const Color(0xFFD65E4A) : const Color(0xFF299B73))
+                        .withValues(alpha: .42),
                 shape: const StadiumBorder(),
               ),
             ),
@@ -360,7 +361,13 @@ class AlertCard extends StatelessWidget {
 }
 
 class MedicationRow extends StatelessWidget {
-  const MedicationRow(this.time, this.name, this.status, this.color, {super.key});
+  const MedicationRow(
+    this.time,
+    this.name,
+    this.status,
+    this.color, {
+    super.key,
+  });
   final String time, name, status;
   final Color color;
 
@@ -426,7 +433,9 @@ class DayStrip extends StatelessWidget {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: onDaySelected != null ? () => onDaySelected!(day) : null,
+                  onTap: onDaySelected != null
+                      ? () => onDaySelected!(day)
+                      : null,
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
@@ -440,7 +449,8 @@ class DayStrip extends StatelessWidget {
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: const Color(0xFF5368F4).withValues(alpha: .32),
+                                color: const Color(0xFF5368F4)
+                                    .withValues(alpha: .32),
                                 blurRadius: 8,
                                 offset: const Offset(0, 3),
                               ),
@@ -453,8 +463,12 @@ class DayStrip extends StatelessWidget {
                       style: TextStyle(
                         color: isSelected
                             ? Colors.white
-                            : (isToday ? const Color(0xFF5167F2) : const Color(0xFF566080)),
-                        fontWeight: isSelected || isToday ? FontWeight.w800 : FontWeight.w700,
+                            : (isToday
+                                  ? const Color(0xFF5167F2)
+                                  : const Color(0xFF566080)),
+                        fontWeight: isSelected || isToday
+                            ? FontWeight.w800
+                            : FontWeight.w700,
                         fontSize: 14,
                       ),
                     ),
@@ -471,13 +485,13 @@ class DayStrip extends StatelessWidget {
 
 class TimelineItem extends StatelessWidget {
   const TimelineItem(
-      this.time,
-      this.title,
-      this.detail,
-      this.status,
-      this.color, {
-        super.key,
-      });
+    this.time,
+    this.title,
+    this.detail,
+    this.status,
+    this.color, {
+    super.key,
+  });
   final String time, title, detail, status;
   final Color color;
 
@@ -672,7 +686,14 @@ class PrescriptionCard extends StatelessWidget {
 }
 
 class InventoryItem extends StatelessWidget {
-  const InventoryItem(this.name, this.qty, this.status, this.value, this.color, {super.key});
+  const InventoryItem(
+    this.name,
+    this.qty,
+    this.status,
+    this.value,
+    this.color, {
+    super.key,
+  });
   final String name, qty, status;
   final double value;
   final Color color;

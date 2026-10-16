@@ -158,23 +158,25 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
           'Kết nối bệnh nhân đầu tiên',
           'Nhập mã mời được bệnh nhân chia sẻ để bắt đầu chăm sóc',
         ),
+        CaregiverProfileCard(
+          userName: widget.userName,
+          userEmail: widget.userEmail,
+        ),
+        const SizedBox(height: 14),
         Glass(
           padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                widget.userName,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+              const Text(
+                'Nhập mã kết nối',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E293B),
                 ),
               ),
-              Text(
-                widget.userEmail,
-                style: const TextStyle(color: Color(0xFF687195)),
-              ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               TextField(
                 controller: _controller,
                 decoration: const InputDecoration(
@@ -196,6 +198,8 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
             ],
           ),
         ),
+        const SizedBox(height: 18),
+        const CaregiverVipSection(),
       ],
     ),
   );
@@ -533,24 +537,13 @@ class _ProfilePageState extends State<_ProfilePage> {
             'Hồ sơ người chăm sóc',
             'Tài khoản và các kết nối bệnh nhân',
           ),
-          Glass(
-            padding: const EdgeInsets.all(18),
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(
-                radius: 28,
-                backgroundColor: Color(0xFFDCE2FE),
-                child: Icon(Icons.person_rounded, color: Color(0xFF5066F3)),
-              ),
-              title: Text(
-                widget.userName,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-              subtitle: Text(widget.userEmail),
-              trailing: const StatusChip('Hoạt động', Color(0xFF249D76)),
-            ),
+          CaregiverProfileCard(
+            userName: widget.userName,
+            userEmail: widget.userEmail,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+          const CaregiverVipSection(),
+          const SizedBox(height: 10),
           const Text(
             'Kết nối thêm bệnh nhân',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),

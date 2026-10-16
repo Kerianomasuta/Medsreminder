@@ -73,9 +73,11 @@ class _AppShellState extends State<AppShell>
       NavItem(Icons.history_rounded, 'Lịch sử'),
     ],
     AppRole.admin => const [
-      NavItem(Icons.insights_rounded, 'Hệ thống'),
+      NavItem(Icons.insights_rounded, 'Tổng quan'),
       NavItem(Icons.people_alt_rounded, 'Người dùng'),
-      NavItem(Icons.security_rounded, 'Cảnh báo'),
+      NavItem(Icons.medication_rounded, 'Đơn thuốc & Giám sát'),
+      NavItem(Icons.local_pharmacy_rounded, 'Nhà thuốc & Đơn hàng'),
+      NavItem(Icons.payments_rounded, 'Giao dịch VIP & Doanh thu'),
     ],
   };
 
@@ -155,7 +157,11 @@ class _AppShellState extends State<AppShell>
       controller: widget.pharmacistController!,
     ),
 
-    AppRole.admin => AdminHome(key: ValueKey('${widget.role}$tab')),
+    AppRole.admin => AdminHome(
+      key: ValueKey('${widget.role}$tab'),
+      tab: tab,
+      adminName: widget.userName,
+    ),
   };
 }
 
