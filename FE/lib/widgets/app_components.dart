@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/billing_api.dart';
 import 'glass.dart';
 import 'pressable.dart';
 
@@ -123,53 +124,59 @@ class GlassBottomNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(items.length, (i) {
           final active = i == currentIndex;
-          return InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => onTap(i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              padding: EdgeInsets.symmetric(
-                horizontal: items.length > 3 ? 9 : 14,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: active
-                    ? const LinearGradient(
-                        colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
-                      )
-                    : null,
-                boxShadow: active
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFF586FF3).withValues(alpha: .22),
-                          blurRadius: 12,
-                          offset: const Offset(0, 5),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    items[i].icon,
-                    color: active
-                        ? const Color(0xFF5066F3)
-                        : const Color(0xFF7B839E),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    items[i].label,
-                    style: TextStyle(
+          return Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => onTap(i),
+              child: Container(
+                alignment: Alignment.center,
+                padding: EdgeInsets.symmetric(
+                  horizontal: items.length > 3 ? 2 : 14,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: active
+                      ? const LinearGradient(
+                          colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
+                        )
+                      : null,
+                  boxShadow: active
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF586FF3)
+                                .withValues(alpha: .22),
+                            blurRadius: 12,
+                            offset: const Offset(0, 5),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      items[i].icon,
+                      size: items.length > 3 ? 20 : 24,
                       color: active
-                          ? const Color(0xFF4459D9)
-                          : const Color(0xFF747D98),
-                      fontSize: 11,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+                          ? const Color(0xFF5066F3)
+                          : const Color(0xFF7B839E),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 3),
+                    Text(
+                      items[i].label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: active
+                            ? const Color(0xFF4459D9)
+                            : const Color(0xFF747D98),
+                        fontSize: items.length > 3 ? 10 : 11,
+                        fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -194,6 +201,86 @@ class StatusChip extends StatelessWidget {
     child: Text(
       text,
       style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w800),
+    ),
+  );
+}
+
+Future<bool> requirePremiumAccess(BuildContext context) async {
+  try {
+    final profile = await BillingApi().getUserVipProfile();
+    if (profile.isPremium) return true;
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không thể kiểm tra gói Premium: $error'),
+          backgroundColor: const Color(0xFFD65B49),
+        ),
+      );
+    }
+    return false;
+  }
+
+  if (!context.mounted) return false;
+  await showPremiumRequiredDialog(context);
+  return false;
+}
+
+Future<bool> isPremiumAccount() async {
+  try {
+    return (await BillingApi().getUserVipProfile()).isPremium;
+  } catch (error) {
+    debugPrint('Could not check Premium status: $error');
+    return false;
+  }
+}
+
+Future<void> showPremiumRequiredDialog(BuildContext context) async {
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.info_outline_rounded,
+              color: Color(0xFF3B82F6),
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Yêu cầu tài khoản Premium',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: const Text(
+        'Tính năng này chỉ mở cho tài khoản Premium. Vui lòng đăng ký Premium để tiếp tục.',
+        style: TextStyle(
+          fontSize: 13.5,
+          color: Color(0xFF334155),
+          height: 1.35,
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Tôi đã hiểu'),
+        ),
+      ],
     ),
   );
 }
@@ -731,6 +818,148 @@ class InventoryItem extends StatelessWidget {
           ),
         ],
       ),
+    ),
+  );
+}
+
+/// Helper function to show a drug interaction warning dialog
+Future<void> showDrugInteractionDialog({
+  required BuildContext context,
+  required String summary,
+  String title = 'Cảnh báo tương tác thuốc!',
+  bool isWarning = true,
+}) async {
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isWarning
+                  ? const Color(0xFFFEF2F2)
+                  : const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isWarning
+                  ? Icons.warning_amber_rounded
+                  : Icons.info_outline_rounded,
+              color: isWarning
+                  ? const Color(0xFFEF4444)
+                  : const Color(0xFF3B82F6),
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: isWarning
+                    ? const Color(0xFFB91C1C)
+                    : const Color(0xFF1E3A8A),
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isWarning
+                ? 'Hệ thống AI đã phát hiện nguy cơ tương tác thuốc giữa các loại thuốc trong đơn:'
+                : 'Thông tin kiểm tra tương tác thuốc từ hệ thống AI:',
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: Color(0xFF334155),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isWarning
+                  ? const Color(0xFFFFF1F2)
+                  : const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isWarning
+                    ? const Color(0xFFFECDD3)
+                    : const Color(0xFFBBF7D0),
+                width: 1.2,
+              ),
+            ),
+            child: Text(
+              summary.trim().isEmpty
+                  ? (isWarning
+                        ? 'Có tương tác nghiêm trọng được phát hiện giữa các thuốc này.'
+                        : 'Không phát hiện tương tác nguy hiểm.')
+                  : summary,
+              style: TextStyle(
+                fontSize: 13.5,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+                color: isWarning
+                    ? const Color(0xFF9F1239)
+                    : const Color(0xFF166534),
+              ),
+            ),
+          ),
+          if (isWarning) ...[
+            const SizedBox(height: 12),
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.health_and_safety_rounded,
+                  size: 16,
+                  color: Color(0xFF64748B),
+                ),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Vui lòng tham khảo ý kiến bác sĩ hoặc dược sĩ trước khi cho người bệnh dùng đồng thời các loại thuốc này.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF64748B),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: isWarning
+                ? const Color(0xFFE11D48)
+                : const Color(0xFF2563EB),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          ),
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text(
+            'Tôi đã hiểu',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
     ),
   );
 }

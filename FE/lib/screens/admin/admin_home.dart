@@ -1238,44 +1238,49 @@ class _AdminBottomNavBar extends StatelessWidget {
           children: List.generate(_items.length, (i) {
             final active = i == currentIndex;
             final item = _items[i];
-            return Pressable(
-              onTap: () => onTap(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: active
-                      ? const LinearGradient(
-                          colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
-                        )
-                      : null,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      item.icon,
-                      size: 20,
-                      color: active
-                          ? const Color(0xFF586FF3)
-                          : const Color(0xFF6B7280),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+            return Expanded(
+              child: Pressable(
+                onTap: () => onTap(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 6,
+                  ),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: active
+                        ? const LinearGradient(
+                            colors: [Color(0xFFEAF0FF), Color(0xFFC9D3FF)],
+                          )
+                        : null,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        item.icon,
+                        size: 20,
                         color: active
-                            ? const Color(0xFF1E284A)
+                            ? const Color(0xFF586FF3)
                             : const Color(0xFF6B7280),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 2),
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+                          color: active
+                              ? const Color(0xFF1E284A)
+                              : const Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
