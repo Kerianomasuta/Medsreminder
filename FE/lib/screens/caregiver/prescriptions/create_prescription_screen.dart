@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/prescription.dart';
 import '../../../services/prescription_service.dart';
+import '../../../widgets/app_components.dart';
 import '../../../widgets/glass.dart';
 import '../../../widgets/medicine_image_field.dart';
 
@@ -144,15 +145,29 @@ class _CreatePrescriptionScreenState extends State<CreatePrescriptionScreen> {
         items: _items.map((d) => d.toPrescriptionItem()).toList(),
       );
 
-      await PrescriptionService.instance.create(prescription);
+      final created = await PrescriptionService.instance.create(prescription);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã tạo đơn thuốc thành công!'),
-            backgroundColor: Color(0xFF249D76),
-          ),
-        );
-        Navigator.of(context).pop(true);
+        final interaction = created.interaction;
+        if (interaction != null &&
+            await isPremiumAccount() &&
+            (interaction.hasWarning || interaction.summary.isNotEmpty) &&
+            mounted) {
+          await showDrugInteractionDialog(
+            context: context,
+            summary: interaction.summary,
+            isWarning: interaction.hasWarning,
+          );
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã tạo đơn thuốc thành công!'),
+              backgroundColor: Color(0xFF249D76),
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) _showError(e.toString());

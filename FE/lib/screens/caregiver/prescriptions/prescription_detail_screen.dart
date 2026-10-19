@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:typed_data';
+
 import '../../../models/prescription.dart';
 import '../../../services/prescription_service.dart';
 import '../../../widgets/glass.dart';
@@ -24,6 +26,8 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
   Prescription? _prescription;
   bool _loading = true;
   String? _error;
+  Uint8List? _photo;
+  String? _photoError;
 
   @override
   void initState() {
@@ -37,9 +41,22 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
       _error = null;
     });
     try {
-      final data = await PrescriptionService.instance
-          .getById(widget.prescriptionId);
-      if (mounted) setState(() => _prescription = data);
+      final data = await PrescriptionService.instance.getById(
+        widget.prescriptionId,
+      );
+      if (mounted) {
+        setState(() => _prescription = data);
+        if (data.imagePrescriptionUrl != null) {
+          try {
+            final photo = await PrescriptionService.instance.getPhoto(
+              widget.prescriptionId,
+            );
+            if (mounted) setState(() => _photo = photo);
+          } catch (e) {
+            if (mounted) setState(() => _photoError = e.toString());
+          }
+        }
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -74,8 +91,8 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _buildError()
-              : _buildContent(),
+          ? _buildError()
+          : _buildContent(),
       floatingActionButton: _prescription != null
           ? FloatingActionButton.extended(
               heroTag: 'add-item-fab',
@@ -97,6 +114,10 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
       children: [
+        if (p.imagePrescriptionUrl != null) ...[
+          _buildPrescriptionPhoto(),
+          const SizedBox(height: 12),
+        ],
         // ── General info card ─────────────────────────────────────────────
         Glass(
           padding: const EdgeInsets.all(18),
@@ -139,18 +160,93 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
                 ],
               ),
               const Divider(height: 24),
-              _infoRow(Icons.person_outline_rounded, 'Bác sĩ',
-                  p.doctorName ?? 'Không rõ'),
+              _infoRow(
+                Icons.person_outline_rounded,
+                'Bác sĩ',
+                p.doctorName ?? 'Không rõ',
+              ),
               const SizedBox(height: 8),
-              _infoRow(Icons.tag_rounded, 'Mã đơn',
-                  p.prescriptionCode ?? 'Không có'),
+              _infoRow(
+                Icons.tag_rounded,
+                'Mã đơn',
+                p.prescriptionCode ?? 'Không có',
+              ),
               const SizedBox(height: 8),
-              _infoRow(Icons.calendar_today_rounded, 'Bắt đầu',
-                  _formatDate(p.startDate)),
+              _infoRow(
+                Icons.calendar_today_rounded,
+                'Bắt đầu',
+                _formatDate(p.startDate),
+              ),
               if (p.endDate != null) ...[
                 const SizedBox(height: 8),
-                _infoRow(Icons.event_rounded, 'Kết thúc',
-                    _formatDate(p.endDate!)),
+                _infoRow(
+                  Icons.event_rounded,
+                  'Kết thúc',
+                  _formatDate(p.endDate!),
+                ),
+              ],
+              if (p.interaction != null &&
+                  p.interaction!.summary.isNotEmpty) ...[
+                const Divider(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: p.interaction!.hasWarning
+                        ? const Color(0xFFFFF1F2)
+                        : const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: p.interaction!.hasWarning
+                          ? const Color(0xFFFECDD3)
+                          : const Color(0xFFBBF7D0),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        p.interaction!.hasWarning
+                            ? Icons.warning_amber_rounded
+                            : Icons.check_circle_outline_rounded,
+                        color: p.interaction!.hasWarning
+                            ? const Color(0xFFE11D48)
+                            : const Color(0xFF16A34A),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.interaction!.hasWarning
+                                  ? 'Cảnh báo tương tác thuốc'
+                                  : 'Kiểm tra tương tác thuốc',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                color: p.interaction!.hasWarning
+                                    ? const Color(0xFF9F1239)
+                                    : const Color(0xFF166534),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              p.interaction!.summary,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.35,
+                                color: p.interaction!.hasWarning
+                                    ? const Color(0xFFBE123C)
+                                    : const Color(0xFF15803D),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
@@ -183,75 +279,107 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
             ),
           ),
 
-        ...p.items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _ItemCard(
-                item: item,
-                onEditSaved: _load,
-              ),
-            )),
+        ...p.items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _ItemCard(item: item, onEditSaved: _load),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value) => Row(
+  Widget _buildPrescriptionPhoto() {
+    return Glass(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: const Color(0xFF5267F4)),
-          const SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF6B7492),
-              fontSize: 13,
-            ),
+          const Text(
+            'Ảnh đơn thuốc gốc',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+          const SizedBox(height: 10),
+          if (_photo != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(
+                _photo!,
+                width: double.infinity,
+                fit: BoxFit.contain,
               ),
+            )
+          else if (_photoError != null)
+            Text(
+              'Không thể tải ảnh đơn thuốc.',
+              style: const TextStyle(color: Color(0xFFD65B49)),
+            )
+          else
+            const SizedBox(
+              height: 180,
+              child: Center(child: CircularProgressIndicator()),
             ),
-          ),
         ],
-      );
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) => Row(
+    children: [
+      Icon(icon, size: 16, color: const Color(0xFF5267F4)),
+      const SizedBox(width: 8),
+      Text(
+        '$label: ',
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF6B7492),
+          fontSize: 13,
+        ),
+      ),
+      Expanded(
+        child: Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+      ),
+    ],
+  );
 
   Widget _buildError() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.wifi_off_rounded,
-                  size: 48, color: Color(0xFFD65B49)),
-              const SizedBox(height: 16),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFFD65B49)),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Thử lại'),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            size: 48,
+            color: Color(0xFFD65B49),
           ),
-        ),
-      );
+          const SizedBox(height: 16),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFFD65B49)),
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Thử lại'),
+          ),
+        ],
+      ),
+    ),
+  );
 
   void _openEdit() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => EditPrescriptionSheet(
-        prescription: _prescription!,
-        onSaved: _load,
-      ),
+      builder: (_) =>
+          EditPrescriptionSheet(prescription: _prescription!, onSaved: _load),
     );
   }
 
@@ -260,10 +388,8 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => AddItemSheet(
-        prescriptionId: widget.prescriptionId,
-        onSaved: _load,
-      ),
+      builder: (_) =>
+          AddItemSheet(prescriptionId: widget.prescriptionId, onSaved: _load),
     );
   }
 
@@ -335,7 +461,9 @@ class _ItemCard extends StatelessWidget {
                     Text(
                       'Liều: ${item.dosagePerTime % 1 == 0 ? item.dosagePerTime.toInt() : item.dosagePerTime} / lần',
                       style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF6B7492)),
+                        fontSize: 12,
+                        color: Color(0xFF6B7492),
+                      ),
                     ),
                   ],
                 ),
@@ -353,16 +481,22 @@ class _ItemCard extends StatelessWidget {
           // Stock row
           Row(
             children: [
-              const Icon(Icons.inventory_2_outlined,
-                  size: 14, color: Color(0xFF6B7492)),
+              const Icon(
+                Icons.inventory_2_outlined,
+                size: 14,
+                color: Color(0xFF6B7492),
+              ),
               const SizedBox(width: 6),
               Text(
                 'Tồn kho: ${item.currentStock}',
                 style: const TextStyle(fontSize: 12),
               ),
               const SizedBox(width: 14),
-              const Icon(Icons.notification_important_outlined,
-                  size: 14, color: Color(0xFF6B7492)),
+              const Icon(
+                Icons.notification_important_outlined,
+                size: 14,
+                color: Color(0xFF6B7492),
+              ),
               const SizedBox(width: 6),
               Text(
                 'Ngưỡng: ${item.reorderThreshold}',
@@ -371,19 +505,25 @@ class _ItemCard extends StatelessWidget {
               if (lowStock) ...[
                 const SizedBox(width: 10),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFECEC),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: const Color(0xFFD65B49).withValues(alpha: .4)),
+                      color: const Color(0xFFD65B49).withValues(alpha: .4),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.warning_amber_rounded,
-                          size: 12, color: Color(0xFFD65B49)),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 12,
+                        color: Color(0xFFD65B49),
+                      ),
                       SizedBox(width: 4),
                       Text(
                         'Sắp hết',
@@ -404,14 +544,19 @@ class _ItemCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.note_alt_outlined,
-                    size: 14, color: Color(0xFF6B7492)),
+                const Icon(
+                  Icons.note_alt_outlined,
+                  size: 14,
+                  color: Color(0xFF6B7492),
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     item.instructions!,
                     style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF6B7492)),
+                      fontSize: 12,
+                      color: Color(0xFF6B7492),
+                    ),
                   ),
                 ),
               ],
@@ -550,8 +695,7 @@ class _EditItemSheetState extends State<_EditItemSheet> {
             : _instructionsCtrl.text.trim(),
         schedules: widget.item.schedules,
       );
-      await PrescriptionService.instance
-          .updateItem(widget.item.id!, updated);
+      await PrescriptionService.instance.updateItem(widget.item.id!, updated);
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSaved();
@@ -565,10 +709,7 @@ class _EditItemSheetState extends State<_EditItemSheet> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: const Color(0xFFD65B49),
-      ),
+      SnackBar(content: Text(msg), backgroundColor: const Color(0xFFD65B49)),
     );
   }
 
@@ -599,20 +740,26 @@ class _EditItemSheetState extends State<_EditItemSheet> {
             const SizedBox(height: 16),
             Text(
               'Chỉnh sửa: ${widget.item.medicineName}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 20),
-            _field('Liều dùng / lần', _dosageCtrl,
-                keyboardType: TextInputType.number),
+            _field(
+              'Liều dùng / lần',
+              _dosageCtrl,
+              keyboardType: TextInputType.number,
+            ),
             const SizedBox(height: 12),
-            _field('Tồn kho hiện tại', _stockCtrl,
-                keyboardType: TextInputType.number),
+            _field(
+              'Tồn kho hiện tại',
+              _stockCtrl,
+              keyboardType: TextInputType.number,
+            ),
             const SizedBox(height: 12),
-            _field('Ngưỡng đặt lại', _thresholdCtrl,
-                keyboardType: TextInputType.number),
+            _field(
+              'Ngưỡng đặt lại',
+              _thresholdCtrl,
+              keyboardType: TextInputType.number,
+            ),
             const SizedBox(height: 12),
             _field('Hướng dẫn sử dụng', _instructionsCtrl, maxLines: 2),
             const SizedBox(height: 24),
@@ -623,15 +770,21 @@ class _EditItemSheetState extends State<_EditItemSheet> {
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.save_rounded),
-              label: const Text('Lưu thay đổi',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              label: const Text(
+                'Lưu thay đổi',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF5168F4),
                 minimumSize: const Size.fromHeight(50),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ],
@@ -640,13 +793,19 @@ class _EditItemSheetState extends State<_EditItemSheet> {
     );
   }
 
-  Widget _field(String label, TextEditingController ctrl,
-      {TextInputType? keyboardType, int maxLines = 1}) {
+  Widget _field(
+    String label,
+    TextEditingController ctrl, {
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
@@ -655,8 +814,10 @@ class _EditItemSheetState extends State<_EditItemSheet> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFDEE2F5)),
@@ -667,8 +828,10 @@ class _EditItemSheetState extends State<_EditItemSheet> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: Color(0xFF5168F4), width: 1.6),
+              borderSide: const BorderSide(
+                color: Color(0xFF5168F4),
+                width: 1.6,
+              ),
             ),
           ),
         ),

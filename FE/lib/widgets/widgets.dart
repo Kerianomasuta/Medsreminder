@@ -6,3 +6,5 @@ export 'custom_components.dart';
 export 'add_medicine_modal.dart';
 export 'schedule_details_modal.dart';
 export 'pharmacy_location_picker.dart';
+export 'caregiver_vip_section.dart';
+export 'caregiver_profile_card.dart';

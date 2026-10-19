@@ -335,6 +335,7 @@ class NotificationService {
         : '${amount == amount.roundToDouble() ? amount.toInt() : amount} $unit'
               '${log.instructions == null ? '' : ' · ${log.instructions}'}';
     final id = _notificationId(log.id);
+    final isSnoozed = log.status == DoseStatus.snoozed;
     if (Platform.isAndroid) {
       await _wakeChannel.invokeMethod<void>('scheduleExactAlarm', {
         'id': id,
@@ -343,7 +344,8 @@ class NotificationService {
         'dosage': dose,
         'time': _clock(reminderAt),
         'medicationLogId': log.id,
-        'alarmRound': 1,
+        'alarmRound': isSnoozed ? 2 : 1,
+        'snoozeCount': isSnoozed ? 1 : 0,
       });
     } else {
       await _plugin.zonedSchedule(

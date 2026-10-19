@@ -2,9 +2,12 @@ package com.medsreminder.meds_reminder
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.view.View
 import android.view.WindowManager
@@ -17,6 +20,30 @@ import java.util.Date
 import java.util.Locale
 
 class ReminderLockActivity : Activity() {
+
+    companion object {
+        @Volatile
+        var currentInstance: ReminderLockActivity? = null
+
+        fun closeIfOpen() {
+            try {
+                currentInstance?.let { activity ->
+                    if (!activity.isFinishing) {
+                        activity.finish()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private val autoCloseHandler = Handler(Looper.getMainLooper())
+    private val autoCloseRunnable = Runnable {
+        if (!isFinishing) {
+            finish()
+        }
+    }
 
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -31,6 +58,9 @@ class ReminderLockActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentInstance = this
+        autoCloseHandler.removeCallbacks(autoCloseRunnable)
+        autoCloseHandler.postDelayed(autoCloseRunnable, 3 * 60 * 1000L)
 
         // 1. Kích hoạt màn hình và hiển thị đè lên màn hình khóa (GIỮ NGUYÊN MÀN HÌNH KHÓA)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -47,7 +77,7 @@ class ReminderLockActivity : Activity() {
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
 
-        // 2. WakeLock dự phòng để đảm bảo màn hình sáng
+        // 2. WakeLock dự phòng để đảm bảo màn hình sáng trong suốt 3 phút của đợt reo
         try {
             val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
@@ -56,7 +86,7 @@ class ReminderLockActivity : Activity() {
                 PowerManager.ON_AFTER_RELEASE,
                 "medsreminder:reminder_activity_wake"
             )
-            wakeLock?.acquire(10 * 60 * 1000L)
+            wakeLock?.acquire(3 * 60 * 1000L)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -72,13 +102,32 @@ class ReminderLockActivity : Activity() {
 
         // 4. Nút "✓ ĐÃ UỐNG" — Tắt hẳn chuông và dừng mọi nhắc lại
         btnTaken.setOnClickListener {
+            ReminderAlarmService.currentInstance?.stopAlarm()
+            val prefs = getSharedPreferences("meds_alarm_state", Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            if (medicationLogId.isNotBlank()) {
+                editor.remove("snooze_$medicationLogId")
+            }
+            editor.remove("snooze_notif_$notifId").apply()
             sendStopAction(ReminderAlarmService.ACTION_TAKEN)
             Toast.makeText(this, "✓ Đã ghi nhận cữ uống thuốc!", Toast.LENGTH_SHORT).show()
             finish()
         }
 
-        // 5. Nút "⏰ Nhắc lại" — Tắt chuông hiện tại, hẹn 5 phút sau reo lại
+        // 5. Nút "⏰ Nhắc lại" — Tắt chuông hiện tại, hẹn 5 phút sau reo lại (tối đa 1 lần)
         btnSnooze.setOnClickListener {
+            val stateKey = if (medicationLogId.isNotBlank()) "snooze_$medicationLogId" else "snooze_notif_$notifId"
+            val prefs = getSharedPreferences("meds_alarm_state", Context.MODE_PRIVATE)
+            val savedSnooze = prefs.getInt(stateKey, 0)
+            val effectiveSnoozeCount = maxOf(snoozeCount, savedSnooze)
+            if (effectiveSnoozeCount >= 1 || alarmRound >= ReminderAlarmService.ALARM_ROUNDS) {
+                btnSnooze.visibility = View.GONE
+                Toast.makeText(this, "Đã hết số lần nhắc lại!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            btnSnooze.isEnabled = false
+            btnSnooze.visibility = View.GONE
+            ReminderAlarmService.currentInstance?.stopAlarm()
             sendSnoozeService(5)
             Toast.makeText(this, "⏰ Sẽ nhắc lại sau 5 phút!", Toast.LENGTH_SHORT).show()
             finish()
@@ -106,21 +155,34 @@ class ReminderLockActivity : Activity() {
         medicationLogId = source.getStringExtra("medication_log_id") ?: ""
         alarmRound = source.getIntExtra("alarm_round", 1)
 
+        val stateKey = if (medicationLogId.isNotBlank()) "snooze_$medicationLogId" else "snooze_notif_$notifId"
+        val prefs = getSharedPreferences("meds_alarm_state", Context.MODE_PRIVATE)
+        val savedSnooze = prefs.getInt(stateKey, 0)
+        val effectiveSnoozeCount = maxOf(snoozeCount, savedSnooze)
+
         findViewById<TextView>(R.id.tvReminderTime).text = time
         findViewById<TextView>(R.id.tvMedicineName).text = medicineName
         findViewById<TextView>(R.id.tvDosageInstructions).text = dosage
+
+        val isLastRound = effectiveSnoozeCount >= 1 || alarmRound >= ReminderAlarmService.ALARM_ROUNDS
         findViewById<TextView>(R.id.tvSnoozeInfo).apply {
-            if (alarmRound > 1) {
+            if (isLastRound) {
                 visibility = View.VISIBLE
-                text = "⏰ Lần nhắc $alarmRound/${ReminderAlarmService.ALARM_ROUNDS}"
+                text = "⏰ Lần nhắc cuối cùng"
             } else {
                 visibility = View.GONE
             }
+        }
+
+        findViewById<Button>(R.id.btnSnooze).apply {
+            visibility = if (isLastRound) View.GONE else View.VISIBLE
+            isEnabled = !isLastRound
         }
     }
 
     private fun sendSnoozeService(minutes: Int) {
         try {
+            ReminderAlarmService.currentInstance?.stopAlarm()
             val snoozeIntent = Intent(this, ReminderAlarmService::class.java).apply {
                 action = ReminderAlarmService.ACTION_SNOOZE
                 putExtra("medicine_name", medicineName)
@@ -130,6 +192,7 @@ class ReminderLockActivity : Activity() {
                 putExtra("snooze_count", snoozeCount)
                 putExtra("snooze_minutes", minutes)
                 putExtra("medication_log_id", medicationLogId)
+                putExtra("alarm_round", alarmRound)
             }
             startService(snoozeIntent)
         } catch (e: Exception) {
@@ -156,6 +219,7 @@ class ReminderLockActivity : Activity() {
 
     private fun sendStopAction(actionType: String, reason: String? = null) {
         try {
+            ReminderAlarmService.currentInstance?.stopAlarm()
             val stopIntent = Intent(this, ReminderAlarmService::class.java).apply {
                 action = actionType
                 putExtra("notification_id", notifId)
@@ -169,6 +233,10 @@ class ReminderLockActivity : Activity() {
     }
 
     override fun onDestroy() {
+        autoCloseHandler.removeCallbacks(autoCloseRunnable)
+        if (currentInstance == this) {
+            currentInstance = null
+        }
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()

@@ -177,9 +177,11 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const PageIntro(
-                'Lịch uống thuốc',
-                'Theo dõi và chỉnh sửa cữ uống',
+              const Expanded(
+                child: PageIntro(
+                  'Lịch uống thuốc',
+                  'Theo dõi và chỉnh sửa cữ uống',
+                ),
               ),
               IconButton(
                 onPressed: _loadSchedules,
