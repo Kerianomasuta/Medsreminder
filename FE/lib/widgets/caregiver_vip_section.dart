@@ -51,10 +51,8 @@ class _CaregiverVipSectionState extends State<CaregiverVipSection> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _VipUpgradeModal(
-        billingApi: _billingApi,
-        onSuccess: _loadVipProfile,
-      ),
+      builder: (_) =>
+          _VipUpgradeModal(billingApi: _billingApi, onSuccess: _loadVipProfile),
     );
   }
 
@@ -144,7 +142,10 @@ class _CaregiverVipSectionState extends State<CaregiverVipSection> {
             Pressable(
               onTap: _openUpgradeModal,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFD700),
                   borderRadius: BorderRadius.circular(14),
@@ -241,8 +242,10 @@ class _CaregiverVipSectionState extends State<CaregiverVipSection> {
               Pressable(
                 onTap: _openUpgradeModal,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFD700),
                     borderRadius: BorderRadius.circular(12),
@@ -277,10 +280,7 @@ class _CaregiverVipSectionState extends State<CaregiverVipSection> {
 }
 
 class _VipUpgradeModal extends StatefulWidget {
-  const _VipUpgradeModal({
-    required this.billingApi,
-    required this.onSuccess,
-  });
+  const _VipUpgradeModal({required this.billingApi, required this.onSuccess});
 
   final BillingApi billingApi;
   final VoidCallback onSuccess;
@@ -375,7 +375,8 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
     try {
       final selectedPlanObj = _plans.firstWhere(
         (p) => p.plan == _selectedPlan,
-        orElse: () => BillingPlan(plan: _selectedPlan, amount: 49000, label: ''),
+        orElse: () =>
+            BillingPlan(plan: _selectedPlan, amount: 49000, label: ''),
       );
       final payload = {
         'code': '00',
@@ -403,9 +404,8 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi gửi Webhook: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Lỗi gửi Webhook: $e')));
       }
     } finally {
       if (mounted) setState(() => _simulatingWebhook = false);
@@ -499,8 +499,10 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.build_rounded,
-                                  color: Color(0xFFFA541C)),
+                              Icon(
+                                Icons.build_rounded,
+                                color: Color(0xFFFA541C),
+                              ),
                               SizedBox(width: 12),
                               Expanded(
                                 child: Text(
@@ -539,9 +541,10 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
                               ),
                               Divider(height: 16),
                               _FeatureLine(
-                                icon: Icons.notification_important_rounded,
-                                title: 'Cảnh báo người thân tức thì',
-                                subtitle: 'Báo động khi bệnh nhân quên cữ',
+                                icon: Icons.medication_liquid_rounded,
+                                title: 'Cảnh báo tương tác thuốc',
+                                subtitle:
+                                    'Kiểm tra nguy cơ tương tác giữa các thuốc',
                               ),
                             ],
                           ),
@@ -564,7 +567,8 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: InkWell(
-                              onTap: () => setState(() => _selectedPlan = plan.plan),
+                              onTap: () =>
+                                  setState(() => _selectedPlan = plan.plan),
                               borderRadius: BorderRadius.circular(16),
                               child: Container(
                                 padding: const EdgeInsets.all(14),
@@ -615,15 +619,17 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
                                                 Container(
                                                   padding:
                                                       const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
+                                                        horizontal: 8,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color:
-                                                        const Color(0xFFDC2626),
+                                                    color: const Color(
+                                                      0xFFDC2626,
+                                                    ),
                                                     borderRadius:
                                                         BorderRadius.circular(
-                                                            10),
+                                                          10,
+                                                        ),
                                                   ),
                                                   child: const Text(
                                                     'TIẾT KIỆM 20%',
@@ -672,7 +678,9 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
 
                         // Nút tạo link thanh toán (POST /create-payment-link)
                         FilledButton(
-                          onPressed: _creatingLink ? null : _handleCreatePaymentLink,
+                          onPressed: _creatingLink
+                              ? null
+                              : _handleCreatePaymentLink,
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF4F46E5),
                             minimumSize: const Size.fromHeight(50),
@@ -713,15 +721,19 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF0FDF4),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFBBF7D0)),
+                              border: Border.all(
+                                color: const Color(0xFFBBF7D0),
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.check_circle_rounded,
-                                        color: Color(0xFF16A34A)),
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Color(0xFF16A34A),
+                                    ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Đơn hàng #${_paymentLinkResult!.orderCode} đã tạo!',
@@ -736,14 +748,21 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
                                 OutlinedButton.icon(
                                   onPressed: () {
                                     final uri = Uri.tryParse(
-                                        _paymentLinkResult!.checkoutUrl);
+                                      _paymentLinkResult!.checkoutUrl,
+                                    );
                                     if (uri != null) {
-                                      launchUrl(uri,
-                                          mode: LaunchMode.externalApplication);
+                                      launchUrl(
+                                        uri,
+                                        mode: LaunchMode.externalApplication,
+                                      );
                                     }
                                   },
-                                  icon: const Icon(Icons.open_in_browser_rounded),
-                                  label: const Text('Mở lại trang thanh toán PayOS'),
+                                  icon: const Icon(
+                                    Icons.open_in_browser_rounded,
+                                  ),
+                                  label: const Text(
+                                    'Mở lại trang thanh toán PayOS',
+                                  ),
                                   style: OutlinedButton.styleFrom(
                                     minimumSize: const Size.fromHeight(44),
                                   ),
@@ -835,10 +854,7 @@ class _FeatureLine extends StatelessWidget {
               ),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF6B7280),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
               ),
             ],
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/prescription.dart';
 import '../../../services/prescription_service.dart';
+import '../../../widgets/app_components.dart';
 
 // ---------------------------------------------------------------------------
 // Add Item Sheet
@@ -78,7 +79,6 @@ class _AddItemSheetState extends State<AddItemSheet> {
         return;
       }
     }
-
     setState(() => _saving = true);
     try {
       final item = PrescriptionItem(
@@ -98,10 +98,27 @@ class _AddItemSheetState extends State<AddItemSheet> {
             : _instructionsCtrl.text.trim(),
         schedules: _schedules.map((s) => s.toSchedule()).toList(),
       );
-      await PrescriptionService.instance.addItem(widget.prescriptionId, item);
+      final addedItem = await PrescriptionService.instance.addItem(
+        widget.prescriptionId,
+        item,
+      );
       if (mounted) {
-        Navigator.of(context).pop();
-        widget.onSaved();
+        final interaction = addedItem.interaction;
+        if (interaction != null &&
+            await isPremiumAccount() &&
+            (interaction.hasWarning || interaction.summary.isNotEmpty) &&
+            mounted) {
+          await showDrugInteractionDialog(
+            context: context,
+            summary: interaction.summary,
+            isWarning: interaction.hasWarning,
+          );
+        }
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          widget.onSaved();
+        }
       }
     } catch (e) {
       if (mounted) _showError(e.toString());

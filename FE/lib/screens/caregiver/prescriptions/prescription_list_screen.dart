@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../models/prescription.dart';
 import '../../../services/prescription_service.dart';
@@ -31,6 +32,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   List<Prescription> _prescriptions = [];
   bool _loading = true;
   String? _error;
+  bool _scanning = false;
 
   @override
   void initState() {
@@ -44,8 +46,9 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       _error = null;
     });
     try {
-      final data =
-          await PrescriptionService.instance.listForPatient(widget.patientId);
+      final data = await PrescriptionService.instance.listForPatient(
+        widget.patientId,
+      );
       if (mounted) setState(() => _prescriptions = data);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -83,6 +86,14 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                     color: Color(0xFF687195),
                   ),
                 ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _scanning ? null : _scanPrescription,
+                  icon: const Icon(Icons.document_scanner_rounded),
+                  label: Text(
+                    _scanning ? 'Đang quét đơn thuốc...' : 'Quét đơn thuốc',
+                  ),
+                ),
               ],
             ),
           ),
@@ -94,10 +105,10 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? _buildError()
-                    : _prescriptions.isEmpty
-                        ? _buildEmpty()
-                        : _buildList(),
+                ? _buildError()
+                : _prescriptions.isEmpty
+                ? _buildEmpty()
+                : _buildList(),
           ),
         ],
       ),
@@ -116,77 +127,80 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   }
 
   Widget _buildList() => ListView.separated(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
-        itemCount: _prescriptions.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _PrescriptionTile(
-          prescription: _prescriptions[i],
-          onTap: () => _openDetail(_prescriptions[i]),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+    itemCount: _prescriptions.length,
+    separatorBuilder: (_, _) => const SizedBox(height: 12),
+    itemBuilder: (_, i) => _PrescriptionTile(
+      prescription: _prescriptions[i],
+      onTap: () => _openDetail(_prescriptions[i]),
+    ),
+  );
 
   Widget _buildEmpty() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8EBFF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.description_outlined,
-                  size: 48,
-                  color: Color(0xFF5168F4),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Chưa có đơn thuốc nào',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1F2A54),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Nhấn nút bên dưới để tạo đơn thuốc đầu tiên.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF687195)),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8EBFF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.description_outlined,
+              size: 48,
+              color: Color(0xFF5168F4),
+            ),
           ),
-        ),
-      );
+          const SizedBox(height: 20),
+          const Text(
+            'Chưa có đơn thuốc nào',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1F2A54),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Nhấn nút bên dưới để tạo đơn thuốc đầu tiên.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF687195)),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _buildError() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.wifi_off_rounded,
-                  size: 48, color: Color(0xFFD65B49)),
-              const SizedBox(height: 16),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFFD65B49)),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Thử lại'),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            size: 48,
+            color: Color(0xFFD65B49),
           ),
-        ),
-      );
+          const SizedBox(height: 16),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFFD65B49)),
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Thử lại'),
+          ),
+        ],
+      ),
+    ),
+  );
 
   void _openDetail(Prescription p) async {
     await Navigator.of(context).push<bool>(
@@ -208,15 +222,70 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     );
     if (created == true) _load();
   }
+
+  Future<void> _scanPrescription() async {
+    if (!await requirePremiumAccess(context) || !mounted) return;
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Chụp ảnh đơn thuốc'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Chọn ảnh từ thư viện'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final image = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 90,
+    );
+    if (image == null || !mounted) return;
+
+    setState(() => _scanning = true);
+    try {
+      final prescription = await PrescriptionService.instance.scan(
+        imageBytes: await image.readAsBytes(),
+        filename: image.name,
+        patientId: widget.patientId,
+      );
+      if (!mounted || prescription.id == null) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              PrescriptionDetailScreen(prescriptionId: prescription.id!),
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Quét đơn thuốc thất bại: $e'),
+          backgroundColor: const Color(0xFFD65B49),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
 
 class _PrescriptionTile extends StatelessWidget {
-  const _PrescriptionTile({
-    required this.prescription,
-    required this.onTap,
-  });
+  const _PrescriptionTile({required this.prescription, required this.onTap});
 
   final Prescription prescription;
   final VoidCallback onTap;
@@ -269,7 +338,10 @@ class _PrescriptionTile extends StatelessWidget {
                   ],
                   const SizedBox(height: 3),
                   Text(
-                    _formatDateRange(prescription.startDate, prescription.endDate),
+                    _formatDateRange(
+                      prescription.startDate,
+                      prescription.endDate,
+                    ),
                     style: const TextStyle(
                       fontSize: 12,
                       color: Color(0xFF717993),
@@ -283,13 +355,13 @@ class _PrescriptionTile extends StatelessWidget {
               children: [
                 StatusChip(
                   isActive ? 'Đang dùng' : 'Ngừng',
-                  isActive
-                      ? const Color(0xFF249D76)
-                      : const Color(0xFF9BA3BF),
+                  isActive ? const Color(0xFF249D76) : const Color(0xFF9BA3BF),
                 ),
                 const SizedBox(height: 6),
-                const Icon(Icons.chevron_right_rounded,
-                    color: Color(0xFF9BA3BF)),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF9BA3BF),
+                ),
               ],
             ),
           ],
