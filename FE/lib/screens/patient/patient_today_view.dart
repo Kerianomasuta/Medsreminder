@@ -126,9 +126,11 @@ class _PatientTodayViewState extends State<PatientTodayView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const PageIntro(
-                'Lịch uống hôm nay',
-                'Thời gian luôn được cập nhật từ lịch uống thuốc',
+              const Expanded(
+                child: PageIntro(
+                  'Lịch uống hôm nay',
+                  'Thời gian luôn được cập nhật từ lịch uống thuốc',
+                ),
               ),
               IconButton(
                 onPressed: _loading ? null : _load,

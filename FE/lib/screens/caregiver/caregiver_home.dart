@@ -396,9 +396,13 @@ class _OverviewPage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Lịch uống hôm nay',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                const Expanded(
+                  child: Text(
+                    'Lịch uống hôm nay',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 if (todaySchedules.isNotEmpty && onViewAllSchedules != null)
                   TextButton.icon(
@@ -813,10 +817,14 @@ class _Metric extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
             style: const TextStyle(fontSize: 11, color: Color(0xFF687195)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -1134,7 +1142,7 @@ class _ComplianceReportCardState extends State<_ComplianceReportCard> {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
@@ -1154,7 +1162,7 @@ class _ComplianceReportCardState extends State<_ComplianceReportCard> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
@@ -1169,10 +1177,10 @@ class _ComplianceReportCardState extends State<_ComplianceReportCard> {
             child: const Icon(
               Icons.picture_as_pdf_rounded,
               color: Color(0xFFEA580C),
-              size: 28,
+              size: 24,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1184,7 +1192,7 @@ class _ComplianceReportCardState extends State<_ComplianceReportCard> {
                       child: Text(
                         'Báo cáo tuân thủ 30 ngày',
                         style: TextStyle(
-                          fontSize: 14.5,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF9A3412),
                         ),
@@ -1218,11 +1226,11 @@ class _ComplianceReportCardState extends State<_ComplianceReportCard> {
                 Text(
                   'Tỷ lệ đúng giờ, liều quên của ${widget.patientName}',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     color: Color(0xFFC2410C),
                     fontWeight: FontWeight.w500,
                   ),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -1240,19 +1248,21 @@ class _ComplianceReportCardState extends State<_ComplianceReportCard> {
                       color: Colors.white,
                     ),
                   )
-                : const Icon(Icons.download_rounded, size: 18),
+                : const Icon(Icons.download_rounded, size: 16),
             label: Text(
               _downloading ? 'Đang xuất...' : 'Tải PDF',
               style: const TextStyle(
                 fontWeight: FontWeight.w800,
-                fontSize: 12.5,
+                fontSize: 12,
               ),
             ),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFEA580C),
               foregroundColor: Colors.white,
               elevation: 2,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

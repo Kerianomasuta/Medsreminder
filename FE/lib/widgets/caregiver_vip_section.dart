@@ -112,12 +112,16 @@ class _CaregiverVipSectionState extends State<CaregiverVipSection> {
                 children: [
                   const Row(
                     children: [
-                      Text(
-                        'Thành viên VIP',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
+                      Flexible(
+                        child: Text(
+                          'Thành viên VIP',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       SizedBox(width: 6),
@@ -135,6 +139,8 @@ class _CaregiverVipSectionState extends State<CaregiverVipSection> {
                       color: Colors.white.withValues(alpha: 0.85),
                       fontSize: 12,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -231,14 +237,19 @@ class _CaregiverVipSectionState extends State<CaregiverVipSection> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Chỉ từ 39.200 đ / tháng',
-                style: TextStyle(
-                  color: Color(0xFFFFD700),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
+              const Flexible(
+                child: Text(
+                  'Chỉ từ 39.200 đ / tháng',
+                  style: TextStyle(
+                    color: Color(0xFFFFD700),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Pressable(
                 onTap: _openUpgradeModal,
                 child: Container(
