@@ -297,13 +297,28 @@ class _ItemCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 40,
+                height: 40,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: const Color(0xFFE5E8FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.medication_rounded,
-                    color: Color(0xFF5167F2), size: 20),
+                child: (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                    ? Image.network(
+                        item.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.medication_rounded,
+                          color: Color(0xFF5167F2),
+                          size: 20,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.medication_rounded,
+                        color: Color(0xFF5167F2),
+                        size: 20,
+                      ),
               ),
               const SizedBox(width: 10),
               Expanded(
