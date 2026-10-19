@@ -1702,12 +1702,16 @@ class _PharmacyCard extends StatelessWidget {
                       color: Color(0xFF0284C7),
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      phone,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0284C7),
+                    Expanded(
+                      child: Text(
+                        phone,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0284C7),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -1997,9 +2001,13 @@ class _PaginationRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Trang $page (${(page - 1) * limit + 1} - ${page * limit > total ? total : page * limit} / $total)',
-            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          Flexible(
+            child: Text(
+              'Trang $page (${(page - 1) * limit + 1} - ${page * limit > total ? total : page * limit} / $total)',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           Row(
             children: [

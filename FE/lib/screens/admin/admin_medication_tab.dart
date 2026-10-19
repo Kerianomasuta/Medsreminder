@@ -2294,9 +2294,13 @@ class _PaginationRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Trang $page (${(page - 1) * limit + 1} - ${page * limit > total ? total : page * limit} / $total)',
-            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          Flexible(
+            child: Text(
+              'Trang $page (${(page - 1) * limit + 1} - ${page * limit > total ? total : page * limit} / $total)',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           Row(
             children: [
