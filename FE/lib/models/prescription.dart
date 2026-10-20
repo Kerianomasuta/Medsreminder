@@ -35,6 +35,35 @@ class Schedule {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Drug Interaction Model
+// ─────────────────────────────────────────────────────────────────────────────
+
+class DrugInteraction {
+  final bool checked;
+  final bool hasWarning;
+  final String summary;
+
+  const DrugInteraction({
+    required this.checked,
+    required this.hasWarning,
+    required this.summary,
+  });
+
+  factory DrugInteraction.fromJson(Map<String, dynamic> json) =>
+      DrugInteraction(
+        checked: json['checked'] == true,
+        hasWarning: json['hasWarning'] == true,
+        summary: json['summary']?.toString() ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+    'checked': checked,
+    'hasWarning': hasWarning,
+    'summary': summary,
+  };
+}
+
 class PrescriptionItem {
   final String? id;
   final String medicineName;
@@ -46,6 +75,7 @@ class PrescriptionItem {
   final int reorderThreshold; // >= 0
   final String? instructions; // nullable
   final List<Schedule> schedules;
+  final DrugInteraction? interaction;
 
   const PrescriptionItem({
     this.id,
@@ -58,6 +88,7 @@ class PrescriptionItem {
     required this.reorderThreshold,
     this.instructions,
     required this.schedules,
+    this.interaction,
   });
 
   bool get isLowStock => currentStock <= reorderThreshold;
@@ -92,6 +123,11 @@ class PrescriptionItem {
                 ?.map((s) => Schedule.fromJson(s as Map<String, dynamic>))
                 .toList() ??
             [],
+        interaction: json['interaction'] != null
+            ? DrugInteraction.fromJson(
+                json['interaction'] as Map<String, dynamic>,
+              )
+            : null,
       );
 
   Map<String, dynamic> toCreateJson() {
@@ -137,10 +173,12 @@ class Prescription {
   final String title;
   final String? doctorName;
   final String? prescriptionCode;
+  final String? imagePrescriptionUrl;
   final String startDate; // "YYYY-MM-DD"
   final String? endDate; // "YYYY-MM-DD", >= startDate
   final bool isActive;
   final List<PrescriptionItem> items;
+  final DrugInteraction? interaction;
 
   const Prescription({
     this.id,
@@ -149,10 +187,12 @@ class Prescription {
     required this.title,
     this.doctorName,
     this.prescriptionCode,
+    this.imagePrescriptionUrl,
     required this.startDate,
     this.endDate,
     this.isActive = true,
     this.items = const [],
+    this.interaction,
   });
 
   Prescription copyWith({
@@ -162,10 +202,12 @@ class Prescription {
     String? title,
     String? doctorName,
     String? prescriptionCode,
+    String? imagePrescriptionUrl,
     String? startDate,
     String? endDate,
     bool? isActive,
     List<PrescriptionItem>? items,
+    DrugInteraction? interaction,
   }) {
     return Prescription(
       id: id ?? this.id,
@@ -174,10 +216,12 @@ class Prescription {
       title: title ?? this.title,
       doctorName: doctorName ?? this.doctorName,
       prescriptionCode: prescriptionCode ?? this.prescriptionCode,
+      imagePrescriptionUrl: imagePrescriptionUrl ?? this.imagePrescriptionUrl,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       isActive: isActive ?? this.isActive,
       items: items ?? this.items,
+      interaction: interaction ?? this.interaction,
     );
   }
 
@@ -188,6 +232,7 @@ class Prescription {
     title: json['title'] as String,
     doctorName: json['doctorName'] as String?,
     prescriptionCode: json['prescriptionCode'] as String?,
+    imagePrescriptionUrl: json['imagePrescriptionUrl'] as String?,
     startDate: json['startDate'] as String,
     endDate: json['endDate'] as String?,
     isActive: json['isActive'] as bool? ?? true,
@@ -196,6 +241,9 @@ class Prescription {
             ?.map((i) => PrescriptionItem.fromJson(i as Map<String, dynamic>))
             .toList() ??
         [],
+    interaction: json['interaction'] != null
+        ? DrugInteraction.fromJson(json['interaction'] as Map<String, dynamic>)
+        : null,
   );
 
   Map<String, dynamic> toCreateJson() {

@@ -32,6 +32,24 @@ export class UserService {
         return this.userModel.findOne({ _id: userId }).select("-password").exec();
     }
 
+    async getPremium(userId: string) {
+        const user = await this.userModel.findById(userId).select('isPremium premiumExpiresAt').exec();
+        if (!user) {
+            throw ErrorHandling.NotFound('User not found');
+        }
+        const expiresAt = user.premiumExpiresAt ?? null;
+        if (expiresAt && expiresAt.getTime() <= Date.now()) {
+            if (user.isPremium) {
+                await this.userModel.updateOne({ _id: userId }, { isPremium: false }).exec();
+            }
+            return { isPremium: false, premiumExpiresAt: null };
+        }
+        return {
+            isPremium: user.isPremium === true,
+            premiumExpiresAt: expiresAt,
+        };
+    }
+
     async createNewUser(input: {
         email: string,
         password: string,

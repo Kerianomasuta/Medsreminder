@@ -31,6 +31,8 @@ type CreatePrescriptionMessage = ActorMessage & {
   doctorName?: string | null;
   prescriptionCode?: string | null;
   imagePrescriptionUrl?: string | null;
+  imageBase64?: string;
+  imageContentType?: string;
   startDate?: string;
   endDate?: string | null;
   items?: ItemMessage[];
@@ -64,6 +66,21 @@ export class PrescriptionsController {
   @MessagePattern({ cmd: 'get_prescription' })
   getById(@Payload() payload: ActorMessage & { id: string }) {
     return this.prescriptionsService.getById(payload.id, this.actor(payload));
+  }
+
+  @MessagePattern({ cmd: 'get_prescription_photo' })
+  getPhoto(@Payload() payload: ActorMessage & { id: string }) {
+    return this.prescriptionsService.getPhoto(payload.id, this.actor(payload));
+  }
+
+  @MessagePattern({ cmd: 'list_active_medicine_names' })
+  listActiveMedicineNames(@Payload() payload: ActorMessage & { patientId?: string }) {
+    return this.prescriptionsService.listActiveMedicineNames(payload?.patientId, this.actor(payload));
+  }
+
+  @MessagePattern({ cmd: 'get_prescription_item_brief' })
+  itemBrief(@Payload() payload: ActorMessage & { id?: string }) {
+    return this.prescriptionsService.itemBrief(payload?.id, this.actor(payload));
   }
 
   @MessagePattern({ cmd: 'update_prescription' })

@@ -111,10 +111,23 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
     });
     try {
       final deviceLocation = await _locationProvider.currentLocation();
-      final location = await _geocodingApi.reverseGeocode(
-        deviceLocation.latitude,
-        deviceLocation.longitude,
-      );
+      PharmacyLocationSelection location;
+      try {
+        location = await _geocodingApi.reverseGeocode(
+          deviceLocation.latitude,
+          deviceLocation.longitude,
+        );
+      } catch (_) {
+        // Fallback: Nếu không phân giải được tên đường từ OpenStreetMap,
+        // vẫn giữ tọa độ GPS để tìm nhà thuốc bình thường.
+        final latStr = deviceLocation.latitude.toStringAsFixed(5);
+        final lonStr = deviceLocation.longitude.toStringAsFixed(5);
+        location = PharmacyLocationSelection(
+          addressText: 'Vị trí hiện tại ($latStr, $lonStr)',
+          latitude: deviceLocation.latitude,
+          longitude: deviceLocation.longitude,
+        );
+      }
       if (!mounted || revision != _locationRevision) return;
       _selectLocation(location, notice: deviceLocation.notice);
     } catch (error) {
@@ -480,10 +493,11 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
                             children: [
                               TileLayer(
                                 urlTemplate:
-                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                    'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                                subdomains: const ['0', '1', '2', '3'],
                                 userAgentPackageName:
                                     'com.medsreminder.meds_reminder',
-                                maxNativeZoom: 19,
+                                maxNativeZoom: 20,
                               ),
                               MarkerLayer(
                                 markers: [

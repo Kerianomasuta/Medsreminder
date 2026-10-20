@@ -23,6 +23,13 @@ export class UserService {
         return this.userClient.send({ cmd: 'handle_get_linked_informations' }, payload)
     }
 
+    getPremium(userId: string) {
+        return this.userClient.send<{ isPremium?: boolean; premiumExpiresAt?: Date | null }>(
+            { cmd: 'handle_get_premium' },
+            { userId },
+        )
+    }
+
     saveFcmToken(userId: string, token: string) {
         return this.userClient.send({ cmd: 'save_fcm_token' }, { userId, token })
     }

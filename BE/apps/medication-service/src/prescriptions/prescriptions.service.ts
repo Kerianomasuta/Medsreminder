@@ -47,6 +47,8 @@ export type CreatePrescriptionInput = {
   doctorName?: string | null;
   prescriptionCode?: string | null;
   imagePrescriptionUrl?: string | null;
+  imageBase64?: string;
+  imageContentType?: string;
   startDate?: string;
   endDate?: string | null;
   items?: PrescriptionItemInput[];
@@ -121,6 +123,21 @@ export class PrescriptionsService {
           isActive: true,
         }),
       );
+      if (payload.imageBase64) {
+        const imagePrescriptionUrl = `/api/v1/prescriptions/${saved.id}/photo`;
+        await manager.query(
+          `UPDATE medication.prescriptions
+           SET image_data = $1, image_content_type = $2, image_prescription_url = $3
+           WHERE id = $4`,
+          [
+            Buffer.from(payload.imageBase64, 'base64'),
+            (payload.imageContentType ?? 'image/jpeg').slice(0, 100),
+            imagePrescriptionUrl,
+            saved.id,
+          ],
+        );
+        saved.imagePrescriptionUrl = imagePrescriptionUrl;
+      }
 
       const savedItems = [];
       for (const item of items) {
@@ -140,6 +157,61 @@ export class PrescriptionsService {
     });
 
     return rows.map((row) => this.toPrescriptionFromEntity(row));
+  }
+
+  async getPhoto(id: string, actor?: PrescriptionActor) {
+    const prescription = await this.findPrescription(id);
+    this.assertPatientOwns(prescription.patientId, actor);
+    const rows = await this.dataSource.query(
+      `SELECT image_data, image_content_type FROM medication.prescriptions WHERE id = $1`,
+      [id],
+    ) as Array<{ image_data?: Buffer | null; image_content_type?: string | null }>;
+    const bytes = imageBytes(rows[0]?.image_data);
+    if (!bytes?.length) {
+      throw ErrorHandling.NotFound('Prescription photo not found');
+    }
+    return {
+      contentType: safeImageType(rows[0]?.image_content_type),
+      imageBase64: bytes.toString('base64'),
+    };
+  }
+
+  async listActiveMedicineNames(patientId: string | undefined, actor?: PrescriptionActor) {
+    const id = this.patientOwnerId(actor) ?? this.requireObjectId(patientId, 'patientId');
+    const today = todayInVietnam();
+    const rows = await this.dataSource.query(
+      `SELECT i.name AS name, i.generic_name AS "genericName"
+       FROM medication.prescription_items i
+       INNER JOIN medication.prescriptions p ON p.id = i.prescription_id
+       WHERE p.patient_id = $1
+         AND p.is_active = true
+         AND p.start_date <= $2::date
+         AND (p.end_date IS NULL OR p.end_date >= $2::date)
+       ORDER BY i.created_at ASC`,
+      [id, today],
+    ) as Array<{ name?: string | null; genericName?: string | null; genericname?: string | null }>;
+    return rows.flatMap((row) => {
+      const name = row.name?.trim();
+      if (!name) {
+        return [];
+      }
+      const genericName = (row.genericName ?? row.genericname)?.trim() || null;
+      return [{ name, genericName }];
+    });
+  }
+
+  async itemBrief(id: string | undefined, actor?: PrescriptionActor) {
+    const item = await this.findItem(id);
+    const patientId = item.prescription?.patientId;
+    if (!patientId) {
+      throw ErrorHandling.NotFound('Prescription not found');
+    }
+    this.assertPatientOwns(patientId, actor);
+    return {
+      patientId,
+      name: item.name,
+      genericName: item.genericName,
+    };
   }
 
   async getById(id: string, actor?: PrescriptionActor) {
@@ -394,7 +466,7 @@ export class PrescriptionsService {
     return prescription;
   }
 
-  private async findItem(id: string) {
+  private async findItem(id: string | undefined) {
     this.requireUuid(id, 'prescription item id');
     const item = await this.prescriptionItems.findOne({
       where: { id },
@@ -602,4 +674,33 @@ export class PrescriptionsService {
       isActive: rule.isActive,
     };
   }
+}
+
+function todayInVietnam() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+}
+
+function imageBytes(value: unknown) {
+  if (Buffer.isBuffer(value)) {
+    return value;
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value);
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const hex = value.startsWith('\\x') ? value.slice(2) : '';
+  if (hex.length > 0 && hex.length % 2 === 0 && /^[0-9a-f]+$/i.test(hex)) {
+    return Buffer.from(hex, 'hex');
+  }
+  return null;
+}
+
+function safeImageType(value: string | null | undefined) {
+  const mime = (value ?? '').split(';')[0].trim().toLowerCase();
+  if (mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp') {
+    return mime;
+  }
+  return 'application/octet-stream';
 }

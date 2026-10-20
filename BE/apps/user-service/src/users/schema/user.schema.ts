@@ -23,8 +23,17 @@ export class User {
     @Prop({})
     avatar_url: string;
 
+    @Prop({ default: false })
+    isPremium: boolean;
+
+    @Prop()
+    premiumExpiresAt?: Date;
+
     @Prop({ required: false })
     fcmToken?: string;
+
+    @Prop({ default: true })
+    isActive: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User)

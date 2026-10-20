@@ -1,13 +1,34 @@
 import { Controller } from "@nestjs/common";
+import { AdminUsersService } from "./admin-users.service.js";
 import { UserService } from "./user.service.js";
 import { MessagePattern, Payload } from "@nestjs/microservices";
-import { ErrorHandling } from "@lib/error-handling";
 
 @Controller()
 export class UserController {
     constructor(
         private readonly userService: UserService,
+        private readonly adminUsersService: AdminUsersService,
     ) {}
+
+    @MessagePattern({ cmd: 'admin_dashboard_summary' })
+    adminSummary() {
+        return this.adminUsersService.summary();
+    }
+
+    @MessagePattern({ cmd: 'admin_list_users' })
+    adminListUsers(@Payload() data: { role?: string; q?: string; isActive?: boolean; page?: number; limit?: number }) {
+        return this.adminUsersService.list(data ?? {});
+    }
+
+    @MessagePattern({ cmd: 'admin_get_user' })
+    adminGetUser(@Payload() data: { userId?: string }) {
+        return this.adminUsersService.detail(data?.userId);
+    }
+
+    @MessagePattern({ cmd: 'admin_update_user' })
+    adminUpdateUser(@Payload() data: { actorUserId?: string; userId?: string; fullName?: string; phone?: string; role?: string; isActive?: boolean }) {
+        return this.adminUsersService.update(data ?? {});
+    }
 
     @MessagePattern({ cmd: "handle_get_patient_detail" })
     async handleGetPatientDetail(@Payload() data: any) {
@@ -29,6 +50,11 @@ export class UserController {
                 invitationLink,
             }
         }
+    }
+
+    @MessagePattern({ cmd: "handle_get_premium" })
+    handleGetPremium(@Payload() data: { userId?: string }) {
+        return this.userService.getPremium(data?.userId ?? '');
     }
 
     @MessagePattern({ cmd: 'save_fcm_token' })

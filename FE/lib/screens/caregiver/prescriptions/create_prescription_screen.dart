@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../models/prescription.dart';
 import '../../../services/prescription_service.dart';
+import '../../../widgets/app_components.dart';
 import '../../../widgets/glass.dart';
+import '../../../widgets/medicine_image_field.dart';
 
 // ---------------------------------------------------------------------------
 // Create Prescription Screen — 2-step Wizard
@@ -143,15 +145,29 @@ class _CreatePrescriptionScreenState extends State<CreatePrescriptionScreen> {
         items: _items.map((d) => d.toPrescriptionItem()).toList(),
       );
 
-      await PrescriptionService.instance.create(prescription);
+      final created = await PrescriptionService.instance.create(prescription);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã tạo đơn thuốc thành công!'),
-            backgroundColor: Color(0xFF249D76),
-          ),
-        );
-        Navigator.of(context).pop(true);
+        final interaction = created.interaction;
+        if (interaction != null &&
+            await isPremiumAccount() &&
+            (interaction.hasWarning || interaction.summary.isNotEmpty) &&
+            mounted) {
+          await showDrugInteractionDialog(
+            context: context,
+            summary: interaction.summary,
+            isWarning: interaction.hasWarning,
+          );
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã tạo đơn thuốc thành công!'),
+              backgroundColor: Color(0xFF249D76),
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) _showError(e.toString());
@@ -675,16 +691,28 @@ class _DraftItemCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 38,
+                height: 38,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: const Color(0xFFE5E8FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.medication_rounded,
-                  color: Color(0xFF5167F2),
-                  size: 18,
-                ),
+                child: (draft.imageUrl != null && draft.imageUrl!.isNotEmpty)
+                    ? Image.network(
+                        draft.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.medication_rounded,
+                          color: Color(0xFF5167F2),
+                          size: 18,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.medication_rounded,
+                        color: Color(0xFF5167F2),
+                        size: 18,
+                      ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -782,6 +810,7 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
   final _instructionsCtrl = TextEditingController();
 
   final List<ScheduleDraft> _schedules = [ScheduleDraft()];
+  bool _uploadingImage = false;
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -958,8 +987,11 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
               ],
             ),
             const SizedBox(height: 12),
-            _lbl('URL ảnh thuốc (tuỳ chọn)'),
-            _tf(_imageUrlCtrl, 'https://example.com/medicine.png'),
+            _lbl('Ảnh thuốc (tuỳ chọn)'),
+            MedicineImageField(
+              controller: _imageUrlCtrl,
+              onUploadingChanged: (v) => setState(() => _uploadingImage = v),
+            ),
 
             const SizedBox(height: 12),
             Row(
@@ -1126,7 +1158,7 @@ class _AddItemDraftSheetState extends State<_AddItemDraftSheet> {
             }),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: _confirm,
+              onPressed: _uploadingImage ? null : _confirm,
               icon: const Icon(Icons.check_circle_rounded),
               label: const Text(
                 'Xác nhận thêm thuốc',

@@ -17,10 +17,13 @@ services:
       MEDICATION_SERVICE_PORT: 3530
       PHARMACY_ORDER_SERVICE_HOST: pharmacy-order-service
       PHARMACY_ORDER_SERVICE_PORT: 3531
+      AI_SERVICE_HOST: ai-service
+      AI_SERVICE_PORT: 3532
     depends_on:
       - user-service
       - medication-service
       - pharmacy-order-service
+      - ai-service
     networks:
       - meds-network
     restart: unless-stopped
@@ -70,6 +73,23 @@ services:
       MEDICATION_SERVICE_PORT: 3530
     expose:
       - "3531"
+    networks:
+      - meds-network
+    restart: unless-stopped
+
+  ai-service:
+    image: ${REGISTRY}/ai-service:${IMAGE_TAG}
+    container_name: meds-ai-service
+    env_file:
+      - ./apps/ai-service/.env
+    environment:
+      NODE_ENV: production
+      AI_SERVICE_HOST: 0.0.0.0
+      AI_SERVICE_PORT: 3532
+      AI_BASE_URL: https://openrouter.ai/api/v1
+      AI_MODEL: qwen/qwen2.5-vl-72b-instruct
+    expose:
+      - "3532"
     networks:
       - meds-network
     restart: unless-stopped

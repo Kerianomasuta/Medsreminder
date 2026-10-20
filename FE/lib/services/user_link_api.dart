@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/care_network.dart';
 import 'api_base_url.dart';
+import 'billing_api.dart';
 import 'http_client_factory.dart';
 
 class UserLinkApiException implements Exception {
@@ -125,6 +126,15 @@ class UserLinkApi {
       throw const UserLinkApiException('Thông tin bệnh nhân không hợp lệ.');
     }
     return PatientDetail.fromJson(raw);
+  }
+
+  /// Lấy thông tin hồ sơ & trạng thái VIP: GET /api/v1/users/profile
+  Future<UserVipProfile> getUserProfile() async {
+    final payload = await _request(
+      'GET',
+      Uri.parse('$apiBaseUrl/api/v1/users/profile'),
+    );
+    return UserVipProfile.fromJson(payload);
   }
 
   Future<Map<String, dynamic>> _request(String method, Uri uri) async {

@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import '../models/prescription.dart';
 import 'api_base_url.dart';
 import 'http_client_factory.dart';
+import 'prescription_scanner.dart';
 
 // ---------------------------------------------------------------------------
 
@@ -185,12 +187,48 @@ class PrescriptionService {
     // ─────────────────────────────────────────────────────────────────────────
     final payload = prescription.toCreateJson();
     payload['createdByCgId'] ??= '6ac0cbf1ea185d34aa6f322a';
-    final raw = await _request(
-      'POST',
-      '/api/v1/prescriptions',
-      body: payload,
-    );
+    final raw = await _request('POST', '/api/v1/prescriptions', body: payload);
     return Prescription.fromJson(raw);
+  }
+
+  Future<Prescription> scan({
+    required List<int> imageBytes,
+    required String filename,
+    required String patientId,
+  }) async {
+    final normalizedPatientId = patientId.trim();
+    if (!RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(normalizedPatientId)) {
+      throw PrescriptionServiceException(
+        400,
+        'patientId không hợp lệ: "$normalizedPatientId". Cần MongoDB ObjectId 24 ký tự.',
+      );
+    }
+    return scanPrescription(
+      url: '$apiBaseUrl/api/v1/prescriptions/scan',
+      imageBytes: imageBytes,
+      filename: filename,
+      patientId: normalizedPatientId,
+      client: _client,
+    );
+  }
+
+  Future<Uint8List> getPhoto(String prescriptionId) async {
+    final uri = Uri.parse(
+      '$apiBaseUrl/api/v1/prescriptions/$prescriptionId/photo',
+    );
+    late http.Response response;
+    try {
+      response = await _client.get(uri, headers: const {'Accept': 'image/*'});
+    } catch (_) {
+      throw PrescriptionServiceException(0, 'Không thể tải ảnh đơn thuốc.');
+    }
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    }
+    throw PrescriptionServiceException(
+      response.statusCode,
+      'Không thể tải ảnh đơn thuốc (${response.statusCode}).',
+    );
   }
 
   /// PATCH /api/v1/prescriptions/{id}

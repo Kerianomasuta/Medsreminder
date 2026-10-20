@@ -50,6 +50,19 @@ class CareNetworkController extends ChangeNotifier {
       .whereType<LinkedUserSummary>()
       .toList(growable: false);
 
+  String? mongoPatientId(String? patientId) {
+    final id = linkedAccounts
+        .map((link) => link.patient)
+        .whereType<LinkedUserSummary>()
+        .where((patient) => patient.id == patientId)
+        .map((patient) => patient.id.trim())
+        .firstWhere(
+          (value) => RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(value),
+          orElse: () => '',
+        );
+    return id.isEmpty ? null : id;
+  }
+
   PatientBundle? bundleFor(String? patientId) =>
       patientId == null ? null : _bundleCache[patientId];
 
