@@ -7,6 +7,7 @@ import '../../models/schedule_rule.dart';
 import '../patient/schedule_timeline_page.dart';
 import 'prescriptions/create_prescription_screen.dart';
 import 'prescriptions/prescription_detail_screen.dart';
+import '../../services/user_link_api.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverHome extends StatelessWidget {
@@ -47,10 +48,32 @@ class CaregiverHome extends StatelessWidget {
             userEmail: userEmail,
           );
         }
-        return const _CenteredMessage(
-          icon: Icons.people_outline_rounded,
+        return _CenteredMessage(
+          icon: Icons.qr_code_scanner_rounded,
           title: 'Chưa có bệnh nhân',
-          message: 'Nhập mã mời của bệnh nhân tại Hồ sơ để bắt đầu kết nối.',
+          message: 'Quét mã QR của bệnh nhân để bắt đầu kết nối và theo dõi.',
+          actionLabel: 'Quét mã QR ngay',
+          onAction: () async {
+            final uuid = await CaregiverQrScannerSheet.show(context);
+            if (uuid != null && uuid.isNotEmpty && context.mounted) {
+              try {
+                await controller.verifyInvitation(uuid);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã kết nối bệnh nhân thành công!'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Lỗi kết nối: $e')),
+                  );
+                }
+              }
+            }
+          },
         );
       }
 
@@ -131,10 +154,10 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
       children: [
         const PageIntro(
           'Kết nối bệnh nhân đầu tiên',
-          'Nhập mã mời được bệnh nhân chia sẻ để bắt đầu chăm sóc',
+          'Quét mã QR hoặc nhập mã mời của bệnh nhân để bắt đầu chăm sóc',
         ),
         Glass(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -149,11 +172,45 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
                 widget.userEmail,
                 style: const TextStyle(color: Color(0xFF687195)),
               ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _submitting ? null : _scanQr,
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
+                label: const Text(
+                  'Quét mã QR kết nối',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF5066F3),
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'hoặc nhập mã thủ công',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF767F9D),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                ],
+              ),
               const SizedBox(height: 18),
               TextField(
                 controller: _controller,
                 decoration: const InputDecoration(
-                  labelText: 'Mã mời (UUID)',
+                  labelText: 'Mã mời (UUID) hoặc link',
                   prefixIcon: Icon(Icons.key_rounded),
                   border: OutlineInputBorder(),
                 ),
@@ -163,10 +220,21 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
                 Text(_error!, style: const TextStyle(color: Color(0xFFC64E57))),
               ],
               const SizedBox(height: 14),
-              FilledButton.icon(
+              OutlinedButton.icon(
                 onPressed: _submitting ? null : _submit,
-                icon: const Icon(Icons.person_add_alt_1_rounded),
+                icon: _submitting
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.person_add_alt_1_rounded),
                 label: const Text('Xác nhận kết nối'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ],
           ),
@@ -175,15 +243,29 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
     ),
   );
 
+  Future<void> _scanQr() async {
+    final uuid = await CaregiverQrScannerSheet.show(context);
+    if (uuid != null && uuid.isNotEmpty && mounted) {
+      _controller.text = uuid;
+      await _submit();
+    }
+  }
+
   Future<void> _submit() async {
-    final uuid = _controller.text.trim();
-    if (uuid.isEmpty) return;
+    final raw = _controller.text.trim();
+    final uuid = UserLinkApi.extractInvitationUuid(raw);
+    if (uuid == null || uuid.isEmpty) return;
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
       await widget.controller.verifyInvitation(uuid);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã kết nối bệnh nhân thành công!')),
+        );
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -503,10 +585,44 @@ class _ProfilePageState extends State<_ProfilePage> {
             padding: const EdgeInsets.all(18),
             child: Column(
               children: [
+                FilledButton.icon(
+                  onPressed: _submitting ? null : _scanQr,
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                  label: const Text(
+                    'Quét mã QR bệnh nhân',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF5066F3),
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(
+                        'hoặc nhập mã thủ công',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: const Color(0xFF767F9D),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                  ],
+                ),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _invitationController,
                   decoration: const InputDecoration(
-                    labelText: 'Mã mời (UUID)',
+                    labelText: 'Mã mời (UUID) hoặc link',
                     prefixIcon: Icon(Icons.key_rounded),
                     border: OutlineInputBorder(),
                   ),
@@ -519,10 +635,21 @@ class _ProfilePageState extends State<_ProfilePage> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                FilledButton.icon(
+                OutlinedButton.icon(
                   onPressed: _submitting ? null : _submitInvitation,
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
+                  icon: _submitting
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_add_alt_1_rounded),
                   label: const Text('Xác nhận kết nối'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -556,9 +683,18 @@ class _ProfilePageState extends State<_ProfilePage> {
     ),
   );
 
+  Future<void> _scanQr() async {
+    final uuid = await CaregiverQrScannerSheet.show(context);
+    if (uuid != null && uuid.isNotEmpty && mounted) {
+      _invitationController.text = uuid;
+      await _submitInvitation();
+    }
+  }
+
   Future<void> _submitInvitation() async {
-    final uuid = _invitationController.text.trim();
-    if (uuid.isEmpty) return;
+    final raw = _invitationController.text.trim();
+    final uuid = UserLinkApi.extractInvitationUuid(raw);
+    if (uuid == null || uuid.isEmpty) return;
     setState(() {
       _submitting = true;
       _error = null;

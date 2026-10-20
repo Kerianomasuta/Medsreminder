@@ -28,66 +28,71 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
             'Kết nối người chăm sóc',
             'Chia sẻ lời mời bảo mật và quản lý tài khoản đã liên kết',
           ),
-          Glass(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Color(0xFFE7E9FF),
-                      child: Icon(Icons.link_rounded, color: Color(0xFF5267F4)),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Mời người chăm sóc',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          Text(
-                            'Mã mời có hiệu lực tối đa 15 phút',
-                            style: TextStyle(
-                              color: Color(0xFF6E7590),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+          if (widget.controller.invitationUuid != null) ...[
+            PatientQrCodeCard(
+              invitationUuid: widget.controller.invitationUuid!,
+              invitationLink: widget.controller.invitationLink,
+              patientName: widget.controller.user.fullName,
+              createdAt: widget.controller.invitationCreatedAt,
+              onRefresh: _refreshInvitation,
+              isRefreshing: _creating,
+            ),
+          ] else ...[
+            Glass(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE7E9FF),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.qr_code_2_rounded,
+                          color: Color(0xFF5267F4),
+                          size: 28,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                if (widget.controller.invitationUuid != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDEFFC),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: SelectableText(
-                      widget.controller.invitationUuid!,
-                      style: const TextStyle(
-                        color: Color(0xFF3D4FC2),
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Mời người chăm sóc',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF1E285F),
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Mã QR có hiệu lực 15 phút để bảo mật',
+                              style: TextStyle(
+                                color: Color(0xFF6E7590),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Tạo mã QR an toàn để người thân hoặc người chăm sóc quét và kết nối theo dõi lịch uống thuốc của bạn.',
+                    style: TextStyle(
+                      color: Color(0xFF5D6585),
+                      fontSize: 13,
+                      height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(
-                    onPressed: _copyUuid,
-                    icon: const Icon(Icons.copy_rounded),
-                    label: const Text('Sao chép mã mời'),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   FilledButton.icon(
                     onPressed: _creating ? null : _createInvitation,
                     icon: _creating
@@ -98,20 +103,30 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
                               color: Colors.white,
                             ),
                           )
-                        : const Icon(Icons.person_add_alt_1_rounded),
-                    label: const Text('Tạo mã mời'),
+                        : const Icon(Icons.qr_code_rounded),
+                    label: const Text('Tạo mã QR kết nối'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF5066F3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: Color(0xFFC64E57)),
+                    ),
+                  ],
                 ],
-                if (_error != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Color(0xFFC64E57)),
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 20),
           Row(
             children: [
@@ -191,6 +206,20 @@ class _PatientConnectionsPageState extends State<PatientConnectionsPage> {
     });
     try {
       await widget.controller.createInvitation();
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
+  }
+
+  Future<void> _refreshInvitation() async {
+    setState(() {
+      _creating = true;
+      _error = null;
+    });
+    try {
+      await widget.controller.refreshInvitation();
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {

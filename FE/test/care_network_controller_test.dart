@@ -44,6 +44,50 @@ void main() {
       expect(prescriptions.calls, 2);
     },
   );
+
+  test(
+    'creates, caches, and refreshes invitation UUID and QR link',
+    () async {
+      final links = _FakeUserLinkApi();
+      final controller = CareNetworkController(
+        user: const AuthUser(
+          id: _patientId,
+          email: 'patient@example.com',
+          fullName: 'Bệnh nhân Lan',
+          role: AppRole.patient,
+        ),
+        userLinkApi: links,
+      );
+
+      expect(controller.invitationUuid, isNull);
+      expect(controller.invitationLink, isNull);
+      expect(controller.invitationCreatedAt, isNull);
+
+      final uuid1 = await controller.createInvitation();
+      expect(uuid1, 'invite-1');
+      expect(controller.invitationUuid, 'invite-1');
+      expect(controller.invitationLink, contains('invite-1'));
+      expect(controller.invitationCreatedAt, isNotNull);
+      expect(links.inviteCalls, 1);
+
+      // Subsequent call reuses cached invitation
+      final uuidCached = await controller.createInvitation();
+      expect(uuidCached, 'invite-1');
+      expect(links.inviteCalls, 1);
+
+      // Refresh forces new invitation creation
+      final uuid2 = await controller.refreshInvitation();
+      expect(uuid2, 'invite-2');
+      expect(controller.invitationUuid, 'invite-2');
+      expect(controller.invitationLink, contains('invite-2'));
+      expect(links.inviteCalls, 2);
+
+      controller.clearInvitation();
+      expect(controller.invitationUuid, isNull);
+      expect(controller.invitationLink, isNull);
+      expect(controller.invitationCreatedAt, isNull);
+    },
+  );
 }
 
 const _patientId = '507f1f77bcf86cd799439011';
@@ -51,6 +95,15 @@ const _patientId = '507f1f77bcf86cd799439011';
 class _FakeUserLinkApi extends UserLinkApi {
   int linkCalls = 0;
   int detailCalls = 0;
+  int inviteCalls = 0;
+
+  @override
+  Future<String> createInvitation() async {
+    inviteCalls++;
+    lastInvitationLink =
+        'https://example.com/invitation?invitationUUID=invite-$inviteCalls';
+    return 'invite-$inviteCalls';
+  }
 
   @override
   Future<List<LinkedAccount>> getLinkedAccounts() async {
