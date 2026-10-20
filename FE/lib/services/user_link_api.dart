@@ -21,6 +21,7 @@ class UserLinkApi {
   UserLinkApi({http.Client? client}) : _client = client ?? createHttpClient();
 
   final http.Client _client;
+  String? lastInvitationLink;
 
   Future<String> createInvitation() async {
     final payload = await _request(
@@ -29,6 +30,7 @@ class UserLinkApi {
     );
     final data = payload['data'] as Map<String, dynamic>?;
     final link = data?['invitationLink']?.toString().trim();
+    lastInvitationLink = link;
     final invitationUuid = link == null || link.isEmpty
         ? null
         : Uri.tryParse(link)?.queryParameters['invitationUUID']?.trim();
@@ -38,6 +40,54 @@ class UserLinkApi {
       );
     }
     return invitationUuid;
+  }
+
+  /// Parses invitation UUID from varied formats:
+  /// - Full URL query string: `.../invitation?invitationUUID=<uuid>`
+  /// - JSON string: `{"invitationUUID": "<uuid>"}`
+  /// - Standard 36-char UUID string: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+  /// - Raw string fallback
+  static String? extractInvitationUuid(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. Check URL parameters
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.hasQuery) {
+      final param = uri.queryParameters['invitationUUID'] ??
+          uri.queryParameters['invitationUuid'] ??
+          uri.queryParameters['uuid'];
+      if (param != null && param.trim().isNotEmpty) {
+        return param.trim();
+      }
+    }
+
+    // 2. Check JSON payload
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map<String, dynamic>) {
+          final id = decoded['invitationUUID'] ??
+              decoded['invitationUuid'] ??
+              decoded['uuid'];
+          if (id != null && id.toString().trim().isNotEmpty) {
+            return id.toString().trim();
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Check UUID regex
+    final uuidRegex = RegExp(
+      r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+    );
+    final match = uuidRegex.firstMatch(trimmed);
+    if (match != null) {
+      return match.group(0);
+    }
+
+    return trimmed;
   }
 
   Future<void> verifyInvitation(String invitationUuid) async {

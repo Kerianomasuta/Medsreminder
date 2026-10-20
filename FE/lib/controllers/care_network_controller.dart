@@ -5,6 +5,7 @@ import '../models/auth_user.dart';
 import '../models/care_network.dart';
 import '../models/prescription.dart';
 import '../models/schedule_rule.dart';
+import '../services/api_base_url.dart';
 import '../services/prescription_service.dart';
 import '../services/schedule_api.dart';
 import '../services/user_link_api.dart';
@@ -30,6 +31,8 @@ class CareNetworkController extends ChangeNotifier {
   bool linksLoading = false;
   String? linksError;
   String? invitationUuid;
+  String? invitationLink;
+  DateTime? invitationCreatedAt;
 
   bool _linksLoaded = false;
   Future<void>? _linksInFlight;
@@ -154,10 +157,24 @@ class CareNetworkController extends ChangeNotifier {
     }
   }
 
-  Future<String> createInvitation() async {
-    invitationUuid ??= await _userLinkApi.createInvitation();
-    notifyListeners();
+  Future<String> createInvitation({bool force = false}) async {
+    if (force || invitationUuid == null) {
+      invitationUuid = await _userLinkApi.createInvitation();
+      invitationLink = _userLinkApi.lastInvitationLink ??
+          '$apiBaseUrl/invitation?invitationUUID=$invitationUuid';
+      invitationCreatedAt = DateTime.now();
+      notifyListeners();
+    }
     return invitationUuid!;
+  }
+
+  Future<String> refreshInvitation() => createInvitation(force: true);
+
+  void clearInvitation() {
+    invitationUuid = null;
+    invitationLink = null;
+    invitationCreatedAt = null;
+    notifyListeners();
   }
 
   Future<void> verifyInvitation(String invitationUuid) async {
