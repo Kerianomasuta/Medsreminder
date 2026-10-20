@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../models/prescription.dart';
 import '../../../services/prescription_service.dart';
+import '../../../widgets/app_components.dart';
+import '../../../widgets/medicine_image_field.dart';
 
 // ---------------------------------------------------------------------------
 // Add Item Sheet
@@ -36,6 +38,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   final List<ScheduleDraft> _schedules = [ScheduleDraft()];
   bool _saving = false;
+  bool _uploadingImage = false;
 
   @override
   void dispose() {
@@ -78,7 +81,6 @@ class _AddItemSheetState extends State<AddItemSheet> {
         return;
       }
     }
-
     setState(() => _saving = true);
     try {
       final item = PrescriptionItem(
@@ -98,10 +100,27 @@ class _AddItemSheetState extends State<AddItemSheet> {
             : _instructionsCtrl.text.trim(),
         schedules: _schedules.map((s) => s.toSchedule()).toList(),
       );
-      await PrescriptionService.instance.addItem(widget.prescriptionId, item);
+      final addedItem = await PrescriptionService.instance.addItem(
+        widget.prescriptionId,
+        item,
+      );
       if (mounted) {
-        Navigator.of(context).pop();
-        widget.onSaved();
+        final interaction = addedItem.interaction;
+        if (interaction != null &&
+            await isPremiumAccount() &&
+            (interaction.hasWarning || interaction.summary.isNotEmpty) &&
+            mounted) {
+          await showDrugInteractionDialog(
+            context: context,
+            summary: interaction.summary,
+            isWarning: interaction.hasWarning,
+          );
+        }
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          widget.onSaved();
+        }
       }
     } catch (e) {
       if (mounted) _showError(e.toString());
@@ -229,8 +248,11 @@ class _AddItemSheetState extends State<AddItemSheet> {
               ],
             ),
             const SizedBox(height: 12),
-            _label('URL ảnh thuốc (tuỳ chọn)'),
-            _tf(_imageUrlCtrl, 'https://example.com/medicine.png'),
+            _label('Ảnh thuốc (tuỳ chọn)'),
+            MedicineImageField(
+              controller: _imageUrlCtrl,
+              onUploadingChanged: (v) => setState(() => _uploadingImage = v),
+            ),
 
             const SizedBox(height: 12),
             Row(
@@ -292,7 +314,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
             ...List.generate(_schedules.length, _scheduleRow),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: _saving ? null : _save,
+              onPressed: (_saving || _uploadingImage) ? null : _save,
               icon: _saving
                   ? const SizedBox(
                       width: 18,

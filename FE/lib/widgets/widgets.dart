@@ -6,3 +6,7 @@ export 'custom_components.dart';
 export 'add_medicine_modal.dart';
 export 'schedule_details_modal.dart';
 export 'pharmacy_location_picker.dart';
+export 'patient_qr_code_card.dart';
+export 'caregiver_qr_scanner_sheet.dart';
+export 'caregiver_vip_section.dart';
+export 'caregiver_profile_card.dart';

@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../controllers/care_network_controller.dart';
 import '../../models/care_network.dart';
 import '../../models/prescription.dart';
 import '../../models/schedule_rule.dart';
+import '../../services/medication_logs_api.dart';
+import '../../services/pdf_download_service.dart';
+import '../../services/prescription_service.dart';
 import '../patient/schedule_timeline_page.dart';
 import 'prescriptions/create_prescription_screen.dart';
 import 'prescriptions/prescription_detail_screen.dart';
+import '../../services/user_link_api.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverHome extends StatelessWidget {
@@ -68,10 +74,32 @@ class CaregiverHome extends StatelessWidget {
             userEmail: userEmail,
           );
         }
-        return const _CenteredMessage(
-          icon: Icons.people_outline_rounded,
+        return _CenteredMessage(
+          icon: Icons.qr_code_scanner_rounded,
           title: 'Chưa có bệnh nhân',
-          message: 'Nhập mã mời của bệnh nhân tại Hồ sơ để bắt đầu kết nối.',
+          message: 'Quét mã QR của bệnh nhân để bắt đầu kết nối và theo dõi.',
+          actionLabel: 'Quét mã QR ngay',
+          onAction: () async {
+            final uuid = await CaregiverQrScannerSheet.show(context);
+            if (uuid != null && uuid.isNotEmpty && context.mounted) {
+              try {
+                await controller.verifyInvitation(uuid);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã kết nối bệnh nhân thành công!'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Lỗi kết nối: $e')),
+                  );
+                }
+              }
+            }
+          },
         );
       }
 
@@ -156,29 +184,65 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
       children: [
         const PageIntro(
           'Kết nối bệnh nhân đầu tiên',
-          'Nhập mã mời được bệnh nhân chia sẻ để bắt đầu chăm sóc',
+          'Quét mã QR hoặc nhập mã mời của bệnh nhân để bắt đầu chăm sóc',
         ),
+        CaregiverProfileCard(
+          userName: widget.userName,
+          userEmail: widget.userEmail,
+        ),
+        const SizedBox(height: 14),
         Glass(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                widget.userName,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+              const Text(
+                'Kết nối bệnh nhân',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E293B),
                 ),
               ),
-              Text(
-                widget.userEmail,
-                style: const TextStyle(color: Color(0xFF687195)),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _submitting ? null : _scanQr,
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
+                label: const Text(
+                  'Quét mã QR kết nối',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF5066F3),
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'hoặc nhập mã thủ công',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF767F9D),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                ],
               ),
               const SizedBox(height: 18),
               TextField(
                 controller: _controller,
                 decoration: const InputDecoration(
-                  labelText: 'Mã mời (UUID)',
+                  labelText: 'Mã mời (UUID) hoặc link',
                   prefixIcon: Icon(Icons.key_rounded),
                   border: OutlineInputBorder(),
                 ),
@@ -188,27 +252,54 @@ class _ConnectPatientPageState extends State<_ConnectPatientPage> {
                 Text(_error!, style: const TextStyle(color: Color(0xFFC64E57))),
               ],
               const SizedBox(height: 14),
-              FilledButton.icon(
+              OutlinedButton.icon(
                 onPressed: _submitting ? null : _submit,
-                icon: const Icon(Icons.person_add_alt_1_rounded),
+                icon: _submitting
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.person_add_alt_1_rounded),
                 label: const Text('Xác nhận kết nối'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 18),
+        const CaregiverVipSection(),
       ],
     ),
   );
 
+  Future<void> _scanQr() async {
+    final uuid = await CaregiverQrScannerSheet.show(context);
+    if (uuid != null && uuid.isNotEmpty && mounted) {
+      _controller.text = uuid;
+      await _submit();
+    }
+  }
+
   Future<void> _submit() async {
-    final uuid = _controller.text.trim();
-    if (uuid.isEmpty) return;
+    final raw = _controller.text.trim();
+    final uuid = UserLinkApi.extractInvitationUuid(raw);
+    if (uuid == null || uuid.isEmpty) return;
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
       await widget.controller.verifyInvitation(uuid);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã kết nối bệnh nhân thành công!')),
+        );
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -378,13 +469,22 @@ class _OverviewPage extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 14),
+            _ComplianceReportCard(
+              patientId: bundle.detail.id,
+              patientName: bundle.detail.fullName,
+            ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Lịch uống hôm nay',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                const Expanded(
+                  child: Text(
+                    'Lịch uống hôm nay',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 if (todaySchedules.isNotEmpty && onViewAllSchedules != null)
                   TextButton.icon(
@@ -432,14 +532,114 @@ class _OverviewPage extends StatelessWidget {
   }
 }
 
-class _PrescriptionPage extends StatelessWidget {
+class _PrescriptionPage extends StatefulWidget {
   const _PrescriptionPage({required this.controller, required this.bundle});
   final CareNetworkController controller;
   final PatientBundle bundle;
 
   @override
+  State<_PrescriptionPage> createState() => _PrescriptionPageState();
+}
+
+class _PrescriptionPageState extends State<_PrescriptionPage> {
+  bool _scanning = false;
+
+  Future<void> _scanPrescription() async {
+    if (!await requirePremiumAccess(context) || !mounted) return;
+
+    final patientId = widget.controller.mongoPatientId(
+      widget.controller.selectedPatientId,
+    );
+    if (patientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Không thể quét: chưa nhận được mã bệnh nhân MongoDB hợp lệ.',
+          ),
+          backgroundColor: Color(0xFFD65B49),
+        ),
+      );
+      return;
+    }
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Chụp ảnh đơn thuốc'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Chọn ảnh từ thư viện'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    List<int>? imageBytes;
+    String? filename;
+    if (source == ImageSource.gallery) {
+      final result = await FilePicker.pickFiles(type: FileType.image);
+      final file = result.isNotEmpty ? result.first : null;
+      imageBytes = file == null ? null : await file.readAsBytes();
+      filename = file?.name;
+    } else {
+      final image = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 90,
+      );
+      if (image != null) {
+        imageBytes = await image.readAsBytes();
+        filename = image.name;
+      }
+    }
+    if (imageBytes == null ||
+        imageBytes.isEmpty ||
+        filename == null ||
+        !mounted) {
+      return;
+    }
+
+    setState(() => _scanning = true);
+    try {
+      debugPrint('Scanning prescription for patientId=$patientId');
+      final prescription = await PrescriptionService.instance.scan(
+        imageBytes: imageBytes,
+        filename: filename,
+        patientId: patientId,
+      );
+      if (!mounted || prescription.id == null) return;
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              PrescriptionDetailScreen(prescriptionId: prescription.id!),
+        ),
+      );
+      widget.controller.loadPatient(patientId, force: true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Quét đơn thuốc thất bại: $e'),
+          backgroundColor: const Color(0xFFD65B49),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => _PatientFrame(
-    controller: controller,
+    controller: widget.controller,
     child: AppScroll(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,9 +649,15 @@ class _PrescriptionPage extends StatelessWidget {
               Expanded(
                 child: PageIntro(
                   'Đơn thuốc',
-                  'Đơn và thuốc của ${bundle.detail.fullName}',
+                  'Đơn và thuốc của ${widget.bundle.detail.fullName}',
                 ),
               ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.document_scanner_rounded, size: 18),
+                label: Text(_scanning ? 'Đang quét...' : 'Quét đơn'),
+                onPressed: _scanning ? null : _scanPrescription,
+              ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Tạo đơn'),
@@ -467,26 +673,31 @@ class _PrescriptionPage extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => CreatePrescriptionScreen(
-                        patientId: bundle.detail.id,
-                        patientName: bundle.detail.fullName,
+                        patientId: widget.bundle.detail.id,
+                        patientName: widget.bundle.detail.fullName,
                       ),
                     ),
                   );
                   if (created == true) {
-                    controller.loadPatient(bundle.detail.id, force: true);
+                    widget.controller.loadPatient(
+                      widget.bundle.detail.id,
+                      force: true,
+                    );
                   }
                 },
               ),
             ],
           ),
-          if (bundle.prescriptions.isEmpty)
+          if (widget.bundle.prescriptions.isEmpty)
             const _EmptyCard(message: 'Bệnh nhân chưa có đơn thuốc.')
           else
-            ...bundle.prescriptions.map(
+            ...widget.bundle.prescriptions.map(
               (prescription) => _PrescriptionCard(
                 prescription: prescription,
-                onRefresh: () =>
-                    controller.loadPatient(bundle.detail.id, force: true),
+                onRefresh: () => widget.controller.loadPatient(
+                  widget.bundle.detail.id,
+                  force: true,
+                ),
               ),
             ),
         ],
@@ -533,24 +744,13 @@ class _ProfilePageState extends State<_ProfilePage> {
             'Hồ sơ người chăm sóc',
             'Tài khoản và các kết nối bệnh nhân',
           ),
-          Glass(
-            padding: const EdgeInsets.all(18),
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(
-                radius: 28,
-                backgroundColor: Color(0xFFDCE2FE),
-                child: Icon(Icons.person_rounded, color: Color(0xFF5066F3)),
-              ),
-              title: Text(
-                widget.userName,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-              subtitle: Text(widget.userEmail),
-              trailing: const StatusChip('Hoạt động', Color(0xFF249D76)),
-            ),
+          CaregiverProfileCard(
+            userName: widget.userName,
+            userEmail: widget.userEmail,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+          const CaregiverVipSection(),
+          const SizedBox(height: 10),
           const Text(
             'Kết nối thêm bệnh nhân',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
@@ -560,10 +760,44 @@ class _ProfilePageState extends State<_ProfilePage> {
             padding: const EdgeInsets.all(18),
             child: Column(
               children: [
+                FilledButton.icon(
+                  onPressed: _submitting ? null : _scanQr,
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                  label: const Text(
+                    'Quét mã QR bệnh nhân',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF5066F3),
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(
+                        'hoặc nhập mã thủ công',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: const Color(0xFF767F9D),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: Color(0xFFD8DEFF))),
+                  ],
+                ),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _invitationController,
                   decoration: const InputDecoration(
-                    labelText: 'Mã mời (UUID)',
+                    labelText: 'Mã mời (UUID) hoặc link',
                     prefixIcon: Icon(Icons.key_rounded),
                     border: OutlineInputBorder(),
                   ),
@@ -576,10 +810,21 @@ class _ProfilePageState extends State<_ProfilePage> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                FilledButton.icon(
+                OutlinedButton.icon(
                   onPressed: _submitting ? null : _submitInvitation,
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
+                  icon: _submitting
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_add_alt_1_rounded),
                   label: const Text('Xác nhận kết nối'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -613,9 +858,18 @@ class _ProfilePageState extends State<_ProfilePage> {
     ),
   );
 
+  Future<void> _scanQr() async {
+    final uuid = await CaregiverQrScannerSheet.show(context);
+    if (uuid != null && uuid.isNotEmpty && mounted) {
+      _invitationController.text = uuid;
+      await _submitInvitation();
+    }
+  }
+
   Future<void> _submitInvitation() async {
-    final uuid = _invitationController.text.trim();
-    if (uuid.isEmpty) return;
+    final raw = _invitationController.text.trim();
+    final uuid = UserLinkApi.extractInvitationUuid(raw);
+    if (uuid == null || uuid.isEmpty) return;
     setState(() {
       _submitting = true;
       _error = null;
@@ -699,10 +953,14 @@ class _Metric extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
             style: const TextStyle(fontSize: 11, color: Color(0xFF687195)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -955,4 +1213,199 @@ int _parseReminderMinutes(String reminderTime) {
   final h = int.tryParse(parts[0]) ?? 0;
   final m = int.tryParse(parts[1]) ?? 0;
   return h * 60 + m;
+}
+
+class _ComplianceReportCard extends StatefulWidget {
+  const _ComplianceReportCard({
+    required this.patientId,
+    required this.patientName,
+  });
+
+  final String patientId;
+  final String patientName;
+
+  @override
+  State<_ComplianceReportCard> createState() => _ComplianceReportCardState();
+}
+
+class _ComplianceReportCardState extends State<_ComplianceReportCard> {
+  bool _downloading = false;
+  final _api = MedicationLogsApi();
+
+  @override
+  void dispose() {
+    _api.close();
+    super.dispose();
+  }
+
+  Future<void> _downloadReport() async {
+    if (!await requirePremiumAccess(context) || !mounted) return;
+
+    setState(() => _downloading = true);
+    try {
+      final result = await _api.downloadComplianceReport(
+        patientId: widget.patientId,
+      );
+      downloadPdfFile(result.bytes, result.filename);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã tải báo cáo tuân thủ: ${result.filename}'),
+            backgroundColor: const Color(0xFF249D76),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.toString().contains('403') ||
+                      e.toString().toLowerCase().contains('premium')
+                  ? 'Tính năng xuất báo cáo PDF chỉ dành cho tài khoản VIP.'
+                  : 'Tải báo cáo thất bại: $e',
+            ),
+            backgroundColor: const Color(0xFFD65B49),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFED7AA), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEA580C).withValues(alpha: .08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFEA580C).withValues(alpha: .14),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.picture_as_pdf_rounded,
+              color: Color(0xFFEA580C),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Flexible(
+                      child: Text(
+                        'Báo cáo tuân thủ 30 ngày',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF9A3412),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEA580C),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'VIP',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Tỷ lệ đúng giờ, liều quên của ${widget.patientName}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFFC2410C),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: _downloading ? null : _downloadReport,
+            icon: _downloading
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.download_rounded, size: 16),
+            label: Text(
+              _downloading ? 'Đang xuất...' : 'Tải PDF',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEA580C),
+              foregroundColor: Colors.white,
+              elevation: 2,
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

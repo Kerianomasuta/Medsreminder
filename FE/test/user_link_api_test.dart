@@ -84,4 +84,47 @@ void main() {
       ]);
     },
   );
+
+  group('UserLinkApi.extractInvitationUuid', () {
+    test('extracts UUID from invitation link URL', () {
+      const url =
+          'https://example.com/invitation?invitationUUID=550e8400-e29b-41d4-a716-446655440000';
+      expect(
+        UserLinkApi.extractInvitationUuid(url),
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+    });
+
+    test('extracts UUID from alternate uuid query parameter', () {
+      const url =
+          'medsreminder://invite?uuid=550e8400-e29b-41d4-a716-446655440000';
+      expect(
+        UserLinkApi.extractInvitationUuid(url),
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+    });
+
+    test('extracts UUID from raw UUID string', () {
+      const rawUuid = '550e8400-e29b-41d4-a716-446655440000';
+      expect(UserLinkApi.extractInvitationUuid(rawUuid), rawUuid);
+    });
+
+    test('extracts UUID from embedded JSON payload', () {
+      const jsonStr =
+          '{"invitationUUID": "550e8400-e29b-41d4-a716-446655440000"}';
+      expect(
+        UserLinkApi.extractInvitationUuid(jsonStr),
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+    });
+
+    test('falls back to trimmed text for custom test tokens', () {
+      expect(UserLinkApi.extractInvitationUuid(' invite-token-1 '), 'invite-token-1');
+    });
+
+    test('returns null for empty or null inputs', () {
+      expect(UserLinkApi.extractInvitationUuid(null), isNull);
+      expect(UserLinkApi.extractInvitationUuid('   '), isNull);
+    });
+  });
 }
