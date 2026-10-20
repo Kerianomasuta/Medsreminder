@@ -20,6 +20,8 @@ async function bootstrap() {
     origin: [
       /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
       'https://medsreminder.duckdns.org',
+      'https://medsreminder.vercel.app',
+      /^https:\/\/.*\.vercel\.app$/,
       ...configuredCorsOrigins,
     ],
     credentials: true
