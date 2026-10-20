@@ -74,10 +74,21 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
       final deviceLocation = await _locationProvider.currentLocation();
       if (!mounted) return;
       setState(() => _resolvingAddress = true);
-      final location = await _geocodingApi.reverseGeocode(
-        deviceLocation.latitude,
-        deviceLocation.longitude,
-      );
+      PharmacyLocationSelection location;
+      try {
+        location = await _geocodingApi.reverseGeocode(
+          deviceLocation.latitude,
+          deviceLocation.longitude,
+        );
+      } catch (_) {
+        final latStr = deviceLocation.latitude.toStringAsFixed(5);
+        final lonStr = deviceLocation.longitude.toStringAsFixed(5);
+        location = PharmacyLocationSelection(
+          addressText: 'Vị trí hiện tại ($latStr, $lonStr)',
+          latitude: deviceLocation.latitude,
+          longitude: deviceLocation.longitude,
+        );
+      }
       if (!mounted) return;
       final point = LatLng(location.latitude, location.longitude);
       setState(() {
@@ -168,9 +179,10 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                 children: [
                   TileLayer(
                     urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                    subdomains: const ['0', '1', '2', '3'],
                     userAgentPackageName: 'com.medsreminder.meds_reminder',
-                    maxNativeZoom: 19,
+                    maxNativeZoom: 20,
                   ),
                   if (_markerPoint != null)
                     MarkerLayer(

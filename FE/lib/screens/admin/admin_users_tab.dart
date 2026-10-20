@@ -650,12 +650,16 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Trang $currentPage / $totalPages (Tổng $totalItems)',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF64748B),
+          Flexible(
+            child: Text(
+              'Trang $currentPage / $totalPages (Tổng $totalItems)',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           Row(
@@ -1088,11 +1092,15 @@ class _UserListItemCard extends StatelessWidget {
                           color: Color(0xFF94A3B8),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          user.phone!,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF64748B),
+                        Expanded(
+                          child: Text(
+                            user.phone!,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
