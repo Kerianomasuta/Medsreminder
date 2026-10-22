@@ -8,4 +8,5 @@
 /ios/
 /macos/
 /*.iml
+.DS_Store
 

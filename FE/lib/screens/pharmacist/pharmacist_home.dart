@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/pharmacist_dashboard_controller.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
+export 'pharmacist_dashboard.dart';
 
 class PharmacistHome extends StatelessWidget {
   const PharmacistHome({
@@ -65,37 +66,89 @@ class _DashboardHeader extends StatelessWidget {
   );
 }
 
-class _OrdersPage extends StatelessWidget {
+class _OrdersPage extends StatefulWidget {
   const _OrdersPage({required this.controller, required this.history});
 
   final PharmacistDashboardController controller;
   final bool history;
 
   @override
+  State<_OrdersPage> createState() => _OrdersPageState();
+}
+
+class _OrdersPageState extends State<_OrdersPage> {
+  PharmacyOrderStatus? _selectedStatus;
+
+  @override
   Widget build(BuildContext context) {
-    final orders = history ? controller.historyOrders : controller.activeOrders;
+    final allOrders = widget.history
+        ? widget.controller.historyOrders
+        : widget.controller.activeOrders;
+
+    final filteredOrders = _selectedStatus == null
+        ? allOrders
+        : allOrders.where((o) => o.status == _selectedStatus).toList();
+
+    final statusFilters = widget.history
+        ? [
+            (null, 'Tất cả'),
+            (PharmacyOrderStatus.completed, 'Hoàn tất'),
+            (PharmacyOrderStatus.cancelled, 'Đã huỷ'),
+          ]
+        : [
+            (null, 'Tất cả'),
+            (PharmacyOrderStatus.pendingReview, 'Chờ duyệt'),
+            (PharmacyOrderStatus.preparing, 'Đang chuẩn bị'),
+            (PharmacyOrderStatus.readyForPickup, 'Chờ nhận'),
+            (PharmacyOrderStatus.shipped, 'Đang giao'),
+          ];
+
     return AppScroll(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _DashboardHeader(
-            controller: controller,
-            title: history ? 'Lịch sử đơn thuốc' : 'Xử lý đơn thuốc',
-            subtitle: history
-                ? '${orders.length} đơn đã hoàn tất hoặc huỷ'
-                : '${orders.length} đơn đang cần nhà thuốc xử lý',
+            controller: widget.controller,
+            title: widget.history ? 'Lịch sử đơn thuốc' : 'Xử lý đơn thuốc',
+            subtitle: widget.history
+                ? '${filteredOrders.length} đơn đã hoàn tất hoặc huỷ'
+                : '${filteredOrders.length} đơn đang cần nhà thuốc xử lý',
           ),
-          if (orders.isEmpty)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: statusFilters.map((entry) {
+                final selected = _selectedStatus == entry.$1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8, bottom: 12),
+                  child: FilterChip(
+                    label: Text(entry.$2),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _selectedStatus = entry.$1),
+                    selectedColor: const Color(0xFF556AF4),
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : const Color(0xFF2D3748),
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    showCheckmark: false,
+                    backgroundColor: const Color(0xFFF0F2FA),
+                    side: BorderSide.none,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          if (filteredOrders.isEmpty)
             _EmptyCard(
-              icon: history ? Icons.history_rounded : Icons.inbox_rounded,
-              title: history ? 'Chưa có lịch sử đơn' : 'Không có đơn đang chờ',
-              subtitle: 'Dữ liệu được lấy trực tiếp từ tài khoản dược sĩ đang đăng nhập.',
+              icon: widget.history ? Icons.history_rounded : Icons.inbox_rounded,
+              title: widget.history ? 'Chưa có lịch sử đơn' : 'Không có đơn theo bộ lọc',
+              subtitle: 'Dữ liệu được cập nhật từ hệ thống quản lý đơn thuốc.',
             )
           else
-            ...orders.map(
+            ...filteredOrders.map(
               (order) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _OrderCard(order: order, controller: controller),
+                child: _OrderCard(order: order, controller: widget.controller),
               ),
             ),
         ],
@@ -124,6 +177,11 @@ class _OrderCard extends StatelessWidget {
     padding: EdgeInsets.zero,
     child: ExpansionTile(
       shape: const RoundedRectangleBorder(),
+      onExpansionChanged: (expanded) {
+        if (expanded) {
+          controller.getOrderDetail(order.id);
+        }
+      },
       leading: CircleAvatar(
         backgroundColor: color.withValues(alpha: .12),
         child: Icon(Icons.receipt_long_rounded, color: color),
@@ -150,6 +208,10 @@ class _OrderCard extends StatelessWidget {
             subtitle: Text('${item.quantity} ${item.unit}'),
           ),
         ),
+        if (order.recipientName?.isNotEmpty == true)
+          _InfoLine(label: 'Người nhận', value: order.recipientName!),
+        if (order.recipientPhone?.isNotEmpty == true)
+          _InfoLine(label: 'Số ĐT', value: order.recipientPhone!),
         if (order.patientNote?.isNotEmpty == true)
           _InfoLine(label: 'Ghi chú', value: order.patientNote!),
         if (order.deliveryAddress?.isNotEmpty == true)

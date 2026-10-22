@@ -2,6 +2,21 @@
 
 A new Flutter project.
 
+## Run on web
+
+Run Flutter normally. By default, the app calls the deployed API gateway at
+`https://medsreminder.duckdns.org`.
+
+```powershell
+flutter run -d chrome
+```
+
+To target another backend for development, override the URL at build time:
+
+```powershell
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:3000
+```
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

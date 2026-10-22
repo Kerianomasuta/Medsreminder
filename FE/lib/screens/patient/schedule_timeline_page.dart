@@ -177,9 +177,11 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const PageIntro(
-                'Lịch uống thuốc',
-                'Theo dõi và chỉnh sửa cữ uống',
+              const Expanded(
+                child: PageIntro(
+                  'Lịch uống thuốc',
+                  'Theo dõi và chỉnh sửa cữ uống',
+                ),
               ),
               IconButton(
                 onPressed: _loadSchedules,
@@ -424,12 +426,16 @@ class _ScheduleTimelinePageState extends State<ScheduleTimelinePage> {
                                     color: Colors.grey[600],
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    _formatDays(rule.daysOfWeek),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey[700],
+                                  Expanded(
+                                    child: Text(
+                                      _formatDays(rule.daysOfWeek),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[700],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],

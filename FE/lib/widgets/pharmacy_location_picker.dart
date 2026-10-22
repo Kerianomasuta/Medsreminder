@@ -37,7 +37,9 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
   PharmacyLocationSelection? _selection;
   LatLng? _markerPoint;
   bool _usingDeviceLocation = false;
+  bool _resolvingAddress = false;
   String? _error;
+  String? _locationNotice;
 
   @override
   void initState() {
@@ -66,19 +68,33 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
     setState(() {
       _usingDeviceLocation = true;
       _error = null;
+      _locationNotice = null;
     });
     try {
       final deviceLocation = await _locationProvider.currentLocation();
       if (!mounted) return;
-      final location = await _geocodingApi.reverseGeocode(
-        deviceLocation.latitude,
-        deviceLocation.longitude,
-      );
+      setState(() => _resolvingAddress = true);
+      PharmacyLocationSelection location;
+      try {
+        location = await _geocodingApi.reverseGeocode(
+          deviceLocation.latitude,
+          deviceLocation.longitude,
+        );
+      } catch (_) {
+        final latStr = deviceLocation.latitude.toStringAsFixed(5);
+        final lonStr = deviceLocation.longitude.toStringAsFixed(5);
+        location = PharmacyLocationSelection(
+          addressText: 'Vị trí hiện tại ($latStr, $lonStr)',
+          latitude: deviceLocation.latitude,
+          longitude: deviceLocation.longitude,
+        );
+      }
       if (!mounted) return;
       final point = LatLng(location.latitude, location.longitude);
       setState(() {
         _selection = location;
         _markerPoint = point;
+        _locationNotice = deviceLocation.notice;
       });
       widget.onChanged(location);
       if (widget.showMap) {
@@ -89,7 +105,12 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
-      if (mounted) setState(() => _usingDeviceLocation = false);
+      if (mounted) {
+        setState(() {
+          _usingDeviceLocation = false;
+          _resolvingAddress = false;
+        });
+      }
     }
   }
 
@@ -117,11 +138,21 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                 : const Icon(Icons.my_location_rounded),
             label: Text(
               _usingDeviceLocation
-                  ? 'Đang lấy vị trí...'
+                  ? _resolvingAddress
+                        ? 'Đang xác định địa chỉ...'
+                        : 'Đang lấy vị trí...'
                   : 'Dùng vị trí hiện tại',
             ),
           ),
         ),
+        if (_locationNotice != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _locationNotice!,
+            key: const Key('pharmacy-location-notice'),
+            style: const TextStyle(color: Color(0xFF9A6700)),
+          ),
+        ],
         if (widget.showMap && _markerPoint != null) ...[
           const SizedBox(height: 12),
           Text(
@@ -148,9 +179,10 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                 children: [
                   TileLayer(
                     urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                    subdomains: const ['0', '1', '2', '3'],
                     userAgentPackageName: 'com.medsreminder.meds_reminder',
-                    maxNativeZoom: 19,
+                    maxNativeZoom: 20,
                   ),
                   if (_markerPoint != null)
                     MarkerLayer(
@@ -216,11 +248,6 @@ class _PharmacyLocationPickerState extends State<PharmacyLocationPicker> {
                       Text(
                         '${_selection!.latitude.toStringAsFixed(6)}, '
                         '${_selection!.longitude.toStringAsFixed(6)}',
-                      ),
-                      Text(
-                        'Geohash: ${_selection!.geohash}',
-                        key: const Key('confirmed-pharmacy-geohash'),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),

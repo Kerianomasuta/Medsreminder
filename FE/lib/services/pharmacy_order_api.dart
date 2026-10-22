@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -20,6 +21,7 @@ class PharmacyOrderApi {
     : _client = client ?? createHttpClient();
 
   final http.Client _client;
+  static const _requestTimeout = Duration(seconds: 10);
 
   Future<PharmacyOrder> create({
     required String patientId,
@@ -56,6 +58,54 @@ class PharmacyOrderApi {
       ],
     },
   );
+
+  Future<List<PharmacyOrder>> getOrders({
+    String? status,
+    String? pharmacyId,
+  }) async {
+    final query = <String, String>{
+      if (pharmacyId != null && pharmacyId.isNotEmpty) 'pharmacyId': pharmacyId,
+      if (status != null && status.isNotEmpty) 'status': status,
+    };
+    final uri = Uri.parse('$apiBaseUrl/api/v1/orders')
+        .replace(queryParameters: query.isEmpty ? null : query);
+    try {
+      final payload = await _request('GET', uri);
+      return (payload as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(PharmacyOrder.fromJson)
+          .toList(growable: false);
+    } catch (e) {
+      if (e is PharmacyOrderApiException && e.statusCode == 403) {
+        final fallbackStatus = switch (status) {
+          'READY' => PharmacyOrderStatus.readyForPickup,
+          'DELIVERING' => PharmacyOrderStatus.shipped,
+          'REJECTED' => PharmacyOrderStatus.cancelled,
+          null => null,
+          _ => PharmacyOrderStatus.fromApi(status),
+        };
+        return listMine(status: fallbackStatus);
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<PharmacyOrder>> list({
+    String? pharmacyId,
+    PharmacyOrderStatus? status,
+  }) async {
+    final query = <String, String>{
+      if (pharmacyId != null && pharmacyId.isNotEmpty) 'pharmacyId': pharmacyId,
+      if (status != null) 'status': status.apiValue,
+    };
+    final uri = Uri.parse('$apiBaseUrl/api/v1/orders')
+        .replace(queryParameters: query.isEmpty ? null : query);
+    final payload = await _request('GET', uri);
+    return (payload as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(PharmacyOrder.fromJson)
+        .toList(growable: false);
+  }
 
   Future<List<PharmacyOrder>> listMine({PharmacyOrderStatus? status}) async {
     final uri = Uri.parse('$apiBaseUrl/api/v1/orders/mine').replace(
@@ -129,16 +179,23 @@ class PharmacyOrderApi {
     late http.Response response;
     try {
       response = switch (method) {
-        'GET' => await _client.get(uri),
-        'POST' => await _client.post(
-          uri,
-          headers: body == null
-              ? null
-              : const {'Content-Type': 'application/json; charset=utf-8'},
-          body: body == null ? null : jsonEncode(body),
-        ),
+        'GET' => await _client.get(uri).timeout(_requestTimeout),
+        'POST' =>
+          await _client
+              .post(
+                uri,
+                headers: body == null
+                    ? null
+                    : const {'Content-Type': 'application/json; charset=utf-8'},
+                body: body == null ? null : jsonEncode(body),
+              )
+              .timeout(_requestTimeout),
         _ => throw UnsupportedError('Unsupported HTTP method: $method'),
       };
+    } on TimeoutException {
+      throw const PharmacyOrderApiException(
+        'Dịch vụ đơn hàng phản hồi quá lâu. Vui lòng thử lại.',
+      );
     } catch (error) {
       if (error is PharmacyOrderApiException) rethrow;
       throw const PharmacyOrderApiException(
@@ -153,7 +210,9 @@ class PharmacyOrderApi {
       decoded = null;
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = decoded is Map<String, dynamic>
+      final message = response.statusCode == 401
+          ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+          : decoded is Map<String, dynamic>
           ? decoded['message']?.toString()
           : null;
       throw PharmacyOrderApiException(

@@ -73,9 +73,11 @@ class _AppShellState extends State<AppShell>
       NavItem(Icons.history_rounded, 'Lịch sử'),
     ],
     AppRole.admin => const [
-      NavItem(Icons.insights_rounded, 'Hệ thống'),
+      NavItem(Icons.insights_rounded, 'Tổng quan'),
       NavItem(Icons.people_alt_rounded, 'Người dùng'),
-      NavItem(Icons.security_rounded, 'Cảnh báo'),
+      NavItem(Icons.medication_rounded, 'Đơn thuốc & Giám sát'),
+      NavItem(Icons.local_pharmacy_rounded, 'Nhà thuốc & Đơn hàng'),
+      NavItem(Icons.payments_rounded, 'Giao dịch VIP & Doanh thu'),
     ],
   };
 
@@ -146,6 +148,7 @@ class _AppShellState extends State<AppShell>
               userName: widget.userName,
               userEmail: widget.userEmail,
               controller: widget.networkController,
+              onTabChange: (newTab) => setState(() => tab = newTab),
             ),
 
     AppRole.pharmacist => PharmacistHome(
@@ -154,7 +157,11 @@ class _AppShellState extends State<AppShell>
       controller: widget.pharmacistController!,
     ),
 
-    AppRole.admin => AdminHome(key: ValueKey('${widget.role}$tab')),
+    AppRole.admin => AdminHome(
+      key: ValueKey('${widget.role}$tab'),
+      tab: tab,
+      adminName: widget.userName,
+    ),
   };
 }
 
@@ -179,32 +186,40 @@ class TopBar extends StatelessWidget {
     child: Row(
       children: [
         const BrandMark(),
-        const Spacer(),
-        GestureDetector(
-          key: const Key('account-information-button'),
-          onTap: () => _showAccount(context),
-          child: Glass(
-            radius: 18,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                  radius: 13,
-                  backgroundColor: const Color(0xFF4D63E9),
-                  child: Icon(role.icon, color: Colors.white, size: 15),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              key: const Key('account-information-button'),
+              onTap: () => _showAccount(context),
+              child: Glass(
+                radius: 18,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 8,
                 ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 145),
-                  child: Text(
-                    userName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: const Color(0xFF4D63E9),
+                      child: Icon(role.icon, color: Colors.white, size: 15),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        userName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                  ],
                 ),
-                const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-              ],
+              ),
             ),
           ),
         ),

@@ -1,12 +1,15 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../controllers/care_network_controller.dart';
 import '../../models/care_network.dart';
 import '../../models/pharmacist_dashboard.dart';
 import '../../models/prescription.dart';
 import '../../services/device_location_service.dart';
+import '../../services/geocoding_api.dart';
 import '../../services/pharmacy_api.dart';
 import '../../services/pharmacy_order_api.dart';
 import '../../utils/geohash.dart';
@@ -19,12 +22,18 @@ class CaregiverPharmacyScreen extends StatefulWidget {
     this.pharmacyApi,
     this.orderApi,
     this.locationProvider,
+    this.geocodingApi,
+    this.showLocationMap = true,
   });
 
   final CareNetworkController controller;
   final PharmacyApi? pharmacyApi;
   final PharmacyOrderApi? orderApi;
   final DeviceLocationProvider? locationProvider;
+  final GeocodingApi? geocodingApi;
+
+  /// Kept configurable so widget tests do not need to load map tiles.
+  final bool showLocationMap;
 
   @override
   State<CaregiverPharmacyScreen> createState() =>
@@ -35,23 +44,38 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
   late final PharmacyApi _pharmacyApi;
   late final PharmacyOrderApi _orderApi;
   late final DeviceLocationProvider _locationProvider;
+  late final GeocodingApi _geocodingApi;
+  late final MapController _mapController;
+  late final TextEditingController _addressController;
   late final bool _ownsPharmacyApi;
   late final bool _ownsOrderApi;
+  late final bool _ownsGeocodingApi;
 
   List<Pharmacy> _pharmacies = const [];
   List<PharmacyOrder> _orders = const [];
+  List<PharmacyLocationSelection> _addressResults = const [];
+  PharmacyLocationSelection? _selectedLocation;
   String? _geohash;
   bool _loading = false;
+  bool _locating = false;
+  bool _editingLocation = false;
+  bool _addressDirty = false;
+  int _locationRevision = 0;
   String? _error;
+  String? _locationNotice;
 
   @override
   void initState() {
     super.initState();
     _ownsPharmacyApi = widget.pharmacyApi == null;
     _ownsOrderApi = widget.orderApi == null;
+    _ownsGeocodingApi = widget.geocodingApi == null;
     _pharmacyApi = widget.pharmacyApi ?? PharmacyApi();
     _orderApi = widget.orderApi ?? PharmacyOrderApi();
     _locationProvider = widget.locationProvider ?? DeviceLocationService();
+    _geocodingApi = widget.geocodingApi ?? GeocodingApi();
+    _mapController = MapController();
+    _addressController = TextEditingController();
     _loadOrders();
   }
 
@@ -66,22 +90,150 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
   void dispose() {
     if (_ownsPharmacyApi) _pharmacyApi.close();
     if (_ownsOrderApi) _orderApi.close();
+    if (_ownsGeocodingApi) _geocodingApi.close();
+    _mapController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
-  Future<void> _findNearby() async {
+  Future<void> _locateCurrentPosition() async {
+    final revision = ++_locationRevision;
     setState(() {
-      _loading = true;
+      _locating = true;
+      _error = null;
+      _locationNotice = null;
+      _selectedLocation = null;
+      _addressResults = const [];
+      _addressDirty = false;
+      _addressController.clear();
+      _geohash = null;
+      _pharmacies = const [];
+    });
+    try {
+      final deviceLocation = await _locationProvider.currentLocation();
+      PharmacyLocationSelection location;
+      try {
+        location = await _geocodingApi.reverseGeocode(
+          deviceLocation.latitude,
+          deviceLocation.longitude,
+        );
+      } catch (_) {
+        // Fallback: Nếu không phân giải được tên đường từ OpenStreetMap,
+        // vẫn giữ tọa độ GPS để tìm nhà thuốc bình thường.
+        final latStr = deviceLocation.latitude.toStringAsFixed(5);
+        final lonStr = deviceLocation.longitude.toStringAsFixed(5);
+        location = PharmacyLocationSelection(
+          addressText: 'Vị trí hiện tại ($latStr, $lonStr)',
+          latitude: deviceLocation.latitude,
+          longitude: deviceLocation.longitude,
+        );
+      }
+      if (!mounted || revision != _locationRevision) return;
+      _selectLocation(location, notice: deviceLocation.notice);
+    } catch (error) {
+      if (mounted && revision == _locationRevision) {
+        setState(() => _error = error.toString());
+      }
+    } finally {
+      if (mounted && revision == _locationRevision) {
+        setState(() => _locating = false);
+      }
+    }
+  }
+
+  void _selectLocation(
+    PharmacyLocationSelection location, {
+    String? notice,
+  }) {
+    _addressController.text = location.addressText;
+    setState(() {
+      _selectedLocation = location;
+      _addressResults = const [];
+      _addressDirty = false;
+      _locationNotice = notice;
+      _geohash = null;
+      _pharmacies = const [];
+      _error = null;
+    });
+    if (widget.showLocationMap) {
+      final point = LatLng(location.latitude, location.longitude);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _mapController.move(point, 16);
+      });
+    }
+  }
+
+  void _onAddressChanged(String _) {
+    setState(() {
+      _addressDirty = true;
+      _addressResults = const [];
+      _geohash = null;
+      _pharmacies = const [];
+      _error = null;
+    });
+  }
+
+  Future<void> _searchAddress() async {
+    final query = _addressController.text.trim();
+    if (query.length < 3) {
+      setState(() => _error = 'Vui lòng nhập ít nhất 3 ký tự để tìm địa chỉ.');
+      return;
+    }
+    final revision = ++_locationRevision;
+    setState(() {
+      _editingLocation = true;
+      _addressResults = const [];
       _error = null;
     });
     try {
-      final location = await _locationProvider.currentLocation();
-      await _searchWithCoordinates(location.latitude, location.longitude);
+      final results = await _geocodingApi.searchAddress(query);
+      if (!mounted || revision != _locationRevision) return;
+      setState(() {
+        _addressResults = results;
+        if (results.isEmpty) {
+          _error = 'Không tìm thấy địa chỉ phù hợp. Hãy nhập địa chỉ chi tiết hơn.';
+        }
+      });
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted && revision == _locationRevision) {
+        setState(() => _error = error.toString());
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _locationRevision) {
+        setState(() => _editingLocation = false);
+      }
     }
+  }
+
+  Future<void> _selectMapPoint(TapPosition _, LatLng point) async {
+    final revision = ++_locationRevision;
+    setState(() {
+      _editingLocation = true;
+      _addressResults = const [];
+      _error = null;
+    });
+    try {
+      final location = await _geocodingApi.reverseGeocode(
+        point.latitude,
+        point.longitude,
+      );
+      if (!mounted || revision != _locationRevision) return;
+      _selectLocation(location);
+    } catch (error) {
+      if (mounted && revision == _locationRevision) {
+        setState(() => _error = error.toString());
+      }
+    } finally {
+      if (mounted && revision == _locationRevision) {
+        setState(() => _editingLocation = false);
+      }
+    }
+  }
+
+  Future<void> _confirmFindNearby() async {
+    final location = _selectedLocation;
+    if (location == null || _addressDirty) return;
+    await _searchWithCoordinates(location.latitude, location.longitude);
   }
 
   Future<void> _searchWithCoordinates(double latitude, double longitude) async {
@@ -177,14 +329,16 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Vị trí chỉ được dùng khi bạn nhấn tìm và không được lưu vào tài khoản.',
+                'Vị trí chỉ được dùng để tìm nhà thuốc và không được lưu vào tài khoản.',
                 style: TextStyle(color: Color(0xFF687195)),
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
                 key: const Key('find-nearby-pharmacies'),
-                onPressed: _loading ? null : _findNearby,
-                icon: _loading
+                onPressed: _locating || _loading
+                    ? null
+                    : _locateCurrentPosition,
+                icon: _locating
                     ? const SizedBox.square(
                         dimension: 18,
                         child: CircularProgressIndicator(
@@ -194,19 +348,232 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
                       )
                     : const Icon(Icons.my_location_rounded),
                 label: Text(
-                  _loading ? 'Đang xác định vị trí...' : 'Dùng vị trí hiện tại',
+                  _locating
+                      ? 'Đang xác định vị trí...'
+                      : 'Dùng vị trí hiện tại',
                 ),
               ),
-              if (_geohash != null) ...[
+              if (_selectedLocation != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const Key('caregiver-current-location'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F3FF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_rounded,
+                        color: Color(0xFF5267F4),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Vị trí của bạn',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              _selectedLocation!.addressText,
+                              key: const Key('caregiver-current-address'),
+                              style: const TextStyle(
+                                color: Color(0xFF303858),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${_selectedLocation!.latitude.toStringAsFixed(6)}, '
+                              '${_selectedLocation!.longitude.toStringAsFixed(6)}',
+                              key: const Key('caregiver-current-coordinates'),
+                              style: const TextStyle(
+                                color: Color(0xFF687195),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  key: const Key('caregiver-location-address-input'),
+                  controller: _addressController,
+                  onChanged: _onAddressChanged,
+                  onSubmitted: (_) => _editingLocation ? null : _searchAddress(),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    labelText: 'Sửa hoặc tìm địa chỉ khác',
+                    hintText: 'Số nhà, tên đường, phường/xã...',
+                    helperText: _addressDirty
+                        ? 'Bấm nút tìm kiếm để cập nhật vị trí trên bản đồ.'
+                        : 'Bạn cũng có thể chạm trực tiếp lên bản đồ để đổi vị trí.',
+                    prefixIcon: const Icon(Icons.edit_location_alt_outlined),
+                    suffixIcon: IconButton(
+                      key: const Key('search-caregiver-location-address'),
+                      tooltip: 'Tìm địa chỉ',
+                      onPressed: _editingLocation ? null : _searchAddress,
+                      icon: _editingLocation
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.search_rounded),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                if (_addressResults.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  ConstrainedBox(
+                    key: const Key('caregiver-address-results'),
+                    constraints: const BoxConstraints(maxHeight: 210),
+                    child: Material(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Color(0xFFDCE2F3)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _addressResults.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final location = _addressResults[index];
+                          return ListTile(
+                            key: Key('caregiver-address-result-$index'),
+                            dense: true,
+                            leading: const Icon(
+                              Icons.location_on_outlined,
+                              color: Color(0xFF5267F4),
+                            ),
+                            title: Text(location.addressText),
+                            onTap: () => _selectLocation(location),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+                if (widget.showLocationMap) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Chạm lên bản đồ để chỉnh lại vị trí ghim',
+                    style: TextStyle(
+                      color: Color(0xFF687195),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      key: const Key('caregiver-location-map'),
+                      height: 220,
+                      child: Stack(
+                        children: [
+                          FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: LatLng(
+                                _selectedLocation!.latitude,
+                                _selectedLocation!.longitude,
+                              ),
+                              initialZoom: 16,
+                              minZoom: 5,
+                              maxZoom: 19,
+                              onTap: _editingLocation ? null : _selectMapPoint,
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                                subdomains: const ['0', '1', '2', '3'],
+                                userAgentPackageName:
+                                    'com.medsreminder.meds_reminder',
+                                maxNativeZoom: 20,
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: LatLng(
+                                      _selectedLocation!.latitude,
+                                      _selectedLocation!.longitude,
+                                    ),
+                                    width: 48,
+                                    height: 48,
+                                    alignment: Alignment.topCenter,
+                                    child: const Icon(
+                                      Icons.location_pin,
+                                      size: 46,
+                                      color: Color(0xFF5267F4),
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black38,
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const RichAttributionWidget(
+                                attributions: [
+                                  TextSourceAttribution(
+                                    'OpenStreetMap contributors',
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          if (_editingLocation)
+                            const Positioned.fill(
+                              child: ColoredBox(
+                                color: Color(0x55FFFFFF),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  key: const Key('confirm-nearby-pharmacy-search'),
+                  onPressed: _loading || _editingLocation || _addressDirty
+                      ? null
+                      : _confirmFindNearby,
+                  icon: _loading
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.local_pharmacy_rounded),
+                  label: Text(
+                    _loading
+                        ? 'Đang tìm nhà thuốc...'
+                        : 'Xác nhận tìm nhà thuốc',
+                  ),
+                ),
+              ],
+              if (_locationNotice != null) ...[
                 const SizedBox(height: 10),
                 Text(
-                  'Geohash: $_geohash',
-                  key: const Key('caregiver-geohash'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF5267F4),
-                    fontWeight: FontWeight.w800,
-                  ),
+                  _locationNotice!,
+                  key: const Key('nearby-pharmacy-location-notice'),
+                  style: const TextStyle(color: Color(0xFF9A6700)),
                 ),
               ],
               if (_error != null) ...[
@@ -222,9 +589,13 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
         ),
         const SizedBox(height: 18),
         if (_geohash == null)
-          const _EmptyCard(
-            icon: Icons.location_searching_rounded,
-            message: 'Chưa có vị trí để tìm nhà thuốc. Hãy bấm "Dùng vị trí hiện tại".',
+          _EmptyCard(
+            icon: _selectedLocation == null
+                ? Icons.location_searching_rounded
+                : Icons.check_circle_outline_rounded,
+            message: _selectedLocation == null
+                ? 'Chưa có vị trí để tìm nhà thuốc. Hãy bấm "Dùng vị trí hiện tại".'
+                : 'Đã lấy vị trí của bạn. Hãy bấm "Xác nhận tìm nhà thuốc" để tiếp tục.',
           )
         else if (_pharmacies.isEmpty)
           const _EmptyCard(
@@ -1351,4 +1722,3 @@ class _OrderCard extends StatelessWidget {
     );
   }
 }
-

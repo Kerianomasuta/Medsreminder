@@ -72,6 +72,42 @@ class MedicationLogsApi {
 
   Future<MedicationLog> markMissed(String id) => _post('$id/missed', const {});
 
+  /// Tải báo cáo tuân thủ 30 ngày dạng file PDF:
+  /// GET /api/v1/medication-logs/compliance-report?patientId={patientId}
+  Future<({List<int> bytes, String filename})> downloadComplianceReport({
+    String? patientId,
+  }) async {
+    final query = <String, String>{};
+    if (patientId != null && patientId.isNotEmpty) {
+      query['patientId'] = patientId;
+    }
+    final uri = Uri.parse('$apiBaseUrl/api/v1/medication-logs/compliance-report')
+        .replace(queryParameters: query.isEmpty ? null : query);
+
+    final response = await _client.get(
+      uri,
+      headers: {
+        ..._headers,
+        'Accept': 'application/pdf, application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw _exception(response);
+    }
+
+    String filename = 'bao-cao-tuan-thu.pdf';
+    final disposition = response.headers['content-disposition'];
+    if (disposition != null) {
+      final match = RegExp(r'filename="?([^";]+)"?').firstMatch(disposition);
+      if (match != null && match.group(1) != null) {
+        filename = match.group(1)!;
+      }
+    }
+
+    return (bytes: response.bodyBytes, filename: filename);
+  }
+
   Future<MedicationLog> _post(String suffix, Map<String, Object> body) async {
     final response = await _client.post(
       Uri.parse('$apiBaseUrl/api/v1/medication-logs/$suffix'),

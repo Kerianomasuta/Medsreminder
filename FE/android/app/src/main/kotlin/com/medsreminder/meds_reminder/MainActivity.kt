@@ -1,6 +1,9 @@
 package com.medsreminder.meds_reminder
 
 import android.app.AlarmManager
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -17,8 +20,24 @@ class MainActivity : FlutterActivity() {
     private val AUTH_CHANNEL = "com.medsreminder/auth_session"
     private var methodChannel: MethodChannel? = null
 
+    private fun createCaregiverAlertChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        val channel = NotificationChannel(
+            "caregiver_alerts",
+            "Cảnh báo người chăm sóc",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Thông báo khi bệnh nhân quên hoặc bỏ qua cữ thuốc"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            enableVibration(true)
+        }
+        manager.createNotificationChannel(channel)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        createCaregiverAlertChannel()
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -54,7 +73,8 @@ class MainActivity : FlutterActivity() {
                     val time = call.argument<String>("time") ?: ""
                     val medicationLogId = call.argument<String>("medicationLogId") ?: ""
                     val alarmRound = call.argument<Int>("alarmRound") ?: 1
-                    scheduleExactAlarm(id, triggerAtMillis, med, dose, time, medicationLogId, alarmRound)
+                    val snoozeCount = call.argument<Int>("snoozeCount") ?: if (alarmRound > 1) 1 else 0
+                    scheduleExactAlarm(id, triggerAtMillis, med, dose, time, medicationLogId, alarmRound, snoozeCount)
                     result.success(true)
                 }
                 "cancelAlarm" -> {
@@ -173,7 +193,8 @@ class MainActivity : FlutterActivity() {
         dosage: String,
         time: String,
         medicationLogId: String,
-        alarmRound: Int
+        alarmRound: Int,
+        snoozeCount: Int = 0
     ) {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val intent = Intent(this, AlarmReceiver::class.java).apply {
@@ -185,6 +206,7 @@ class MainActivity : FlutterActivity() {
             putExtra("trigger_at_millis", triggerAtMillis)
             putExtra("medication_log_id", medicationLogId)
             putExtra("alarm_round", alarmRound)
+            putExtra("snooze_count", snoozeCount)
         }
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE

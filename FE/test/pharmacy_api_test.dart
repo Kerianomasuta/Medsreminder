@@ -105,6 +105,33 @@ void main() {
     expect(result.single.distanceKm, 1.25);
   });
 
+  test('pharmacy API hides backend DTO details from the caregiver', () async {
+    final client = MockClient(
+      (_) async => http.Response(
+        jsonEncode({
+          'statusCode': 400,
+          'message': ['property isActive should not exist'],
+          'error': 'Bad Request',
+        }),
+        400,
+      ),
+    );
+    final api = PharmacyApi(client: client);
+
+    await expectLater(
+      api.list(),
+      throwsA(
+        isA<PharmacyApiException>()
+            .having(
+              (error) => error.message,
+              'message',
+              'Dịch vụ tìm nhà thuốc chưa đồng bộ. Vui lòng thử lại sau.',
+            )
+            .having((error) => error.statusCode, 'statusCode', 400),
+      ),
+    );
+  });
+
   test(
     'caregiver creates an order without a client supplied caregiver id',
     () async {

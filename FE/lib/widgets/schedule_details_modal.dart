@@ -692,6 +692,11 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
               'Không tải được kết quả cữ thuốc: $_logsError',
               style: const TextStyle(color: Color(0xFFD65D4A)),
             )
+          else if (_isOutsidePrescriptionRange)
+            Text(
+              'Ngày này nằm ngoài thời gian của đơn thuốc nên chưa phát sinh cữ thuốc.',
+              style: const TextStyle(color: Color(0xFF64748B)),
+            )
           else if (_doseLogs.isEmpty)
             const Text(
               'Chưa có dữ liệu ghi nhận cho cữ thuốc này.',
@@ -702,6 +707,25 @@ class _ScheduleDetailsModalSheetState extends State<ScheduleDetailsModalSheet> {
         ],
       ),
     );
+  }
+
+  bool get _isOutsidePrescriptionRange {
+    final prescription = _rule?.prescription;
+    if (prescription == null) return false;
+
+    final start = _parseDate(prescription.startDate);
+    final end = _parseDate(prescription.endDate);
+    if (start != null && _selectedDate.isBefore(start)) return true;
+    if (end != null && _selectedDate.isAfter(end)) return true;
+    return false;
+  }
+
+  DateTime? _parseDate(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final parsed = DateTime.tryParse(value);
+    return parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
   }
 
   Widget _doseLogTile(MedicationLog log) {
@@ -930,7 +954,7 @@ class _ScheduleEditModalSheetState extends State<ScheduleEditModalSheet> {
     }
   }
 
-  /// Gọi API PATCH http://localhost:3000/api/v1/schedule-rules/:id
+  /// Gọi API PATCH /api/v1/schedule-rules/:id
   Future<void> _save() async {
     if (_daysOfWeek.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1340,7 +1364,7 @@ class _AddScheduleModalSheetState extends State<AddScheduleModalSheet> {
     }
   }
 
-  /// Gọi POST http://localhost:3000/api/v1/prescription-items/:id/schedules
+  /// Gọi POST /api/v1/prescription-items/:id/schedules
   Future<void> _submitCreate() async {
     setState(() => _isCreating = true);
     try {
