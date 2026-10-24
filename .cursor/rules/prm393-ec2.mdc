@@ -1,0 +1,44 @@
+---
+description: PRM393 self-host Ollama trên EC2 CPU mới. Dùng khi triển khai model môn PRM. Không sửa MedReminder hay OpenRouter.
+alwaysApply: false
+---
+
+# PRM393 — Ollama trên EC2 CPU
+
+Tách hoàn toàn khỏi MedReminder (môn EXE). Không sửa file, `.env`, `docker-compose` hay code của repo này. Không SSH vào máy chủ đang trỏ OpenRouter. Không dùng GPU, không xin quota GPU.
+
+## Máy mới
+
+Region `ap-southeast-1`. Ubuntu Server 22.04 LTS, 64-bit x86. Type `t3.xlarge` (4 vCPU, 16 GB RAM). Ổ 40 GB gp3. Key pair `prm-ai`. Security group `prm-ai-sg`: SSH 22 và TCP 11434, source là My IP.
+
+## Trên Ubuntu
+
+```bash
+sudo apt-get update
+sudo apt-get install -y docker.io
+sudo systemctl enable --now docker
+sudo docker run -d --name prm-ollama --restart unless-stopped \
+  -p 11434:11434 \
+  -v ollama-data:/root/.ollama \
+  -e OLLAMA_HOST=0.0.0.0:11434 \
+  ollama/ollama
+sudo docker exec prm-ollama ollama pull qwen2.5:1.5b
+sudo docker exec prm-ollama ollama list
+```
+
+Ảnh đơn thuốc thì thêm `sudo docker exec prm-ollama ollama pull moondream`. `qwen2.5:1.5b` chỉ đọc chữ.
+
+## Chứng minh
+
+```bash
+curl http://127.0.0.1:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer prm-local" \
+  -d '{"model":"qwen2.5:1.5b","temperature":0,"messages":[{"role":"user","content":"Tra loi ngan bang tieng Viet: 2+2 bang may?"}]}'
+```
+
+Từ Windows, đổi host thành `http://<PUBLIC_IP>:11434`. Ảnh JPEG dùng model `moondream`, content gồm `text` và `image_url` dạng `data:image/jpeg;base64,...`.
+
+Ảnh nộp: EC2 `t3.xlarge` Ubuntu đang Running, security group 22 và 11434, `docker ps` thấy `prm-ollama`, `ollama list` thấy model, JSON curl có câu trả lời.
+
+Xong thì Stop instance. Start lại thì IP đổi. SSH vào IP mới rồi `sudo docker start prm-ollama`. Model nằm trong volume `ollama-data`, không kéo lại.
