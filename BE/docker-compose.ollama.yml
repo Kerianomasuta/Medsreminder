@@ -1,11 +1,24 @@
-# PRM: quét đơn thuốc bằng model thị giác chạy local trong Docker (Ollama).
-# EXE vẫn dùng OpenRouter qua docker-compose.yml, không đổi.
+# PRM: quet don thuoc bang model thi giac chay local trong Docker (Ollama + FastAPI wrapper).
+# EXE van dung OpenRouter qua docker-compose.yml, KHONG doi gi.
 #
-# Chạy PRM (model local):
+# Luong PRM: ai-service -> ai-wrapper (FastAPI) -> ollama (model local)
+#
+# Chay PRM (model local):
 #   docker compose -f docker-compose.yml -f docker-compose.ollama.yml up -d --build
 #   docker compose -f docker-compose.yml -f docker-compose.ollama.yml exec ollama ollama pull qwen2.5vl:7b
 #
-# Chạy EXE (OpenRouter) vẫn như cũ:
+# Kiem tra wrapper + model:
+#   curl http://localhost:8000/health
+#
+# Benchmark cho bao cao (chay tren may host):
+#   pip install httpx
+#   python ai-wrapper/benchmark.py --image <anh_don_thuoc>.jpg --runs 5
+#   docker stats meds-ollama meds-ai-wrapper --no-stream
+#
+# Tat PRM, ve lai EXE:
+#   docker compose -f docker-compose.yml -f docker-compose.ollama.yml down
+#
+# Chay EXE (OpenRouter) van nhu cu:
 #   docker compose up -d --build
 
 services:
@@ -20,14 +33,31 @@ services:
       - meds-network
     restart: unless-stopped
 
-  # Chỉ ghi đè endpoint + model cho ai-service, không chạm code.
+  # API Wrapper (FastAPI) dung truoc Ollama - yeu cau PRM 2.3.
+  ai-wrapper:
+    build:
+      context: ./ai-wrapper
+      dockerfile: Dockerfile
+    container_name: meds-ai-wrapper
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    # Mo port ra host chi de benchmark/health-check luc demo PRM.
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+    networks:
+      - meds-network
+    restart: unless-stopped
+
+  # Chi ghi de endpoint + model cho ai-service, KHONG cham code.
   ai-service:
     environment:
-      AI_BASE_URL: http://ollama:11434/v1
+      AI_BASE_URL: http://ai-wrapper:8000/v1
       AI_MODEL: qwen2.5vl:7b
       AI_API_KEY: ollama
     depends_on:
-      - ollama
+      - ai-wrapper
 
 volumes:
   ollama-data:
