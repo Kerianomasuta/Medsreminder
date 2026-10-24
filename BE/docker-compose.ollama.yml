@@ -1,0 +1,33 @@
+# PRM: quét đơn thuốc bằng model thị giác chạy local trong Docker (Ollama).
+# EXE vẫn dùng OpenRouter qua docker-compose.yml, không đổi.
+#
+# Chạy PRM (model local):
+#   docker compose -f docker-compose.yml -f docker-compose.ollama.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.ollama.yml exec ollama ollama pull qwen2.5vl:7b
+#
+# Chạy EXE (OpenRouter) vẫn như cũ:
+#   docker compose up -d --build
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: meds-ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    expose:
+      - "11434"
+    networks:
+      - meds-network
+    restart: unless-stopped
+
+  # Chỉ ghi đè endpoint + model cho ai-service, không chạm code.
+  ai-service:
+    environment:
+      AI_BASE_URL: http://ollama:11434/v1
+      AI_MODEL: qwen2.5vl:7b
+      AI_API_KEY: ollama
+    depends_on:
+      - ollama
+
+volumes:
+  ollama-data:
