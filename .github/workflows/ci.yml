@@ -22,6 +22,8 @@ jobs:
   backend-check:
     name: Backend Lint, Test & Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: BE
@@ -56,3 +58,19 @@ jobs:
           docker build --build-arg APP_NAME=medication-service -t test-medication .
           docker build --build-arg APP_NAME=pharmacy-order-service -t test-pharmacy .
           docker build --build-arg APP_NAME=ai-service -t test-ai .
+
+      - name: Validate Compose Files
+        run: |
+          # .env files are gitignored; create empty placeholders so compose can resolve env_file
+          touch apps/api-gateway/.env apps/user-service/.env apps/medication-service/.env apps/pharmacy-order-service/.env apps/ai-service/.env
+          REGISTRY=ci IMAGE_TAG=ci docker compose -f docker-compose.prod.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.ollama.yml config -q
+
+      - name: Guard - local model must stay out of production and CD
+        run: |
+          if grep -qi 'ollama' docker-compose.prod.yml; then
+            echo "docker-compose.prod.yml must not reference the local model service"; exit 1
+          fi
+          if grep -qi 'ollama' "$GITHUB_WORKSPACE/.github/workflows/cd.yml"; then
+            echo "cd.yml must not deploy the local model service"; exit 1
+          fi
