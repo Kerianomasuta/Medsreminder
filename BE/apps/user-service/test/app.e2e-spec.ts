@@ -2,11 +2,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import { UserSchema } from './../src/users/schema/user.schema.js';
 
+// Read env without depending on @types/node (test files are outside tsconfig).
+const env =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process?.env ?? {};
+
 // Integration test: write and read a real user document against a live MongoDB
 // instance (provided as a CI service container). Uses the production UserSchema
 // so schema defaults and the role enum are exercised end to end.
 describe('User persistence (integration, MongoDB)', () => {
-  const uri = process.env.MONGO_URI ?? 'mongodb://localhost:27017/meds_test';
+  const uri = env.MONGO_URI ?? 'mongodb://localhost:27017/meds_test';
   let conn: mongoose.Connection;
 
   beforeAll(async () => {

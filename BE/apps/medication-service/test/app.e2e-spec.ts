@@ -10,9 +10,14 @@ import { MedicineUnit } from './../src/enums/medicine-unit.enum.js';
 // PostgreSQL instance (provided as a CI service container). A dedicated test
 // DataSource with synchronize:true builds the schema from the real entities, so
 // the entity mapping, enum type and the parent-child relation are all exercised.
+// Read env without depending on @types/node (test files are outside tsconfig).
+const env =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process?.env ?? {};
+
 describe('Prescription persistence (integration, PostgreSQL)', () => {
   const url =
-    process.env.MEDICATION_DATABASE_URL ??
+    env.MEDICATION_DATABASE_URL ??
     'postgres://meds:meds@localhost:5432/meds_test';
   let ds: DataSource;
 
@@ -66,7 +71,7 @@ describe('Prescription persistence (integration, PostgreSQL)', () => {
 
     const found = await prescriptions.findOne({
       where: { id: saved.id },
-      relations: ['items'],
+      relations: { items: true },
     });
 
     expect(found).toBeTruthy();
