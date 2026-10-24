@@ -2,13 +2,13 @@ name: CI Pipeline
 
 on:
   push:
-    branches: ["main", "dev"]
+    branches: ["main", "dev", "develop"]
     paths:
       - "BE/**"
       - ".github/workflows/ci.yml"
       - ".github/workflows/cd.yml"
   pull_request:
-    branches: ["main", "dev"]
+    branches: ["main", "dev", "develop"]
     paths:
       - "BE/**"
       - ".github/workflows/ci.yml"
@@ -74,3 +74,67 @@ jobs:
           if grep -qi 'ollama' "$GITHUB_WORKSPACE/.github/workflows/cd.yml"; then
             echo "cd.yml must not deploy the local model service"; exit 1
           fi
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: BE
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: meds
+          POSTGRES_PASSWORD: meds
+          POSTGRES_DB: meds_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meds"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGO_URI: mongodb://localhost:27017/meds_test
+      MEDICATION_DATABASE_URL: postgres://meds:meds@localhost:5432/meds_test
+      MEDICATION_DB_SCHEMA: medication
+      REDIS_URL: redis://localhost:6379
+      ACCESS_JWT_SECRET: ci_access_secret
+      REFRESH_JWT_SECRET: ci_refresh_secret
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: BE/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Integration (e2e) Tests
+        run: npm run test:e2e
