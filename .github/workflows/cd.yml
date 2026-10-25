@@ -114,6 +114,9 @@ jobs:
               exit 1
             fi
             echo "${GHCR_TOKEN}" | "${DOCKER[@]}" login ghcr.io -u "${GHCR_USER}" --password-stdin
+            "${DOCKER[@]}" compose -f docker-compose.prod.yml down --remove-orphans || true
+            "${DOCKER[@]}" image prune -af
+            "${DOCKER[@]}" builder prune -af || true
             "${DOCKER[@]}" compose -f docker-compose.prod.yml pull
             "${DOCKER[@]}" rm -f meds-api-gateway meds-user-service meds-medication-service meds-pharmacy-order-service meds-ai-service || true
             "${DOCKER[@]}" compose -f docker-compose.prod.yml up -d --remove-orphans
