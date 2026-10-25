@@ -9,4 +9,5 @@
 /macos/
 /*.iml
 .DS_Store
+.vercel
 

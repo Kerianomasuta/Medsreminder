@@ -1,0 +1,48 @@
+name: Deploy Frontend to Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "FE/**"
+      - ".github/workflows/deploy-fe-vercel.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-fe-vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & Deploy Flutter Web to Vercel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: |
+          cd FE
+          flutter pub get
+
+      - name: Build Flutter Web Release
+        run: |
+          cd FE
+          flutter build web --release
+          cp vercel.json build/web/
+
+      - name: Deploy to Vercel
+        working-directory: FE/build/web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx vercel deploy --prod --token="${{ secrets.VERCEL_TOKEN }}" --yes
