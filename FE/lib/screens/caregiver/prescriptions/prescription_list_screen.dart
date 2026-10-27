@@ -256,8 +256,9 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     try {
       showPrescriptionScanOverlay(context);
       overlayOpen = true;
+      final imageBytes = await image.readAsBytes();
       final prescription = await PrescriptionService.instance.scan(
-        imageBytes: await image.readAsBytes(),
+        imageBytes: imageBytes,
         filename: image.name,
         patientId: widget.patientId,
       );
@@ -265,10 +266,16 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         Navigator.of(context).pop();
         overlayOpen = false;
       }
-      if (!mounted || prescription.id == null) return;
-      await showScannedPrescriptionConfirm(
+      if (!mounted) return;
+      final confirmed = await showScannedPrescriptionConfirm(
         context: context,
         prescription: prescription,
+      );
+      if (!confirmed || !mounted) return;
+      await PrescriptionService.instance.create(
+        prescription,
+        imageBytes: imageBytes,
+        imageFilename: image.name,
       );
       await _load();
     } catch (e) {

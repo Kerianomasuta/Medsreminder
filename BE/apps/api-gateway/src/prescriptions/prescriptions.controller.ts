@@ -62,10 +62,10 @@ export class PrescriptionsController {
     },
   })
   @ApiOperation({
-    summary: 'Upload a prescription photo, read it with AI, and create it',
-    description: 'Premium accounts only. Accepts a JPEG, PNG, or WebP file up to 8 MB from a web upload, phone library, or camera. The model reads the photo, then the server stores the prescription, medicine lines, dose times, and the photo. The response also includes an interaction check against the patient\'s other active medicines. A patient is stored as the owner from the access token. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+    summary: 'Read a prescription photo and return a draft',
+    description: 'Premium accounts only. Accepts a JPEG, PNG, or WebP file up to 8 MB. The model reads the photo and returns the draft. Nothing is saved until the client confirms with POST /prescriptions. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
-  @ApiCreatedResponse({ type: PrescriptionResponseDto, description: 'The prescription created from the photo.' })
+  @ApiOkResponse({ type: PrescriptionResponseDto, description: 'The unsaved draft read from the photo.' })
   @ApiBadRequestResponse({ description: 'The photo is missing or not JPEG, PNG, or WebP, or the model could not read a medicine line.' })
   @ApiForbiddenResponse({ description: 'The account is not premium.' })
   scan(

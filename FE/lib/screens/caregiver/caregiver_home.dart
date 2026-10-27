@@ -622,10 +622,16 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
         Navigator.of(context).pop();
         overlayOpen = false;
       }
-      if (!mounted || prescription.id == null) return;
-      await showScannedPrescriptionConfirm(
+      if (!mounted) return;
+      final confirmed = await showScannedPrescriptionConfirm(
         context: context,
         prescription: prescription,
+      );
+      if (!confirmed || !mounted) return;
+      await PrescriptionService.instance.create(
+        prescription,
+        imageBytes: imageBytes,
+        imageFilename: filename,
       );
       widget.controller.loadPatient(patientId, force: true);
     } catch (e) {

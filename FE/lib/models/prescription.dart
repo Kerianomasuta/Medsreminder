@@ -14,13 +14,19 @@ class Schedule {
     required this.daysOfWeek,
   });
 
-  factory Schedule.fromJson(Map<String, dynamic> json) => Schedule(
-    id: json['id'] as String?,
-    reminderTime: json['reminderTime'] as String,
-    daysOfWeek:
-        (json['daysOfWeek'] as List<dynamic>?)?.map((e) => e as int).toList() ??
-        [],
-  );
+  factory Schedule.fromJson(Map<String, dynamic> json) {
+    final rawTime = json['reminderTime']?.toString() ?? '';
+    final clock = RegExp(r'^(\d{2}:\d{2})').firstMatch(rawTime)?.group(1);
+    return Schedule(
+      id: json['id'] as String?,
+      reminderTime: clock ?? (rawTime.isEmpty ? '08:00' : rawTime),
+      daysOfWeek:
+          (json['daysOfWeek'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          [],
+    );
+  }
 
   /// Serialises for CREATE payload — omit daysOfWeek if full week.
   Map<String, dynamic> toCreateJson() {
@@ -114,9 +120,9 @@ class PrescriptionItem {
             (json['imageUrl'] ??
                     (json['medicine'] as Map<String, dynamic>?)?['imageUrl'])
                 ?.toString(),
-        dosagePerTime: (json['dosagePerTime'] as num).toDouble(),
-        currentStock: json['currentStock'] as int,
-        reorderThreshold: json['reorderThreshold'] as int,
+        dosagePerTime: (json['dosagePerTime'] as num?)?.toDouble() ?? 1,
+        currentStock: (json['currentStock'] as num?)?.toInt() ?? 0,
+        reorderThreshold: (json['reorderThreshold'] as num?)?.toInt() ?? 6,
         instructions: json['instructions'] as String?,
         schedules:
             (json['schedules'] as List<dynamic>?)
@@ -227,13 +233,13 @@ class Prescription {
 
   factory Prescription.fromJson(Map<String, dynamic> json) => Prescription(
     id: json['id'] as String?,
-    patientId: json['patientId'] as String,
+    patientId: json['patientId']?.toString() ?? '',
     createdByCgId: json['createdByCgId'] as String?,
-    title: json['title'] as String,
+    title: json['title']?.toString() ?? 'Đơn thuốc từ ảnh',
     doctorName: json['doctorName'] as String?,
     prescriptionCode: json['prescriptionCode'] as String?,
     imagePrescriptionUrl: json['imagePrescriptionUrl'] as String?,
-    startDate: json['startDate'] as String,
+    startDate: json['startDate']?.toString() ?? '',
     endDate: json['endDate'] as String?,
     isActive: json['isActive'] as bool? ?? true,
     items:

@@ -92,21 +92,26 @@ export class PrescriptionsService {
       : proposedEnd;
     const patientId = user.role === 'PATIENT' ? user.userId : dto.patientId;
     const current = await this.currentMedicines(patientId, user);
-    const saved = await this.send<Record<string, unknown>>({ cmd: 'create_prescription' }, {
-      patientId: dto.patientId,
-      createdByCgId: dto.createdByCgId || user.userId,
-      title: draft.title,
-      doctorName: draft.doctorName ?? undefined,
-      prescriptionCode: draft.prescriptionCode ?? undefined,
-      imageBase64: image.toString('base64'),
-      imageContentType: normalizedType,
-      startDate,
-      endDate,
-      items: draft.items,
-      ...this.actor(user),
-    });
     return {
-      ...saved,
+      patientId,
+      title: draft.title,
+      doctorName: draft.doctorName,
+      prescriptionCode: draft.prescriptionCode,
+      startDate,
+      endDate: endDate ?? null,
+      items: draft.items.map((item) => ({
+        name: item.name,
+        genericName: item.genericName ?? null,
+        unit: item.unit,
+        dosagePerTime: item.dosagePerTime,
+        currentStock: item.currentStock ?? 0,
+        reorderThreshold: item.reorderThreshold ?? 6,
+        instructions: item.instructions ?? null,
+        schedules: item.schedules.map((schedule) => ({
+          reminderTime: schedule.reminderTime.slice(0, 5),
+          daysOfWeek: schedule.daysOfWeek,
+        })),
+      })),
       interaction: await this.reviewInteraction(
         user,
         current,
@@ -170,7 +175,7 @@ export class PrescriptionsService {
   async updateItem(id: string, dto: UpdatePrescriptionItemDto, user: AccessUser) {
     const renamed = dto.name !== undefined || dto.genericName !== undefined;
     if (!renamed) {
-      return this.send({ cmd: 'update_prescription_item' }, { id, ...dto, ...this.actor(user) });
+    return this.send({ cmd: 'update_prescription_item' }, { id, ...dto, ...this.actor(user) });
     }
     const brief = await this.send<ItemBrief>(
       { cmd: 'get_prescription_item_brief' },

@@ -121,6 +121,17 @@ export class CreatePrescriptionDto {
   @MaxLength(2000)
   imagePrescriptionUrl?: string;
 
+  @ApiPropertyOptional({ description: 'Base64 photo kept when the caregiver confirms an AI draft' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(12_000_000)
+  imageBase64?: string;
+
+  @ApiPropertyOptional({ enum: ['image/jpeg', 'image/png', 'image/webp'] })
+  @IsOptional()
+  @IsIn(['image/jpeg', 'image/png', 'image/webp'])
+  imageContentType?: string;
+
   @ApiProperty({ example: '2026-10-01' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   startDate: string;
