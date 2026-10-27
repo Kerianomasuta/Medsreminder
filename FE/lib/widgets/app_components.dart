@@ -1018,50 +1018,102 @@ class _PrescriptionScanOverlay extends StatelessWidget {
   }
 }
 
-/// Shown after AI has saved the prescription. The only action is confirm.
-Future<void> showScannedPrescriptionConfirm({
+/// Shows the unsaved AI draft. Returns true only when the caregiver confirms creation.
+Future<bool> showScannedPrescriptionConfirm({
   required BuildContext context,
   required Prescription prescription,
-}) {
-  final interaction = prescription.interaction;
-  final medicineCount = prescription.items.length;
-  return showDialog<void>(
+}) async {
+  final confirmed = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
+    builder: (ctx) => _ScannedPrescriptionDialog(prescription: prescription),
+  );
+  return confirmed == true;
+}
+
+class _ScannedPrescriptionDialog extends StatelessWidget {
+  const _ScannedPrescriptionDialog({required this.prescription});
+
+  final Prescription prescription;
+
+  @override
+  Widget build(BuildContext context) {
+    final interaction = prescription.interaction;
+    final dates = prescription.endDate == null || prescription.endDate!.isEmpty
+        ? prescription.startDate
+        : '${prescription.startDate} – ${prescription.endDate}';
+    return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text(
-        'Đã tạo đơn thuốc',
+        'Đơn thuốc AI đọc được',
         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            prescription.title,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            medicineCount == 1 ? '1 loại thuốc' : '$medicineCount loại thuốc',
-            style: const TextStyle(color: Color(0xFF687195)),
-          ),
-          if (interaction != null && interaction.summary.trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              interaction.summary,
-              style: TextStyle(
-                height: 1.4,
-                color: interaction.hasWarning
-                    ? const Color(0xFF9F1239)
-                    : const Color(0xFF166534),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                prescription.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: Color(0xFF1F2A54),
+                ),
               ),
-            ),
-          ],
-        ],
+              if (prescription.doctorName != null &&
+                  prescription.doctorName!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text('Bác sĩ: ${prescription.doctorName}'),
+              ],
+              if (prescription.prescriptionCode != null &&
+                  prescription.prescriptionCode!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text('Mã đơn: ${prescription.prescriptionCode}'),
+              ],
+              if (dates.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  dates,
+                  style: const TextStyle(color: Color(0xFF687195)),
+                ),
+              ],
+              const SizedBox(height: 14),
+              if (prescription.items.isEmpty)
+                const Text('Không đọc được dòng thuốc nào.')
+              else
+                for (final item in prescription.items) ...[
+                  _ScannedMedicineLine(item: item),
+                  const SizedBox(height: 10),
+                ],
+              if (interaction != null &&
+                  interaction.summary.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  interaction.summary,
+                  style: TextStyle(
+                    height: 1.4,
+                    color: interaction.hasWarning
+                        ? const Color(0xFF9F1239)
+                        : const Color(0xFF166534),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              const Text(
+                'Đơn chưa được lưu. Xác nhận để tạo.',
+                style: TextStyle(color: Color(0xFF687195), fontSize: 13),
+              ),
+            ],
+          ),
+        ),
       ),
       actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Hủy'),
+        ),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF5168F4),
@@ -1069,13 +1121,74 @@ Future<void> showScannedPrescriptionConfirm({
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          onPressed: () => Navigator.of(ctx).pop(),
+          onPressed: () => Navigator.of(context).pop(true),
           child: const Text(
-            'Xác nhận',
+            'Xác nhận tạo đơn',
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
       ],
-    ),
-  );
+    );
+  }
+}
+
+class _ScannedMedicineLine extends StatelessWidget {
+  const _ScannedMedicineLine({required this.item});
+
+  final PrescriptionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final times = item.schedules
+        .map((schedule) => schedule.reminderTime)
+        .where((time) => time.isNotEmpty)
+        .join(', ');
+    final details = <String>[
+      '${_trimAmount(item.dosagePerTime)} ${_unitLabel(item.unit)} / lần',
+      if (item.currentStock > 0) 'Tồn ${item.currentStock}',
+      if (times.isNotEmpty) times,
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6FF),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.medicineName,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          if (item.genericName != null && item.genericName!.trim().isNotEmpty)
+            Text(
+              item.genericName!,
+              style: const TextStyle(color: Color(0xFF687195), fontSize: 13),
+            ),
+          const SizedBox(height: 4),
+          Text(details.join(' · ')),
+          if (item.instructions != null && item.instructions!.trim().isNotEmpty)
+            Text(item.instructions!),
+        ],
+      ),
+    );
+  }
+}
+
+String _unitLabel(String unit) {
+  switch (unit) {
+    case 'GOI':
+      return 'gói';
+    case 'CHAI':
+      return 'chai';
+    default:
+      return 'viên';
+  }
+}
+
+String _trimAmount(double value) {
+  if (value == value.roundToDouble()) return value.toInt().toString();
+  return value.toString();
 }

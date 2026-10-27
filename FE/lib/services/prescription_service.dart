@@ -140,7 +140,11 @@ class PrescriptionService {
   }
 
   /// POST /api/v1/prescriptions (nested creation)
-  Future<Prescription> create(Prescription prescription) async {
+  Future<Prescription> create(
+    Prescription prescription, {
+    List<int>? imageBytes,
+    String? imageFilename,
+  }) async {
     if (prescription.items.isEmpty) {
       throw ArgumentError(
         'A prescription must have at least one medicine item.',
@@ -187,6 +191,10 @@ class PrescriptionService {
     // ─────────────────────────────────────────────────────────────────────────
     final payload = prescription.toCreateJson();
     payload['createdByCgId'] ??= '6ac0cbf1ea185d34aa6f322a';
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      payload['imageBase64'] = base64Encode(imageBytes);
+      payload['imageContentType'] = _imageContentType(imageFilename);
+    }
     final raw = await _request('POST', '/api/v1/prescriptions', body: payload);
     return Prescription.fromJson(raw);
   }
@@ -631,4 +639,11 @@ class PrescriptionValidator {
     }
     return null;
   }
+}
+
+String _imageContentType(String? filename) {
+  final lower = filename?.toLowerCase() ?? '';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
 }
