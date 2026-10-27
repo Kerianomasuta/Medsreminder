@@ -411,9 +411,13 @@ class _AdminOverviewTabState extends State<_AdminOverviewTab> {
                               size: 20,
                             ),
                             SizedBox(width: 8),
-                            Text(
-                              'Gói VIP PayOS',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                            Expanded(
+                              child: Text(
+                                'Gói VIP PayOS',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
@@ -424,6 +428,8 @@ class _AdminOverviewTabState extends State<_AdminOverviewTab> {
                             fontSize: 12.5,
                             color: Color(0xFF475569),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -432,6 +438,8 @@ class _AdminOverviewTabState extends State<_AdminOverviewTab> {
                             fontSize: 12.5,
                             color: Color(0xFF475569),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -453,9 +461,13 @@ class _AdminOverviewTabState extends State<_AdminOverviewTab> {
                               size: 20,
                             ),
                             SizedBox(width: 8),
-                            Text(
-                              'Nhật ký & Liều',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                            Expanded(
+                              child: Text(
+                                'Nhật ký & Liều',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
