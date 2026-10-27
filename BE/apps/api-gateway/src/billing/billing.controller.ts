@@ -30,7 +30,7 @@ export class BillingController {
   @ApiOperation({ summary: 'Create a PayOS checkout link. Rejects another plan while a paid VIP month is still active.' })
   createPaymentLink(@Body() dto: CheckoutPremiumDto, @Req() request: Request) {
     const user = (request as Request & { user: AccessUser }).user;
-    return this.billingService.createPaymentLink(user.userId, dto.plan);
+    return this.billingService.createPaymentLink(user.userId, dto.plan, dto.returnUrl, dto.cancelUrl);
   }
 
   @Post('payos-webhook')

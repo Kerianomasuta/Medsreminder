@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -357,7 +358,11 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
       _error = null;
     });
     try {
-      final result = await widget.billingApi.createPaymentLink(_selectedPlan);
+      final result = await widget.billingApi.createPaymentLink(
+        _selectedPlan,
+        returnUrl: paymentReturnUrl(),
+        cancelUrl: paymentCancelUrl(),
+      );
       if (mounted) {
         setState(() {
           _paymentLinkResult = result;
@@ -367,7 +372,7 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
       // Tự động mở link PayOS
       final uri = Uri.tryParse(result.checkoutUrl);
       if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        await launchUrl(uri, mode: _payosLaunchMode);
       }
     } catch (e) {
       if (mounted) {
@@ -762,10 +767,7 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
                                       _paymentLinkResult!.checkoutUrl,
                                     );
                                     if (uri != null) {
-                                      launchUrl(
-                                        uri,
-                                        mode: LaunchMode.externalApplication,
-                                      );
+                                      launchUrl(uri, mode: _payosLaunchMode);
                                     }
                                   },
                                   icon: const Icon(
@@ -827,6 +829,10 @@ class _VipUpgradeModalState extends State<_VipUpgradeModal> {
     return buffer.toString();
   }
 }
+
+const _payosLaunchMode = kIsWeb
+    ? LaunchMode.platformDefault
+    : LaunchMode.externalApplication;
 
 class _FeatureLine extends StatelessWidget {
   const _FeatureLine({
