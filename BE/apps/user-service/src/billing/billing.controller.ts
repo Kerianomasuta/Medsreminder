@@ -36,7 +36,7 @@ export class BillingController {
   }
 
   @MessagePattern({ cmd: 'handle_create_payment_link' })
-  createPaymentLink(@Payload() payload: { userId?: string; plan?: string }) {
+  createPaymentLink(@Payload() payload: { userId?: string; plan?: string; returnUrl?: string; cancelUrl?: string }) {
     return this.billingService.createPaymentLink(payload ?? {});
   }
 

@@ -18,8 +18,8 @@ export class BillingService {
     return this.send({ cmd: 'handle_billing_config' }, {});
   }
 
-  createPaymentLink(userId: string, plan: 'MONTH' | 'YEAR') {
-    return this.send({ cmd: 'handle_create_payment_link' }, { userId, plan });
+  createPaymentLink(userId: string, plan: 'MONTH' | 'YEAR', returnUrl?: string, cancelUrl?: string) {
+    return this.send({ cmd: 'handle_create_payment_link' }, { userId, plan, returnUrl, cancelUrl });
   }
 
   confirmPayos(body: unknown) {

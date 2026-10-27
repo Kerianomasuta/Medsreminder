@@ -41,6 +41,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _loading = false;
   bool _obscurePassword = true;
   String? _error;
+  String? _emailTaken;
+  String? _phoneTaken;
 
   static const _registerableRoles = [
     AppRole.patient,
@@ -60,11 +62,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
     setState(() {
-      _loading = true;
       _error = null;
+      _emailTaken = null;
+      _phoneTaken = null;
     });
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
     try {
       if (_role == AppRole.pharmacist && _pharmacyLocation == null) {
         setState(() {
@@ -89,7 +93,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (!mounted) return;
+      final message = error.toString().toLowerCase();
+      setState(() {
+        if (message.contains('phone') && message.contains('already')) {
+          _phoneTaken = 'Số điện thoại này đã được đăng ký';
+        } else if ((message.contains('email') && message.contains('already')) ||
+            message.contains('already existed')) {
+          _emailTaken = 'Email này đã được đăng ký';
+        } else {
+          _error = error.toString();
+        }
+      });
+      _formKey.currentState?.validate();
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -148,11 +164,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     decoration: _decoration('Email', Icons.alternate_email),
-                    validator: (value) =>
-                        RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                            .hasMatch(value?.trim() ?? '')
-                        ? null
-                        : 'Vui lòng nhập email hợp lệ',
+                    onChanged: (_) {
+                      if (_emailTaken != null) {
+                        setState(() => _emailTaken = null);
+                      }
+                    },
+                    validator: (value) {
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                          .hasMatch(value?.trim() ?? '')) {
+                        return 'Vui lòng nhập email hợp lệ';
+                      }
+                      return _emailTaken;
+                    },
                   ),
                   const SizedBox(height: 14),
                   TextFormField(
@@ -163,11 +186,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       'Số điện thoại',
                       Icons.phone_outlined,
                     ),
-                    validator: (value) =>
-                        RegExp(r'^0[235789][0-9]{8}$')
-                            .hasMatch(value?.trim() ?? '')
-                        ? null
-                        : 'Vui lòng nhập số điện thoại Việt Nam hợp lệ',
+                    onChanged: (_) {
+                      if (_phoneTaken != null) {
+                        setState(() => _phoneTaken = null);
+                      }
+                    },
+                    validator: (value) {
+                      if (!RegExp(r'^0[235789][0-9]{8}$')
+                          .hasMatch(value?.trim() ?? '')) {
+                        return 'Vui lòng nhập số điện thoại Việt Nam hợp lệ';
+                      }
+                      return _phoneTaken;
+                    },
                   ),
                   const SizedBox(height: 14),
                   DropdownButtonFormField<AppRole>(
