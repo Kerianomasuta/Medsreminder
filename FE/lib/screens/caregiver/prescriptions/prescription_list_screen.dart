@@ -90,9 +90,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                 OutlinedButton.icon(
                   onPressed: _scanning ? null : _scanPrescription,
                   icon: const Icon(Icons.document_scanner_rounded),
-                  label: Text(
-                    _scanning ? 'Đang quét đơn thuốc...' : 'Quét đơn thuốc',
-                  ),
+                  label: const Text('Quét đơn thuốc'),
                 ),
               ],
             ),
@@ -114,7 +112,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'create-prescription-fab',
-        onPressed: _openCreate,
+        onPressed: _scanning ? null : _openCreate,
         backgroundColor: const Color(0xFF5168F4),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
@@ -254,21 +252,27 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     if (image == null || !mounted) return;
 
     setState(() => _scanning = true);
+    var overlayOpen = false;
     try {
+      showPrescriptionScanOverlay(context);
+      overlayOpen = true;
       final prescription = await PrescriptionService.instance.scan(
         imageBytes: await image.readAsBytes(),
         filename: image.name,
         patientId: widget.patientId,
       );
+      if (overlayOpen && mounted) {
+        Navigator.of(context).pop();
+        overlayOpen = false;
+      }
       if (!mounted || prescription.id == null) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              PrescriptionDetailScreen(prescriptionId: prescription.id!),
-        ),
+      await showScannedPrescriptionConfirm(
+        context: context,
+        prescription: prescription,
       );
       await _load();
     } catch (e) {
+      if (overlayOpen && mounted) Navigator.of(context).pop();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
