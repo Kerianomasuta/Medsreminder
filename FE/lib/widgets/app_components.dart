@@ -1,5 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
+import '../models/prescription.dart';
 import '../services/billing_api.dart';
 import 'glass.dart';
 import 'pressable.dart';
@@ -957,6 +960,119 @@ Future<void> showDrugInteractionDialog({
           child: const Text(
             'Tôi đã hiểu',
             style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Centered scan state. The barrier blurs and blocks every other button.
+Future<void> showPrescriptionScanOverlay(BuildContext context) {
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    barrierLabel: 'Đang quét đơn thuốc',
+    barrierColor: const Color(0x661F2A54),
+    pageBuilder: (context, _, _) => const PopScope(
+      canPop: false,
+      child: _PrescriptionScanOverlay(),
+    ),
+  );
+}
+
+class _PrescriptionScanOverlay extends StatelessWidget {
+  const _PrescriptionScanOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: const Center(
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.all(Radius.circular(22)),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Đang quét đơn thuốc...',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: Color(0xFF1F2A54),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown after AI has saved the prescription. The only action is confirm.
+Future<void> showScannedPrescriptionConfirm({
+  required BuildContext context,
+  required Prescription prescription,
+}) {
+  final interaction = prescription.interaction;
+  final medicineCount = prescription.items.length;
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'Đã tạo đơn thuốc',
+        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            prescription.title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            medicineCount == 1 ? '1 loại thuốc' : '$medicineCount loại thuốc',
+            style: const TextStyle(color: Color(0xFF687195)),
+          ),
+          if (interaction != null && interaction.summary.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              interaction.summary,
+              style: TextStyle(
+                height: 1.4,
+                color: interaction.hasWarning
+                    ? const Color(0xFF9F1239)
+                    : const Color(0xFF166534),
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF5168F4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text(
+            'Xác nhận',
+            style: TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
       ],

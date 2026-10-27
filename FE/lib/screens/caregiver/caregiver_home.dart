@@ -608,23 +608,28 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
     }
 
     setState(() => _scanning = true);
+    var overlayOpen = false;
     try {
+      showPrescriptionScanOverlay(context);
+      overlayOpen = true;
       debugPrint('Scanning prescription for patientId=$patientId');
       final prescription = await PrescriptionService.instance.scan(
         imageBytes: imageBytes,
         filename: filename,
         patientId: patientId,
       );
+      if (overlayOpen && mounted) {
+        Navigator.of(context).pop();
+        overlayOpen = false;
+      }
       if (!mounted || prescription.id == null) return;
-      await Navigator.push<void>(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              PrescriptionDetailScreen(prescriptionId: prescription.id!),
-        ),
+      await showScannedPrescriptionConfirm(
+        context: context,
+        prescription: prescription,
       );
       widget.controller.loadPatient(patientId, force: true);
     } catch (e) {
+      if (overlayOpen && mounted) Navigator.of(context).pop();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -654,7 +659,7 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
               ),
               OutlinedButton.icon(
                 icon: const Icon(Icons.document_scanner_rounded, size: 18),
-                label: Text(_scanning ? 'Đang quét...' : 'Quét đơn'),
+                label: const Text('Quét đơn'),
                 onPressed: _scanning ? null : _scanPrescription,
               ),
               const SizedBox(width: 8),
