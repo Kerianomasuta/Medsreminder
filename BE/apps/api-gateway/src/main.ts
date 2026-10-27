@@ -2,12 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { ApiGatewayModule } from './api-gateway.module.js';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
+import { json, urlencoded } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { RpcExceptionFilter } from './filter/rpc-exception.filter.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(ApiGatewayModule);
+  const app = await NestFactory.create(ApiGatewayModule, { bodyParser: false });
+  app.use(json({ limit: '1gb' }));
+  app.use(urlencoded({ extended: true, limit: '1gb' }));
   const configService = app.get(ConfigService);
   const configuredCorsOrigins = (configService.get<string>('CORS_ORIGINS') ?? '')
     .split(',')
