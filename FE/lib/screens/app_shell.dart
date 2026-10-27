@@ -307,7 +307,7 @@ class _AccountInformationSheetState extends State<_AccountInformationSheet> {
                 const SizedBox(height: 16),
                 _InformationCard(
                   key: const Key('pharmacist-account-information'),
-                  title: 'Thông tin dược sĩ',
+                  title: 'Thông tin user',
                   icon: Icons.badge_outlined,
                   rows: [
                     _InformationValue('Họ và tên', widget.userName),
