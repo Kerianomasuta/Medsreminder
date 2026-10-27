@@ -104,11 +104,18 @@ class BillingApi {
   }
 
   /// 3. POST /api/v1/billing/create-payment-link
-  Future<PaymentLinkResult> createPaymentLink(String plan) async {
+  Future<PaymentLinkResult> createPaymentLink(
+    String plan, {
+    String? returnUrl,
+    String? cancelUrl,
+  }) async {
+    final body = <String, Object>{'plan': plan};
+    if (returnUrl != null && returnUrl.isNotEmpty) body['returnUrl'] = returnUrl;
+    if (cancelUrl != null && cancelUrl.isNotEmpty) body['cancelUrl'] = cancelUrl;
     final response = await _client.post(
       Uri.parse('$apiBaseUrl/api/v1/billing/create-payment-link'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'plan': plan}),
+      body: jsonEncode(body),
     );
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -150,3 +157,10 @@ class BillingApi {
     throw Exception('Không lấy được trạng thái VIP (${response.statusCode})');
   }
 }
+
+/// PayOS opens this page after payment or when the payer presses Cancel.
+const paymentPageUrl = 'https://medsreminder.vercel.app/';
+
+String paymentReturnUrl() => paymentPageUrl;
+
+String paymentCancelUrl() => paymentPageUrl;

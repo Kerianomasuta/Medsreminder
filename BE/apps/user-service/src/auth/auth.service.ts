@@ -137,22 +137,39 @@ export class AuthService {
         } = registerData;
 
         const normalizedEmail = email.trim().toLowerCase();
-
+        const normalizedPhone = String(phone ?? '').trim();
 
         const existingUser = await this.userService.findByEmail(normalizedEmail);
         if (existingUser) {
-            throw ErrorHandling.BadRequest(`This user already existed!`);
+            throw ErrorHandling.Conflict('This email is already used');
+        }
+
+        const existingPhone = await this.userService.findByPhone(normalizedPhone);
+        if (existingPhone) {
+            throw ErrorHandling.Conflict('This phone number is already used');
         }
 
         const hashedPassword = await bcrypt.hashSync(password, 12);
 
-        const newUser = await this.userService.createNewUser({
-            email: email,
-            password: hashedPassword,
-            role: role,
-            fullName: fullName,
-            phone: phone,
-        });
+        let newUser;
+        try {
+            newUser = await this.userService.createNewUser({
+                email: normalizedEmail,
+                password: hashedPassword,
+                role: role,
+                fullName: fullName,
+                phone: normalizedPhone,
+            });
+        } catch (error) {
+            const duplicate = duplicateField(error);
+            if (duplicate === 'phone') {
+                throw ErrorHandling.Conflict('This phone number is already used');
+            }
+            if (duplicate === 'email') {
+                throw ErrorHandling.Conflict('This email is already used');
+            }
+            throw error;
+        }
 
         if (!newUser) {
             throw ErrorHandling.InternalServerError(`cannot create new User!`)
@@ -165,4 +182,23 @@ export class AuthService {
             }
         }
     }
+}
+
+function duplicateField(error: unknown) {
+    if (!error || typeof error !== 'object' || !('code' in error)) {
+        return null;
+    }
+    if (error.code !== 11000) {
+        return null;
+    }
+    const keyPattern = 'keyPattern' in error && error.keyPattern && typeof error.keyPattern === 'object'
+        ? error.keyPattern as Record<string, unknown>
+        : {};
+    if (keyPattern.phone) {
+        return 'phone';
+    }
+    if (keyPattern.email) {
+        return 'email';
+    }
+    return null;
 }

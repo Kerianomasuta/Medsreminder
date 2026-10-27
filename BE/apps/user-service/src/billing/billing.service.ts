@@ -31,7 +31,7 @@ export class BillingService {
     return { is_payment_enabled: this.paymentEnabled() };
   }
 
-  async createPaymentLink(input: { userId?: string; plan?: string }) {
+  async createPaymentLink(input: { userId?: string; plan?: string; returnUrl?: string; cancelUrl?: string }) {
     if (!this.paymentEnabled()) {
       throw ErrorHandling.Forbidden('Tính năng thanh toán đang bảo trì');
     }
@@ -65,8 +65,8 @@ export class BillingService {
         orderCode,
         amount,
         description,
-        returnUrl: this.payosUrl('PAYOS_RETURN_URL', 'medsreminder://payment-return'),
-        cancelUrl: this.payosUrl('PAYOS_CANCEL_URL', 'medsreminder://payment-cancel'),
+        returnUrl: this.clientOrConfigured(input.returnUrl, 'PAYOS_RETURN_URL', 'medsreminder://payment-return'),
+        cancelUrl: this.clientOrConfigured(input.cancelUrl, 'PAYOS_CANCEL_URL', 'medsreminder://payment-cancel'),
         items: [{ name: description, quantity: 1, price: amount }],
       });
       return { checkoutUrl: link.checkoutUrl, orderCode };
@@ -161,6 +161,14 @@ export class BillingService {
     return this.configService.get<string>(name)?.trim() || fallback;
   }
 
+  private clientOrConfigured(requested: string | undefined, envName: string, fallback: string) {
+    const candidate = requested?.trim();
+    if (candidate && allowedPayosRedirect(candidate)) {
+      return candidate;
+    }
+    return this.payosUrl(envName, fallback);
+  }
+
   private requiredConfig(name: string) {
     const value = this.configService.get<string>(name)?.trim();
     if (!value) {
@@ -168,6 +176,22 @@ export class BillingService {
     }
     return value;
   }
+}
+
+function allowedPayosRedirect(value: string) {
+  if (value === 'medsreminder://payment-return' || value === 'medsreminder://payment-cancel') {
+    return true;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return false;
+  }
+  return url.username.length === 0 && url.password.length === 0;
 }
 
 function asPayosWebhook(body: unknown): Webhook | undefined {
