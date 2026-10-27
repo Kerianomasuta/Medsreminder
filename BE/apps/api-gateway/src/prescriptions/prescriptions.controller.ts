@@ -46,7 +46,7 @@ export class PrescriptionsController {
 
   @Post('prescriptions/scan')
   @Role(...writers)
-  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 8 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('image'))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -63,7 +63,7 @@ export class PrescriptionsController {
   })
   @ApiOperation({
     summary: 'Read a prescription photo and return a draft',
-    description: 'Premium accounts only. Accepts a JPEG, PNG, or WebP file up to 8 MB. The model reads the photo and returns the draft. Nothing is saved until the client confirms with POST /prescriptions. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
+    description: 'Premium accounts only. Accepts a JPEG, PNG, or WebP file. The model reads the photo and returns the draft. Nothing is saved until the client confirms with POST /prescriptions. Allowed roles: PATIENT, CARE_GIVER, ADMIN.',
   })
   @ApiOkResponse({ type: PrescriptionResponseDto, description: 'The unsaved draft read from the photo.' })
   @ApiBadRequestResponse({ description: 'The photo is missing or not JPEG, PNG, or WebP, or the model could not read a medicine line.' })

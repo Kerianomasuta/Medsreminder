@@ -124,7 +124,6 @@ export class CreatePrescriptionDto {
   @ApiPropertyOptional({ description: 'Base64 photo kept when the caregiver confirms an AI draft' })
   @IsOptional()
   @IsString()
-  @MaxLength(12_000_000)
   imageBase64?: string;
 
   @ApiPropertyOptional({ enum: ['image/jpeg', 'image/png', 'image/webp'] })
