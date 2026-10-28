@@ -614,6 +614,8 @@ class _PrescriptionCard extends StatelessWidget {
         title: Text(
           title,
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,6 +631,8 @@ class _PrescriptionCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF6366F1),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             if (doctor != null && doctor.isNotEmpty)
@@ -640,11 +644,15 @@ class _PrescriptionCard extends StatelessWidget {
                     color: Color(0xFF64748B),
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    'BS. $doctor',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: Color(0xFF475569),
+                  Expanded(
+                    child: Text(
+                      'BS. $doctor',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF475569),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -652,6 +660,8 @@ class _PrescriptionCard extends StatelessWidget {
             Text(
               'Bệnh nhân: ${patientId.length > 8 ? patientId.substring(0, 8) : patientId}...',
               style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -2192,18 +2202,22 @@ class _SegmentButton extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 16,
+              size: 15,
               color: active ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
             ),
-            const SizedBox(width: 6),
-            Text(
-              count != null ? '$title ($count)' : title,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active
-                    ? const Color(0xFF0F172A)
-                    : const Color(0xFF64748B),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                count != null ? '$title ($count)' : title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  color: active
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFF64748B),
+                ),
               ),
             ),
           ],

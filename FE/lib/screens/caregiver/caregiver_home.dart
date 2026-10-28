@@ -801,20 +801,24 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          PageIntro(
+            'Đơn thuốc',
+            'Đơn và thuốc của $_patientName',
+          ),
           Row(
             children: [
-              Expanded(
-                child: PageIntro(
-                  'Đơn thuốc',
-                  'Đơn và thuốc của $_patientName',
-                ),
-              ),
               OutlinedButton.icon(
                 icon: const Icon(Icons.document_scanner_rounded, size: 18),
                 label: const Text('Quét đơn'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                ),
                 onPressed: _scanning ? null : _scanPrescription,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               FilledButton.icon(
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Tạo đơn'),
@@ -847,6 +851,7 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
           if (widget.loading && widget.bundle == null)
             const Padding(
               padding: EdgeInsets.only(top: 48),
