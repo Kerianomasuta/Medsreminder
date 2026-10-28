@@ -189,10 +189,24 @@ class _CreatePrescriptionScreenState extends State<CreatePrescriptionScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.of(context).pop(false),
         ),
-        title: const Text(
-          'Tạo đơn thuốc mới',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tạo đơn thuốc mới',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+            Text(
+              widget.patientName,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF687195),
+              ),
+            ),
+          ],
         ),
+        toolbarHeight: 72,
       ),
       body: Column(
         children: [

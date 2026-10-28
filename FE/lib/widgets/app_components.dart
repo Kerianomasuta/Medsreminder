@@ -1022,19 +1022,27 @@ class _PrescriptionScanOverlay extends StatelessWidget {
 Future<bool> showScannedPrescriptionConfirm({
   required BuildContext context,
   required Prescription prescription,
+  String? patientName,
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => _ScannedPrescriptionDialog(prescription: prescription),
+    builder: (ctx) => _ScannedPrescriptionDialog(
+      prescription: prescription,
+      patientName: patientName,
+    ),
   );
   return confirmed == true;
 }
 
 class _ScannedPrescriptionDialog extends StatelessWidget {
-  const _ScannedPrescriptionDialog({required this.prescription});
+  const _ScannedPrescriptionDialog({
+    required this.prescription,
+    this.patientName,
+  });
 
   final Prescription prescription;
+  final String? patientName;
 
   @override
   Widget build(BuildContext context) {
@@ -1054,6 +1062,16 @@ class _ScannedPrescriptionDialog extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (patientName != null && patientName!.trim().isNotEmpty) ...[
+                Text(
+                  'Bệnh nhân: ${patientName!.trim()}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF5267F4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Text(
                 prescription.title,
                 style: const TextStyle(

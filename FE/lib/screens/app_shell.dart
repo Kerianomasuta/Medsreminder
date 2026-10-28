@@ -141,9 +141,7 @@ class _AppShellState extends State<AppShell>
               controller: widget.networkController,
             )
           : CaregiverHome(
-              key: ValueKey(
-                '${widget.role}$tab${widget.networkController.selectedPatientId}',
-              ),
+              key: ValueKey('${widget.role}$tab'),
               tab: tab,
               userName: widget.userName,
               userEmail: widget.userEmail,

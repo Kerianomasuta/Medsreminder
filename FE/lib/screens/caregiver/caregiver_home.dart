@@ -13,6 +13,7 @@ import '../patient/schedule_timeline_page.dart';
 import 'prescriptions/create_prescription_screen.dart';
 import 'prescriptions/prescription_detail_screen.dart';
 import '../../services/user_link_api.dart';
+import '../../widgets/patient_picker_sheet.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverHome extends StatelessWidget {
@@ -103,10 +104,34 @@ class CaregiverHome extends StatelessWidget {
         );
       }
 
-      final patientId = controller.selectedPatientId!;
+      if (tab == 1) {
+        return _CaregiverSchedulePage(controller: controller);
+      }
+      if (tab == 4) {
+        return _ProfilePage(
+          controller: controller,
+          userName: userName,
+          userEmail: userEmail,
+        );
+      }
+
+      final patientId = controller.selectedPatientId;
+      if (patientId == null) return const SizedBox.shrink();
       final bundle = controller.bundleFor(patientId);
       final error = controller.bundleErrorFor(patientId);
-      if (bundle == null && controller.isPatientLoading(patientId)) {
+      final loading = bundle == null && controller.isPatientLoading(patientId);
+
+      if (tab == 2) {
+        return _PrescriptionPage(
+          controller: controller,
+          patientId: patientId,
+          bundle: bundle,
+          loading: loading,
+          error: error,
+        );
+      }
+
+      if (loading) {
         return _PatientFrame(
           controller: controller,
           child: const Center(child: CircularProgressIndicator()),
@@ -126,27 +151,11 @@ class CaregiverHome extends StatelessWidget {
       }
       if (bundle == null) return const SizedBox.shrink();
 
-      return switch (tab) {
-        1 => _PatientFrame(
-          controller: controller,
-          child: ScheduleTimelinePage(
-            key: ValueKey(patientId),
-            patientId: patientId,
-          ),
-        ),
-        2 => _PrescriptionPage(controller: controller, bundle: bundle),
-        4 => _ProfilePage(
-          controller: controller,
-          bundle: bundle,
-          userName: userName,
-          userEmail: userEmail,
-        ),
-        _ => _OverviewPage(
-          controller: controller,
-          bundle: bundle,
-          onViewAllSchedules: () => _openAllSchedules(context, patientId),
-        ),
-      };
+      return _OverviewPage(
+        controller: controller,
+        bundle: bundle,
+        onViewAllSchedules: () => _openAllSchedules(context, patientId),
+      );
     },
   );
 }
@@ -342,7 +351,7 @@ class _PatientSelector extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         const Text(
-          'Đang chăm sóc',
+          'Đang xem',
           style: TextStyle(color: Color(0xFF687195), fontSize: 12),
         ),
         const SizedBox(width: 10),
@@ -380,6 +389,113 @@ class _PatientSelector extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _CaregiverSchedulePage extends StatefulWidget {
+  const _CaregiverSchedulePage({required this.controller});
+
+  final CareNetworkController controller;
+
+  @override
+  State<_CaregiverSchedulePage> createState() => _CaregiverSchedulePageState();
+}
+
+class _CaregiverSchedulePageState extends State<_CaregiverSchedulePage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabs;
+
+  List<LinkedUserSummary> get _patients => widget.controller.linkedPatients;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(
+      length: _patients.length,
+      vsync: this,
+      initialIndex: _indexFor(_patients),
+    );
+    _tabs.addListener(_onTab);
+  }
+
+  int _indexFor(List<LinkedUserSummary> patients) {
+    final index = patients.indexWhere(
+      (patient) => patient.id == widget.controller.selectedPatientId,
+    );
+    if (index < 0) return 0;
+    return index;
+  }
+
+  void _onTab() {
+    if (_tabs.indexIsChanging || _patients.isEmpty) return;
+    final patient = _patients[_tabs.index];
+    if (widget.controller.selectedPatientId != patient.id) {
+      widget.controller.selectPatient(patient.id);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CaregiverSchedulePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final patients = _patients;
+    if (patients.isEmpty) return;
+    if (_tabs.length != patients.length) {
+      final index = _indexFor(patients);
+      _tabs.removeListener(_onTab);
+      _tabs.dispose();
+      _tabs = TabController(
+        length: patients.length,
+        vsync: this,
+        initialIndex: index,
+      );
+      _tabs.addListener(_onTab);
+      return;
+    }
+    final index = _indexFor(patients);
+    if (_tabs.index != index && !_tabs.indexIsChanging) {
+      _tabs.index = index;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabs.removeListener(_onTab);
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final patients = _patients;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TabBar(
+          controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          labelColor: const Color(0xFF5267F4),
+          unselectedLabelColor: const Color(0xFF687195),
+          indicatorColor: const Color(0xFF5267F4),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w800),
+          tabs: [
+            for (final patient in patients) Tab(text: patient.fullName),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabs,
+            children: [
+              for (final patient in patients)
+                ScheduleTimelinePage(
+                  key: ValueKey(patient.id),
+                  patientId: patient.id,
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _OverviewPage extends StatelessWidget {
@@ -533,9 +649,18 @@ class _OverviewPage extends StatelessWidget {
 }
 
 class _PrescriptionPage extends StatefulWidget {
-  const _PrescriptionPage({required this.controller, required this.bundle});
+  const _PrescriptionPage({
+    required this.controller,
+    required this.patientId,
+    required this.bundle,
+    required this.loading,
+    this.error,
+  });
   final CareNetworkController controller;
-  final PatientBundle bundle;
+  final String patientId;
+  final PatientBundle? bundle;
+  final bool loading;
+  final String? error;
 
   @override
   State<_PrescriptionPage> createState() => _PrescriptionPageState();
@@ -544,12 +669,22 @@ class _PrescriptionPage extends StatefulWidget {
 class _PrescriptionPageState extends State<_PrescriptionPage> {
   bool _scanning = false;
 
+  Future<LinkedUserSummary?> _choosePatient(String title) {
+    return pickLinkedPatient(
+      context,
+      patients: widget.controller.linkedPatients,
+      selectedId: widget.controller.selectedPatientId,
+      title: title,
+    );
+  }
+
   Future<void> _scanPrescription() async {
     if (!await requirePremiumAccess(context) || !mounted) return;
 
-    final patientId = widget.controller.mongoPatientId(
-      widget.controller.selectedPatientId,
-    );
+    final patient = await _choosePatient('Quét đơn cho bệnh nhân nào?');
+    if (patient == null || !mounted) return;
+    final controller = widget.controller;
+    final patientId = controller.mongoPatientId(patient.id);
     if (patientId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -626,6 +761,7 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
       final confirmed = await showScannedPrescriptionConfirm(
         context: context,
         prescription: prescription,
+        patientName: patient.fullName,
       );
       if (!confirmed || !mounted) return;
       await PrescriptionService.instance.create(
@@ -633,7 +769,8 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
         imageBytes: imageBytes,
         imageFilename: filename,
       );
-      widget.controller.loadPatient(patientId, force: true);
+      await controller.selectPatient(patient.id);
+      await controller.loadPatient(patientId, force: true);
     } catch (e) {
       if (overlayOpen && mounted) Navigator.of(context).pop();
       if (!mounted) return;
@@ -648,6 +785,15 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
     }
   }
 
+  String get _patientName {
+    final bundleName = widget.bundle?.detail.fullName;
+    if (bundleName != null && bundleName.isNotEmpty) return bundleName;
+    for (final patient in widget.controller.linkedPatients) {
+      if (patient.id == widget.patientId) return patient.fullName;
+    }
+    return 'bệnh nhân';
+  }
+
   @override
   Widget build(BuildContext context) => _PatientFrame(
     controller: widget.controller,
@@ -660,7 +806,7 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
               Expanded(
                 child: PageIntro(
                   'Đơn thuốc',
-                  'Đơn và thuốc của ${widget.bundle.detail.fullName}',
+                  'Đơn và thuốc của $_patientName',
                 ),
               ),
               OutlinedButton.icon(
@@ -680,33 +826,51 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
                   ),
                 ),
                 onPressed: () async {
-                  final created = await Navigator.push<bool>(
-                    context,
+                  final patient = await _choosePatient(
+                    'Tạo đơn cho bệnh nhân nào?',
+                  );
+                  if (patient == null || !context.mounted) return;
+                  final controller = widget.controller;
+                  final created = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                       builder: (_) => CreatePrescriptionScreen(
-                        patientId: widget.bundle.detail.id,
-                        patientName: widget.bundle.detail.fullName,
+                        patientId: patient.id,
+                        patientName: patient.fullName,
                       ),
                     ),
                   );
                   if (created == true) {
-                    widget.controller.loadPatient(
-                      widget.bundle.detail.id,
-                      force: true,
-                    );
+                    await controller.selectPatient(patient.id);
+                    await controller.loadPatient(patient.id, force: true);
                   }
                 },
               ),
             ],
           ),
-          if (widget.bundle.prescriptions.isEmpty)
+          if (widget.loading && widget.bundle == null)
+            const Padding(
+              padding: EdgeInsets.only(top: 48),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (widget.bundle == null && widget.error != null)
+            _CenteredMessage(
+              icon: Icons.error_outline_rounded,
+              title: 'Không tải được đơn thuốc',
+              message: widget.error!,
+              actionLabel: 'Thử lại',
+              onAction: () => widget.controller.loadPatient(
+                widget.patientId,
+                force: true,
+              ),
+            )
+          else if (widget.bundle == null || widget.bundle!.prescriptions.isEmpty)
             const _EmptyCard(message: 'Bệnh nhân chưa có đơn thuốc.')
           else
-            ...widget.bundle.prescriptions.map(
+            ...widget.bundle!.prescriptions.map(
               (prescription) => _PrescriptionCard(
                 prescription: prescription,
                 onRefresh: () => widget.controller.loadPatient(
-                  widget.bundle.detail.id,
+                  widget.patientId,
                   force: true,
                 ),
               ),
@@ -720,12 +884,10 @@ class _PrescriptionPageState extends State<_PrescriptionPage> {
 class _ProfilePage extends StatefulWidget {
   const _ProfilePage({
     required this.controller,
-    required this.bundle,
     required this.userName,
     required this.userEmail,
   });
   final CareNetworkController controller;
-  final PatientBundle bundle;
   final String userName;
   final String userEmail;
 
@@ -745,16 +907,14 @@ class _ProfilePageState extends State<_ProfilePage> {
   }
 
   @override
-  Widget build(BuildContext context) => _PatientFrame(
-    controller: widget.controller,
-    child: AppScroll(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const PageIntro(
-            'Hồ sơ người chăm sóc',
-            'Tài khoản và các kết nối bệnh nhân',
-          ),
+  Widget build(BuildContext context) => AppScroll(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const PageIntro(
+          'Hồ sơ người chăm sóc',
+          'Tài khoản và các kết nối bệnh nhân',
+        ),
           CaregiverProfileCard(
             userName: widget.userName,
             userEmail: widget.userEmail,
@@ -845,6 +1005,11 @@ class _ProfilePageState extends State<_ProfilePage> {
             'Đang chăm sóc ${widget.controller.linkedPatients.length} bệnh nhân',
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
           ),
+          const SizedBox(height: 4),
+          const Text(
+            'Chọn người để xem tổng quan và đơn thuốc.',
+            style: TextStyle(color: Color(0xFF687195)),
+          ),
           const SizedBox(height: 8),
           ...widget.controller.linkedPatients.map(
             (patient) => Padding(
@@ -856,9 +1021,12 @@ class _ProfilePageState extends State<_ProfilePage> {
                     child: Icon(Icons.person_rounded),
                   ),
                   title: Text(patient.fullName),
+                  subtitle: patient.id == widget.controller.selectedPatientId
+                      ? const Text('Đang xem ở Tổng quan và Đơn thuốc')
+                      : null,
                   trailing: patient.id == widget.controller.selectedPatientId
                       ? const Icon(Icons.check_circle, color: Color(0xFF249D76))
-                      : null,
+                      : const Icon(Icons.chevron_right_rounded),
                   onTap: () => widget.controller.selectPatient(patient.id),
                 ),
               ),
@@ -866,8 +1034,7 @@ class _ProfilePageState extends State<_ProfilePage> {
           ),
         ],
       ),
-    ),
-  );
+    );
 
   Future<void> _scanQr() async {
     final uuid = await CaregiverQrScannerSheet.show(context);

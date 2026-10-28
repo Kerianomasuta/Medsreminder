@@ -13,6 +13,7 @@ import '../../services/geocoding_api.dart';
 import '../../services/pharmacy_api.dart';
 import '../../services/pharmacy_order_api.dart';
 import '../../utils/geohash.dart';
+import '../../widgets/patient_picker_sheet.dart';
 import '../../widgets/widgets.dart';
 
 class CaregiverPharmacyScreen extends StatefulWidget {
@@ -266,9 +267,23 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
   }
 
   Future<void> _openOrder(Pharmacy pharmacy) async {
-    final patientId = widget.controller.selectedPatientId;
-    final bundle = widget.controller.bundleFor(patientId);
-    if (patientId == null || bundle == null) {
+    var patientId = widget.controller.selectedPatientId;
+    final patients = widget.controller.linkedPatients;
+    if (patients.length > 1) {
+      final picked = await pickLinkedPatient(
+        context,
+        patients: patients,
+        selectedId: patientId,
+        title: 'Đặt thuốc cho bệnh nhân nào?',
+      );
+      if (picked == null || !mounted) return;
+      patientId = picked.id;
+      await widget.controller.selectPatient(patientId);
+      if (!mounted) return;
+    }
+    final resolvedPatientId = patientId;
+    final bundle = widget.controller.bundleFor(resolvedPatientId);
+    if (resolvedPatientId == null || bundle == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Hãy chọn và tải hồ sơ bệnh nhân trước.')),
       );
@@ -280,7 +295,7 @@ class _CaregiverPharmacyScreenState extends State<CaregiverPharmacyScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _CreateOrderSheet(
         pharmacy: pharmacy,
-        patientId: patientId,
+        patientId: resolvedPatientId,
         bundle: bundle,
         orderApi: _orderApi,
       ),
@@ -842,13 +857,25 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          'Đặt thuốc tại ${widget.pharmacy.name}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1E293B),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Đặt thuốc tại ${widget.pharmacy.name}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              'Cho ${widget.bundle.detail.fullName}',
+                              style: const TextStyle(
+                                color: Color(0xFF5267F4),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       IconButton(
@@ -1601,6 +1628,16 @@ class _OrderCard extends StatelessWidget {
                                 letterSpacing: 0.3,
                               ),
                             ),
+                            if (order.recipientName != null &&
+                                order.recipientName!.trim().isNotEmpty)
+                              Text(
+                                order.recipientName!.trim(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF5267F4),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             if (timeStr != null)
                               Text(
                                 timeStr,
