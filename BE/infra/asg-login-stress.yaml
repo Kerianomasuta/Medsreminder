@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  ALB + Auto Scaling Group for MedsReminder login stress tests.
+  Each instance runs the existing docker-compose.prod.yml stack on port 3000.
+  Size: 2-4 x t3.xlarge, enough to queue ~2000 concurrent POSTs to /api/v1/auth/login.
+
+Parameters:
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Description: AMI cloned from the current MedsReminder EC2 (Docker + compose + env already on disk).
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two public subnets in different AZs.
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: SSH key for the cloned instances.
+  InstanceType:
+    Type: String
+    Default: t3.xlarge
+    AllowedValues: [t3.large, t3.xlarge, c6i.large, c6i.xlarge]
+  MinSize:
+    Type: Number
+    Default: 2
+  MaxSize:
+    Type: Number
+    Default: 4
+  DesiredCapacity:
+    Type: Number
+    Default: 2
+  DeployPath:
+    Type: String
+    Default: /opt/medsreminder
+
+Resources:
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MedsReminder ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MedsReminder app instances
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: medsreminder-login-stress
+      LaunchTemplateData:
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref InstanceSecurityGroup
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 2
+        Monitoring:
+          Enabled: true
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: medsreminder-asg
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -eu
+            cd ${DeployPath}/BE
+            if docker info >/dev/null 2>&1; then
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            else
+              sudo docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            fi
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: meds-login-tg
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckPath: /api/v1/billing/config
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: meds-login-alb
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref SubnetIds
+      SecurityGroups:
+        - !Ref AlbSecurityGroup
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: medsreminder-login-asg
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref DesiredCapacity
+      VPCZoneIdentifier: !Ref SubnetIds
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      DefaultInstanceWarmup: 180
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      MetricsCollection:
+        - Granularity: 1Minute
+      Tags:
+        - Key: Name
+          Value: medsreminder-asg
+          PropagateAtLaunch: true
+
+  CpuScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 55
+        DisableScaleIn: false
+
+  RequestCountScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ALBRequestCountPerTarget
+          ResourceLabel: !Sub
+            - ${AlbFullName}/${TgFullName}
+            - AlbFullName: !GetAtt LoadBalancer.LoadBalancerFullName
+              TgFullName: !GetAtt TargetGroup.TargetGroupFullName
+        TargetValue: 400
+        DisableScaleIn: false
+
+Outputs:
+  AlbDnsName:
+    Description: Point k6 BASE_URL here, for example http://<dns>
+    Value: !GetAtt LoadBalancer.DNSName
+  AutoScalingGroupName:
+    Value: !Ref AutoScalingGroup
+  TargetGroupArn:
+    Value: !Ref TargetGroup
