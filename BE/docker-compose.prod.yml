@@ -11,6 +11,7 @@ services:
     environment:
       NODE_ENV: production
       GATEWAY_PORT: 3000
+      NODE_OPTIONS: "--max-old-space-size=1024"
       USER_SERVICE_HOST: user-service
       USER_SERVICE_PORT: 3529
       MEDICATION_SERVICE_HOST: medication-service
@@ -37,6 +38,8 @@ services:
       NODE_ENV: production
       USER_SERVICE_HOST: 0.0.0.0
       USER_SERVICE_PORT: 3529
+      UV_THREADPOOL_SIZE: "16"
+      NODE_OPTIONS: "--max-old-space-size=2048"
     expose:
       - "3529"
     networks:
