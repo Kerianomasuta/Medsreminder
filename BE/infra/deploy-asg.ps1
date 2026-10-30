@@ -5,8 +5,8 @@ param(
   [Parameter(Mandatory = $true)][string]$KeyName,
   [string]$StackName = 'medsreminder-login-asg',
   [string]$Region = 'ap-southeast-1',
-  [string]$InstanceType = 't3.xlarge',
-  [int]$DesiredCapacity = 4
+  [string]$InstanceType = 't3.micro',
+  [int]$DesiredCapacity = 1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,8 +22,8 @@ aws cloudformation deploy `
     "SubnetIds=$SubnetIds" `
     KeyName=$KeyName `
     InstanceType=$InstanceType `
-    MinSize=2 `
-    MaxSize=4 `
+    MinSize=1 `
+    MaxSize=2 `
     DesiredCapacity=$DesiredCapacity
 
 aws autoscaling set-desired-capacity `

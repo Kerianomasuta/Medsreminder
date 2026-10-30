@@ -1,6 +1,6 @@
-# Login stress (2000 VUs) + Auto Scaling
+# Request stress + Auto Scaling (Free Tier)
 
-Login uses bcrypt cost 12, so one EC2 will stall before 2000 concurrent `POST /api/v1/auth/login`. This stack puts 2–4 `t3.xlarge` copies of the current Docker compose stack behind an ALB.
+This stack puts 1–2 `t3.micro` copies of the current Docker compose stack behind an ALB. `t3.micro` is a Free Tier instance type. A Free Tier account rejects `t3.xlarge`.
 
 ## AWS account
 
@@ -22,13 +22,13 @@ cd BE/infra
   -KeyName your-key
 ```
 
-The script sets desired capacity to **4** before the test so machines exist before k6 ramps. Auto scaling still adds/removes later from CPU 55% and ALB 400 requests/target.
+The script starts at desired capacity **1**. Auto scaling can add a second `t3.micro` from CPU 55% and ALB 400 requests/target.
 
 5. Point DuckDNS at the ALB DNS only after the target group is healthy. Until then, k6 can hit `http://<alb-dns>`.
 
 ## Run the test
 
-Install [k6](https://k6.io/docs/get-started/installation/). Wait 3–5 minutes after deploy so all 4 instances pass `/api/v1/billing/config`.
+Install [k6](https://k6.io/docs/get-started/installation/). Wait until the target passes `/api/v1/billing/config`. On `t3.micro`, hit that light endpoint. Two thousand bcrypt logins will not succeed on 1 GB RAM.
 
 ```powershell
 k6 run -e BASE_URL=http://<alb-dns> .\k6-login-stress.js
@@ -40,13 +40,12 @@ k6 ramps to 2000 virtual users in 2 minutes, holds 3 minutes, then ramps down. S
 
 - k6 summary: `http_req_failed`, `p(95)`, `login_fail`
 - CloudWatch CPU of `medsreminder-login-asg`
-- EC2 / ASG activity: desired 2 → 4
+- EC2 / ASG activity: desired 1 → 2
 
 ## After the demo
 
 ```powershell
-aws autoscaling set-desired-capacity --auto-scaling-group-name medsreminder-login-asg --desired-capacity 2
 aws cloudformation delete-stack --stack-name medsreminder-login-asg
 ```
 
-Do not leave 4 × `t3.xlarge` running. Do not fire this test at PayOS or the AI scan route.
+Delete the stack when the demo ends. The load balancer is billed by the hour even on a Free Tier account. Do not fire this test at PayOS or the AI scan route.

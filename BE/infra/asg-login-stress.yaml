@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  ALB + Auto Scaling Group for MedsReminder login stress tests.
+  ALB + Auto Scaling Group for MedsReminder request stress tests.
   Each instance runs the existing docker-compose.prod.yml stack on port 3000.
-  Size: 2-4 x t3.xlarge, enough to queue ~2000 concurrent POSTs to /api/v1/auth/login.
+  Size: 1-2 x t3.micro so a Free Tier account can launch the group.
 
 Parameters:
   AmiId:
@@ -18,17 +18,17 @@ Parameters:
     Description: SSH key for the cloned instances.
   InstanceType:
     Type: String
-    Default: t3.xlarge
-    AllowedValues: [t3.large, t3.xlarge, c6i.large, c6i.xlarge]
+    Default: t3.micro
+    AllowedValues: [t3.micro, t2.micro]
   MinSize:
     Type: Number
-    Default: 2
+    Default: 1
   MaxSize:
     Type: Number
-    Default: 4
+    Default: 2
   DesiredCapacity:
     Type: Number
-    Default: 2
+    Default: 1
   DeployPath:
     Type: String
     Default: /opt/medsreminder
