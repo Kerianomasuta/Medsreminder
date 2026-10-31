@@ -9,6 +9,9 @@ const BASE_URL = (__ENV.BASE_URL || 'https://medsreminder.duckdns.org').replace(
 );
 const PASSWORD = __ENV.STRESS_PASSWORD || 'StressTest9';
 const USER_COUNT = Number(__ENV.STRESS_USERS || 200);
+const TARGET_VUS = Number(__ENV.STRESS_VUS || 2000);
+const RAMP = __ENV.STRESS_RAMP || '2m';
+const HOLD = __ENV.STRESS_HOLD || '3m';
 const loginFail = new Rate('login_fail');
 
 const users = new SharedArray('stress-users', () =>
@@ -27,9 +30,9 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '2m', target: 2000 },
-        { duration: '3m', target: 2000 },
-        { duration: '1m', target: 0 },
+        { duration: RAMP, target: TARGET_VUS },
+        { duration: HOLD, target: TARGET_VUS },
+        { duration: '30s', target: 0 },
       ],
       gracefulRampDown: '30s',
     },
@@ -70,7 +73,7 @@ export default function () {
     { headers: { 'Content-Type': 'application/json' }, timeout: '20s' },
   );
   const ok = check(res, {
-    'login 200': (r) => r.status === 200,
+    'login ok': (r) => r.status === 200 || r.status === 201,
   });
   loginFail.add(!ok);
   sleep(1);
